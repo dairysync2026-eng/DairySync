@@ -177,8 +177,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [users]);
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_auth`);
-    return saved !== null ? JSON.parse(saved) : true;
+    return false;
   });
 
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
@@ -188,18 +187,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Track if a Developer superuser session is active across role switching
   const [isDeveloperActive, setIsDeveloperActive] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_dev_active`);
-    if (saved !== null) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return false;
-      }
-    }
-    const savedAuth = localStorage.getItem(`${LOCAL_STORAGE_KEY}_auth`);
-    const isAuth = savedAuth !== null ? JSON.parse(savedAuth) : true;
-    const savedRole = localStorage.getItem(`${LOCAL_STORAGE_KEY}_role`) || 'developer';
-    return isAuth && (savedRole === 'developer');
+    return false;
   });
 
   const setDeveloperActive = (active: boolean) => {
