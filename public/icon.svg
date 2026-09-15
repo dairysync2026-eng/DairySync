@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="dairyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="50%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="dropGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="100" fill="url(#dairyGrad)" />
+  <!-- Milk droplet & dairy canister silhouette -->
+  <path d="M256 96 C220 160 160 230 160 300 A96 96 0 0 0 352 300 C352 230 292 160 256 96 Z" fill="url(#dropGrad)" opacity="0.95" />
+  <circle cx="230" cy="275" r="22" fill="#2563eb" opacity="0.8" />
+  <path d="M190 380 L322 380 A12 12 0 0 1 334 392 L334 400 A12 12 0 0 1 322 412 L190 412 A12 12 0 0 1 178 400 L178 392 A12 12 0 0 1 190 380 Z" fill="#60a5fa" />
+  <text x="256" y="455" text-anchor="middle" fill="#93c5fd" font-family="sans-serif" font-weight="900" font-size="34" letter-spacing="4">DAIRYSYNC</text>
+</svg>

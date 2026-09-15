@@ -1,0 +1,6 @@
+{
+  "name": "DairySync",
+  "description": "Cloud-based inventory and production management system for PCC-MMSU featuring raw ingredient tracking, WIP monitoring, finished goods inventory, predictive reorder triggers, low stock & overstock alerts, and supply-demand synchronization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
