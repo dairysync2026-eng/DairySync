@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { BatchExpirationWidget } from './BatchExpirationWidget';
 import { PrintStockReportModal } from './PrintStockReportModal';
+import { ExportMenu } from './ExportMenu';
 
 interface FinishedGoodsProps {
   onNavigateTab?: (tab: string) => void;
@@ -328,17 +329,8 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
             title="Generate and print cold storage physical inventory hard copy"
           >
             <Printer className="w-4 h-4 text-slate-600" />
-            <span>Print Hard Copy</span>
           </button>
-          <button
-            id="btn-export-finished-goods-csv"
-            type="button"
-            onClick={handleExportFinishedGoodsCsv}
-            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-200 transition-all"
-          >
-            <Download className="w-4 h-4 text-slate-500" />
-            <span>Export CSV</span>
-          </button>
+          <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportFinishedGoodsCsv} />
           <button
             id="btn-add-finished-product"
             onClick={() => setShowAddModal(true)}
@@ -774,7 +766,6 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
               title="Generate printable cold storage stock inventory table"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Hard Copy Table</span>
             </button>
           </div>
 

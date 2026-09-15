@@ -153,7 +153,6 @@ export const PrintStockReportModal: React.FC<PrintStockReportModalProps> = ({
               className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md shadow-indigo-900/50 transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>Print / Save PDF</span>
             </button>
 
             <button

@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Sparkles
 } from 'lucide-react';
+import { ExportMenu } from './ExportMenu';
 
 export const HistoricalBatchesTable: React.FC = () => {
   const { wipBatches, finishedGoods } = useDairySync();
@@ -122,15 +123,7 @@ export const HistoricalBatchesTable: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2 shrink-0">
-          <button
-            id="btn-export-batch-history-csv"
-            type="button"
-            onClick={handleExportCsv}
-            className="flex items-center space-x-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-2xl transition-colors border border-slate-200"
-          >
-            <Download className="w-4 h-4 text-slate-600" />
-            <span>Export History (CSV)</span>
-          </button>
+          <ExportMenu onPdf={() => window.print()} onCsv={handleExportCsv} />
         </div>
       </div>
 

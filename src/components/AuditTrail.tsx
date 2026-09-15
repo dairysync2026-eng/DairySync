@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { AuditPdfReportModal } from './AuditPdfReportModal';
 import { AccessRestricted } from './AccessRestricted';
+import { ExportMenu } from './ExportMenu';
 
 export const AuditTrail: React.FC = () => {
   const { 
@@ -259,15 +260,12 @@ export const AuditTrail: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 pt-2 md:pt-0">
-          <button
-            id="btn-export-audit-pdf"
-            onClick={() => setShowPdfModal(true)}
-            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3.5 py-2 rounded-2xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all cursor-pointer"
-            title="Export Audit Trail logs into a downloadable PDF report for compliance"
-          >
-            <FileText className="w-4 h-4" />
-            <span>Export PDF Report</span>
-          </button>
+          <ExportMenu
+            onPdf={() => setShowPdfModal(true)}
+            onCsv={exportAuditLogsCsv}
+            className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600"
+            menuClassName="bg-white border-slate-200 text-slate-700"
+          />
 
           <button
             id="btn-manual-audit-record"
@@ -277,16 +275,6 @@ export const AuditTrail: React.FC = () => {
           >
             <PlusCircle className="w-4 h-4 text-indigo-600" />
             <span>Record Verification</span>
-          </button>
-
-          <button
-            id="btn-export-audit-csv"
-            onClick={exportAuditLogsCsv}
-            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3.5 py-2 rounded-2xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all cursor-pointer"
-            title="Export all audit logs to CSV"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Export CSV</span>
           </button>
 
           <button
@@ -513,15 +501,12 @@ export const AuditTrail: React.FC = () => {
             )}
           </div>
           <div className="flex items-center space-x-3">
-            <button
-              id="btn-quick-export-audit-pdf"
-              onClick={() => setShowPdfModal(true)}
-              className="inline-flex items-center space-x-1.5 text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-xl transition-all shadow-xs cursor-pointer"
-              title="Export displayed audit trail records to PDF"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Export PDF Report</span>
-            </button>
+            <ExportMenu
+              onPdf={() => setShowPdfModal(true)}
+              onCsv={exportAuditLogsCsv}
+              className="inline-flex bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl"
+              menuClassName="bg-white border-slate-200 text-slate-700"
+            />
             <span className="text-[11px] text-slate-500 font-medium hidden sm:block">
               Click any row to inspect complete immutable provenance
             </span>

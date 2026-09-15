@@ -221,7 +221,6 @@ export const AuditPdfReportModal: React.FC<AuditPdfReportModalProps> = ({
               title="Open browser print dialog for hard copy or save as PDF"
             >
               <Printer className="w-4 h-4" />
-              <span>Print / Save PDF</span>
             </button>
 
             {/* Close Button */}

@@ -2,6 +2,7 @@ import React from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { FileText, X, Printer, Download, CheckCircle2, AlertTriangle, Layers, Award, ShieldCheck } from 'lucide-react';
 import { downloadAuditTrailPdf } from '../utils/auditPdfGenerator';
+import { ExportMenu } from './ExportMenu';
 
 interface ReportsModalProps {
   onClose: () => void;
@@ -79,27 +80,18 @@ export const ReportsModal: React.FC<ReportsModalProps> = ({ onClose }) => {
             <h3 className="font-bold text-lg text-white">DairySync Official System Summary Report</h3>
           </div>
           <div className="flex items-center space-x-2">
-            <button
-              onClick={handleExportAuditTrailPdf}
-              className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow transition-colors cursor-pointer"
-              title="Download Compliance Audit Trail PDF Report"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Audit Trail PDF</span>
-            </button>
-            <button
-              onClick={handleExportFullCsv}
-              className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export CSV</span>
-            </button>
+            <ExportMenu
+              onPdf={handleExportAuditTrailPdf}
+              onCsv={handleExportFullCsv}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500"
+              menuClassName="bg-slate-900 border-slate-700 text-white"
+            />
             <button
               onClick={handlePrint}
-              className="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow transition-colors"
+              className="p-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow transition-colors"
+              title="Print official report"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Official Report</span>
             </button>
             <button onClick={onClose} className="text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
