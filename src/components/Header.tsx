@@ -82,17 +82,17 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-white text-slate-900 border-b-2 border-slate-200 sticky top-0 z-30 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between gap-2 h-16 min-w-0">
           
           {/* Logo & Institution Branding */}
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-2xl bg-indigo-600 flex items-center justify-center font-extrabold text-white text-lg shadow-md shadow-indigo-200">
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+            <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-2xl bg-indigo-600 flex items-center justify-center font-extrabold text-white text-base sm:text-lg shadow-md shadow-indigo-200">
               DS
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-lg tracking-tight text-slate-900">
+                <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900">
                   DairySync
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full border border-emerald-200">

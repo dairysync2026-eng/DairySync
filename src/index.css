@@ -1,5 +1,43 @@
 @import "tailwindcss";
 
+html,
+body,
+#root {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+@media (max-width: 639px) {
+  .overflow-x-auto {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [class*="rounded-3xl"] {
+    border-radius: 1.25rem;
+  }
+
+  [class*="p-6"] {
+    padding: 1rem;
+  }
+
+  [class*="p-8"] {
+    padding: 1.25rem;
+  }
+}
+
 @media print {
   @page {
     margin: 10mm 10mm;

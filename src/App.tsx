@@ -61,7 +61,7 @@ const MainLayout: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen min-w-0 overflow-x-hidden bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
         
         {/* Top Navbar */}
         <div className="print:hidden">
@@ -72,7 +72,7 @@ const MainLayout: React.FC = () => {
         </div>
 
         {/* Primary Container */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <main className="flex-1 min-w-0 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
           
           {/* Role View Context Banner */}
           <div className="print:hidden">
