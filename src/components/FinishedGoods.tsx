@@ -288,53 +288,56 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
           </p>
         </div>
 
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           {/* View Toggle (Grid / Table) */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold mr-1">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold mr-1">
+              <button
+                id="view-toggle-grid"
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Grid Cards View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grid</span>
+              </button>
+              <button
+                id="view-toggle-table"
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
+                  viewMode === 'table'
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Table View"
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span>Table</span>
+              </button>
+            </div>
+
             <button
-              id="view-toggle-grid"
+              id="btn-print-finished-goods-hardcopy"
               type="button"
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Grid Cards View"
+              onClick={() => setShowPrintModal(true)}
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-200 transition-all cursor-pointer"
+              title="Generate and print cold storage physical inventory hard copy"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Grid</span>
+              <Printer className="w-4 h-4 text-slate-600" />
             </button>
-            <button
-              id="view-toggle-table"
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
-                viewMode === 'table'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Table View"
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-              <span>Table</span>
-            </button>
+            <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportFinishedGoodsCsv} />
           </div>
 
           <button
-            id="btn-print-finished-goods-hardcopy"
-            type="button"
-            onClick={() => setShowPrintModal(true)}
-            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-200 transition-all cursor-pointer"
-            title="Generate and print cold storage physical inventory hard copy"
-          >
-            <Printer className="w-4 h-4 text-slate-600" />
-          </button>
-          <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportFinishedGoodsCsv} />
-          <button
             id="btn-add-finished-product"
             onClick={() => setShowAddModal(true)}
-            className="order-last flex w-full items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-sm transition-all sm:order-none sm:w-auto"
+            className="flex w-full items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-sm transition-all sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Product</span>
