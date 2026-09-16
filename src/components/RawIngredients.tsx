@@ -423,51 +423,54 @@ export const RawIngredients: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           {/* View Toggle */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold mr-1">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold mr-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
+                  viewMode === 'table'
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Table View (with Expiry Tracking column)"
+              >
+                <LayoutList className="w-3.5 h-3.5" />
+                <span>Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Grid Cards View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grid</span>
+              </button>
+            </div>
+
             <button
+              id="btn-print-ingredients-hardcopy"
               type="button"
-              onClick={() => setViewMode('table')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
-                viewMode === 'table'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Table View (with Expiry Tracking column)"
+              onClick={() => setShowPrintModal(true)}
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-200 transition-all cursor-pointer"
+              title="Generate and print physical stock inventory hard copy"
             >
-              <LayoutList className="w-3.5 h-3.5" />
-              <span>Table</span>
+              <Printer className="w-4 h-4 text-slate-600" />
             </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-              title="Grid Cards View"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Grid</span>
-            </button>
+            <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportIngredientsCsv} />
           </div>
 
           <button
-            id="btn-print-ingredients-hardcopy"
-            type="button"
-            onClick={() => setShowPrintModal(true)}
-            className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-200 transition-all cursor-pointer"
-            title="Generate and print physical stock inventory hard copy"
-          >
-            <Printer className="w-4 h-4 text-slate-600" />
-          </button>
-          <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportIngredientsCsv} />
-          <button
             id="btn-add-new-material"
             onClick={() => setShowAddModal(true)}
-            className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-sm transition-all"
+            className="flex w-full items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-sm transition-all sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Material</span>
