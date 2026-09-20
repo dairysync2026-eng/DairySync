@@ -8,9 +8,11 @@ export const DairyBoxPos: React.FC = () => {
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [lastReceipt, setLastReceipt] = useState<any | null>(null);
+  const [coldStockNotice, setColdStockNotice] = useState<string | null>(null);
 
   const addToCart = (productId: string) => {
     setFeedback(null);
+    setColdStockNotice(null);
     setCart(prev => {
       const existing = prev.find(i => i.productId === productId);
       if (existing) {
@@ -21,6 +23,7 @@ export const DairyBoxPos: React.FC = () => {
   };
 
   const updateQuantity = (productId: string, delta: number) => {
+    setColdStockNotice(null);
     setCart(prev => prev.map(i => {
       if (i.productId === productId) {
         const newQty = i.quantity + delta;
@@ -31,6 +34,7 @@ export const DairyBoxPos: React.FC = () => {
   };
 
   const removeFromCart = (productId: string) => {
+    setColdStockNotice(null);
     setCart(prev => prev.filter(i => i.productId !== productId));
   };
 
@@ -60,6 +64,7 @@ export const DairyBoxPos: React.FC = () => {
       });
 
       setFeedback({ type: 'success', text: res.message });
+      setColdStockNotice('Cold stock has been updated and synced to the inventory ledger after this sale.');
       setCart([]);
     } else {
       setFeedback({ type: 'error', text: res.message });
@@ -91,6 +96,23 @@ export const DairyBoxPos: React.FC = () => {
         </div>
       )}
 
+      {coldStockNotice && (
+        <div className="relative">
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 shadow-sm max-w-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-extrabold text-amber-900">Cold Stock Updated</p>
+                <p className="text-xs text-amber-800 mt-1">{coldStockNotice}</p>
+              </div>
+              <button onClick={() => setColdStockNotice(null)} className="text-amber-600 hover:text-amber-900 font-bold">✕</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left 2 Cols: Product Catalog */}
@@ -109,7 +131,6 @@ export const DairyBoxPos: React.FC = () => {
                     <span className="text-xs font-extrabold text-emerald-600 font-mono">₱{fg.unitPrice}.00</span>
                   </div>
                   <h3 className="font-extrabold text-slate-900 text-sm mt-2">{fg.name}</h3>
-                  <p className="text-xs text-slate-500 mt-0.5 font-medium">Cold Stock: <strong className="text-slate-900 font-bold">{fg.currentStock} {fg.unit}</strong></p>
                 </div>
 
                 <button
