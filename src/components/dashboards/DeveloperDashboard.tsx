@@ -600,7 +600,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {users.map(u => {
                   const isCurrent = currentUser.id === u.id;
-                  const isDev = u.role === 'developer';
+                  const isDev = u.role === 'Developer';
                   const showPass = showPasswordMap[u.id] || false;
 
                   return (

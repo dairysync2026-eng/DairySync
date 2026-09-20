@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { UserRole } from '../types';
 import { 
   Bell, 
   CloudCheck, 
   Cloud, 
+  Award, 
   FileText, 
   ShieldCheck, 
   User, 
@@ -50,21 +51,32 @@ export const Header: React.FC<HeaderProps> = ({
     returnToDeveloperAccount
   } = useDairySync();
 
+  const [timeString, setTimeString] = useState('');
   const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeString(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' PST');
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const unreadAlerts = alerts.filter(a => !a.read);
 
   const getRoleLabel = (role: UserRole) => {
     switch(role) {
-      case 'developer': return 'Lead Developer & Super Admin';
-      case 'director': return 'Director / PMO Supervisor';
-      case 'procurement': return 'Admin Asst IV (Procurement)';
-      case 'plant_manager': return 'Plant Manager / Internal Custodian';
-      case 'production_staff': return 'Production Staff';
-      case 'store_outlet': return 'Dairy Box Store Outlet';
+      case 'Developer': return 'Lead Developer & Super Admin';
+      case 'Director': return 'Director / PMO Supervisor';
+      case 'Procurement': return 'Admin Asst IV (Procurement)';
+      case 'Plant_manager': return 'Plant Manager / Internal Custodian';
+      case 'Production_Staff': return 'Production Staff';
+      case 'Store_outlet': return 'Dairy Box Store Outlet';
     }
   };
 
@@ -93,6 +105,14 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
+          {/* PST Clock */}
+          <div className="hidden lg:flex items-center space-x-3 bg-slate-50 px-3.5 py-1.5 rounded-2xl border border-slate-200">
+            <div className="text-xs text-slate-700 font-mono font-bold flex items-center space-x-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>{timeString || '08:00:00 PST'}</span>
+            </div>
+          </div>
+
           {/* Desktop Top Actions, Offline Indicator & Role Switcher (Hidden on Mobile) */}
           <div className="hidden sm:flex items-center space-x-2 sm:space-x-3">
             {/* Requirement 18: Small Status Indicator (Green for Online, Amber for Offline/Cached) */}
@@ -100,6 +120,15 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Install PWA Button */}
             <PWAInstallButton />
+
+            {/* ISO 25010 Quality Rating */}
+            <button
+              onClick={onOpenIsoSurvey}
+              className="p-2 bg-slate-100 hover:bg-slate-200 text-emerald-600 rounded-xl border border-slate-200 transition-colors"
+              title="ISO 25010 Quality Evaluation Scorecard"
+            >
+              <Award className="w-4 h-4" />
+            </button>
 
             {/* Reports */}
             <button
@@ -180,7 +209,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Quick Developer Switching Indicator when viewing another dashboard */}
-            {isDeveloperActive && currentRole !== 'developer' && (
+            {isDeveloperActive && currentRole !== 'Developer' && (
               <button
                 onClick={() => setShowRoleDropdown(prev => !prev)}
                 className="hidden md:flex items-center space-x-2 bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-200 text-indigo-900 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs"
@@ -255,7 +284,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Edit Profile & Credentials</span>
                   </button>
 
-                  {(currentRole === 'developer' || isDeveloperActive) && (
+                  {(currentRole === 'Developer' || isDeveloperActive) && (
                     <>
                       <div className="px-2 py-1.5 border-b border-indigo-100 bg-indigo-50/70 rounded-xl mb-1.5 flex items-center justify-between">
                         <div>
@@ -270,7 +299,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </span>
                       </div>
 
-                      {currentRole !== 'developer' && (
+                      {currentRole !== 'Developer' && (
                         <button
                           onClick={() => {
                             returnToDeveloperAccount();
@@ -556,7 +585,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Lead Developer Exclusive Account Switching */}
-            {(currentRole === 'developer' || isDeveloperActive) && (
+            {(currentRole === 'Developer' || isDeveloperActive) && (
               <div className="p-3 bg-indigo-50/80 border-2 border-indigo-200 rounded-2xl space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
@@ -570,7 +599,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
 
-                {currentRole !== 'developer' && (
+                {currentRole !== 'Developer' && (
                   <button
                     onClick={() => {
                       returnToDeveloperAccount();
