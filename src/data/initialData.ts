@@ -12,69 +12,69 @@ import {
 export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-dev',
-    name: 'Engr. Alexis Vance',
-    role: 'developer',
-    title: 'Lead Software Engineer & System Developer',
+    name: 'Selwyn Dominic Martinez',
+    role: 'Developer',
+    title: 'Lead System Developer',
     department: 'Information Systems & Software Engineering Unit',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
     email: 'developer@pcc-mmsu.gov.ph',
-    username: 'developer',
+    username: 'Developer',
     nickname: 'Lead Developer',
     password: 'dev2026'
   },
   {
     id: 'usr-1',
-    name: 'Dr. Edward Domingo',
-    role: 'director',
+    name: 'Edward Domingo',
+    role: 'Director',
     title: 'Center Director / PMO Supervisor',
     department: 'PCC-MMSU Executive Office',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
     email: 'dr.domingo@pcc-mmsu.gov.ph',
-    username: 'director',
+    username: 'Director',
     password: 'pcc2026'
   },
   {
     id: 'usr-2',
     name: 'Selwyn Dominic Martinez',
-    role: 'procurement',
-    title: 'Administrative Assistant IV (Procurement)',
+    role: 'Procurement',
+    title: 'Admin Assist. IV (Procurement)',
     department: 'Supply & Procurement Unit',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
     email: 'procurement@pcc-mmsu.gov.ph',
-    username: 'procurement',
+    username: 'Procurement',
     password: 'procure2026'
   },
   {
     id: 'usr-3',
     name: 'Shyna Jee Silva',
-    role: 'plant_manager',
+    role: 'Plant_manager',
     title: 'Plant Manager / Internal Custodian',
     department: 'Dairy Processing Facility',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
     email: 'plant.manager@pcc-mmsu.gov.ph',
-    username: 'plantmanager',
+    username: 'Plantmanager',
     password: 'plant2026'
   },
   {
     id: 'usr-4',
     name: 'Jerwin Jake Yasay',
-    role: 'production_staff',
-    title: 'Senior Dairy Production Specialist',
+    role: 'Production_Staff',
+    title: 'Production Staff',
     department: 'Processing Plant Operations',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
     email: 'production@pcc-mmsu.gov.ph',
-    username: 'production',
+    username: 'Production',
     password: 'dairy2026'
   },
   {
     id: 'usr-5',
     name: 'Dairy Box Batac Outlet Staff',
-    role: 'store_outlet',
+    role: 'Store_outlet',
     title: 'Retail Store Lead Specialist',
     department: 'MMSU Dairy Box Retail Outlet',
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150',
     email: 'dairybox@pcc-mmsu.gov.ph',
-    username: 'dairybox',
+    username: 'Dairybox',
     password: 'store2026'
   }
 ];
@@ -495,7 +495,7 @@ export const INITIAL_ALERTS: SystemAlert[] = [
     message: 'Finished goods stock (860 bottles) exceeds cold-storage allocation threshold (800). Pause new batch manufacturing to avoid cold storage overcrowding.',
     severity: 'warning',
     read: false,
-    targetRole: ['director', 'plant_manager', 'production_staff']
+    targetRole: ['Director', 'Plant_manager', 'Production_Staff']
   },
   {
     id: 'rop-ing-3',
@@ -505,7 +505,7 @@ export const INITIAL_ALERTS: SystemAlert[] = [
     message: 'Current stock (12.0 kg) is below Reorder Point (18.0 kg). Lead time is 3 days. Generate procurement order immediately.',
     severity: 'critical',
     read: false,
-    targetRole: ['procurement', 'plant_manager', 'director']
+    targetRole: ['Procurement', 'Plant_manager', 'Director']
   },
   {
     id: 'rop-ing-7',
@@ -515,7 +515,7 @@ export const INITIAL_ALERTS: SystemAlert[] = [
     message: 'Stock at 380 pcs (ROP threshold 500 pcs). Immediate reorder required.',
     severity: 'critical',
     read: false,
-    targetRole: ['procurement', 'plant_manager']
+    targetRole: ['Procurement', 'Plant_manager']
   },
   {
     id: 'alt-4',
@@ -580,7 +580,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-4',
     userName: 'Jerwin Jake Yasay',
-    userRole: 'production_staff',
+    userRole: 'Production_Staff',
     userTitle: 'Lead Dairy Plant Operator',
     terminalOrStation: 'Processing Floor Terminal #2',
     severity: 'info'
@@ -603,7 +603,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-4',
     userName: 'Jerwin Jake Yasay',
-    userRole: 'production_staff',
+    userRole: 'Production_Staff',
     userTitle: 'Lead Dairy Plant Operator',
     terminalOrStation: 'Processing Floor Terminal #2',
     severity: 'info'
@@ -627,7 +627,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-2',
     userName: 'Sean Dave Martinez',
-    userRole: 'procurement',
+    userRole: 'Procurement',
     userTitle: 'Admin Asst IV / Procurement Officer',
     terminalOrStation: 'Procurement Workstation #1',
     severity: 'warning'
@@ -651,7 +651,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-5',
     userName: 'Dairy Box Outlet Staff',
-    userRole: 'store_outlet',
+    userRole: 'Store_outlet',
     userTitle: 'Retail Sales Custodian',
     terminalOrStation: 'Dairy Box MMSU POS Register #1',
     severity: 'success'
@@ -674,7 +674,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-3',
     userName: 'Sander James Silva',
-    userRole: 'plant_manager',
+    userRole: 'Plant_manager',
     userTitle: 'Plant Manager & Internal Custodian',
     terminalOrStation: 'Plant Management Office',
     severity: 'info'
@@ -697,7 +697,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-1',
     userName: 'Ernesto T. Domingo',
-    userRole: 'director',
+    userRole: 'Director',
     userTitle: 'Center Director / PMO Supervisor',
     terminalOrStation: 'Executive Director Console',
     severity: 'info'
@@ -717,7 +717,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-dev',
     userName: 'Engr. Alexis Vance',
-    userRole: 'developer',
+    userRole: 'Developer',
     userTitle: 'Lead Software Engineer & System Developer',
     terminalOrStation: 'Admin Workstation Batac IT Unit',
     severity: 'info'

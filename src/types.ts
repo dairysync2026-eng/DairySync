@@ -1,10 +1,10 @@
 export type UserRole = 
-  | 'developer'           // System Developer / Super Administrator (Full Access)
-  | 'director'            // Director / PMO Supervisor
-  | 'procurement'         // Administrative Assistant IV (Procurement)
-  | 'plant_manager'       // Internal Custodian / Plant Manager
-  | 'production_staff'    // Production Staff
-  | 'store_outlet';       // Store Outlet (Dairy Box)
+  | 'Developer'           // System Developer / Super Administrator (Full Access)
+  | 'Director'            // Director / PMO Supervisor
+  | 'Procurement'         // Administrative Assistant IV (Procurement)
+  | 'Plant_manager'       // Internal Custodian / Plant Manager
+  | 'Production_Staff'    // Production Staff
+  | 'Store_outlet';       // Store Outlet (Dairy Box)
 
 export interface UserProfile {
   id: string;
