@@ -69,9 +69,9 @@ interface DairySyncContextType {
   
   // Actions
   addIngredient: (ingredient: Omit<RawIngredient, 'id'>) => void;
-  updateIngredientStock: (id: string, newStock: number, notes?: string, expiryDate?: string) => void;
+  updateIngredientStock: (id: string, newStock: number, notes?: string, expiryDate?: string) => boolean;
   addFinishedGood: (product: Omit<FinishedGood, 'id'>) => void;
-  updateFinishedGoodStock: (id: string, newStock: number, notes?: string) => void;
+  updateFinishedGoodStock: (id: string, newStock: number, notes?: string) => boolean;
   updateFinishedGoodSafetyStock: (id: string, safetyStock: number) => void;
   
   // Production / WIP Actions
@@ -624,6 +624,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const clearAuditLogs = () => {
+    if (!authorizeDirectorMutation('clear audit history')) return;
     setAuditLogs([]);
     localStorage.removeItem(`${LOCAL_STORAGE_KEY}_audit_logs`);
   };
@@ -756,6 +757,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [ingredients, finishedGoods]);
 
   const addIngredient = (ingData: Omit<RawIngredient, 'id'>) => {
+    if (!authorizeDirectorMutation('add a raw material')) return;
     const newIng: RawIngredient = {
       ...ingData,
       id: `ing-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
@@ -779,6 +781,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateIngredientStock = (id: string, newStock: number, notes?: string, expiryDate?: string) => {
+    if (!authorizeDirectorMutation('update raw material stock')) return false;
     let newTx: StockTransaction | null = null;
     let targetIng: RawIngredient | undefined;
     let prevStock = 0;
@@ -843,9 +846,11 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
     }
     triggerManualCloudSync();
+    return true;
   };
 
   const addFinishedGood = (fgData: Omit<FinishedGood, 'id'>) => {
+    if (!authorizeDirectorMutation('add a finished product')) return;
     const newFg: FinishedGood = {
       ...fgData,
       id: `fg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
@@ -869,6 +874,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateFinishedGoodStock = (id: string, newStock: number, notes?: string) => {
+    if (!authorizeDirectorMutation('update finished goods stock')) return false;
     let newTx: StockTransaction | null = null;
     let targetFg: FinishedGood | undefined;
     let prevStock = 0;
@@ -922,9 +928,11 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
     }
     triggerManualCloudSync();
+    return true;
   };
 
   const updateFinishedGoodSafetyStock = (id: string, safetyStock: number) => {
+    if (!authorizeDirectorMutation('update finished goods safety stock')) return;
     const targetFg = finishedGoods.find(fg => fg.id === id);
     setFinishedGoods(prev => prev.map(fg => fg.id === id ? { ...fg, safetyStock: Math.max(0, safetyStock) } : fg));
     if (targetFg) {
@@ -949,6 +957,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Bulk update raw ingredient stocks
   const bulkUpdateIngredientsStock = (updates: { id: string; newStock: number }[], notes: string) => {
     if (updates.length === 0) return { success: false, count: 0 };
+    if (!authorizeDirectorMutation('bulk update raw material stock')) return { success: false, count: 0 };
     
     const updateMap = new Map(updates.map(u => [u.id, u.newStock]));
     const newTransactions: StockTransaction[] = [];
@@ -1009,6 +1018,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Bulk delete raw ingredients
   const bulkDeleteIngredients = (ids: string[]) => {
     if (ids.length === 0) return { success: false, count: 0 };
+    if (!authorizeDirectorMutation('delete raw materials')) return { success: false, count: 0 };
     const idSet = new Set(ids);
     const toDelete = ingredients.filter(i => idSet.has(i.id));
 
@@ -1033,6 +1043,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Bulk update finished goods stock
   const bulkUpdateFinishedGoodsStock = (updates: { id: string; newStock: number; newSafetyStock?: number }[], notes: string) => {
     if (updates.length === 0) return { success: false, count: 0 };
+    if (!authorizeDirectorMutation('bulk update finished goods stock')) return { success: false, count: 0 };
     
     const updateMap = new Map(updates.map(u => [u.id, u]));
     const newTransactions: StockTransaction[] = [];
@@ -1093,6 +1104,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Bulk delete finished goods
   const bulkDeleteFinishedGoods = (ids: string[]) => {
     if (ids.length === 0) return { success: false, count: 0 };
+    if (!authorizeDirectorMutation('delete finished goods')) return { success: false, count: 0 };
     const idSet = new Set(ids);
     const toDelete = finishedGoods.filter(f => idSet.has(f.id));
 
@@ -1121,7 +1133,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (data.quantityAdded <= 0) return { success: false, message: 'Quantity added must be greater than 0.' };
 
     const newStock = target.currentStock + data.quantityAdded;
-    updateIngredientStock(target.id, newStock, `Quick Arrival Log: ${data.supplierReceipt ? `DR #${data.supplierReceipt} - ` : ''}${data.notes || 'Cooperative / Supplier delivery'}`);
+    const stockUpdated = updateIngredientStock(target.id, newStock, `Quick Arrival Log: ${data.supplierReceipt ? `DR #${data.supplierReceipt} - ` : ''}${data.notes || 'Cooperative / Supplier delivery'}`);
+    if (!stockUpdated) return { success: false, message: 'Director authorization was canceled or failed.' };
 
     return { 
       success: true, 
@@ -1136,7 +1149,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (data.quantity <= 0) return { success: false, message: 'Quantity must be greater than 0.' };
 
     const newStock = product.currentStock + data.quantity;
-    updateFinishedGoodStock(product.id, newStock, `Direct Batch Log: ${data.notes || 'Direct plant release into cold storage'}`);
+    const stockUpdated = updateFinishedGoodStock(product.id, newStock, `Direct Batch Log: ${data.notes || 'Direct plant release into cold storage'}`);
+    if (!stockUpdated) return { success: false, message: 'Director authorization was canceled or failed.' };
 
     // Create completed batch record
     const batchNum = `BATCH-QUICK-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
@@ -1236,6 +1250,9 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     assignedStaff: string;
     notes?: string;
   }) => {
+    if (!authorizeDirectorMutation('create a production batch')) {
+      return { success: false, message: 'Director authorization was canceled or failed.' };
+    }
     const product = finishedGoods.find(p => p.id === batchData.productId);
     if (!product) {
       return { success: false, message: 'Target finished product not found.' };
@@ -1348,6 +1365,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const advanceWipBatchStep = (batchId: string, nextStep: WipStep) => {
     const targetBatch = wipBatches.find(b => b.id === batchId);
     if (!targetBatch) return;
+    if (!authorizeDirectorMutation('advance a production batch')) return;
 
     if (nextStep === 'completed' && targetBatch.status !== 'completed') {
       const fgItem = finishedGoods.find(f => f.id === targetBatch.productId);
@@ -1406,6 +1424,9 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Cancel Scheduled WIP Batch without affecting raw materials (restores ingredients)
   const cancelWipBatch = (batchId: string, reason?: string): { success: boolean; message: string } => {
+    if (!authorizeDirectorMutation('cancel a production batch')) {
+      return { success: false, message: 'Director authorization was canceled or failed.' };
+    }
     const targetBatch = wipBatches.find(b => b.id === batchId);
     if (!targetBatch) {
       return { success: false, message: 'Batch record not found.' };
@@ -1491,6 +1512,9 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Process POS Sale at Dairy Box Outlet
   const processRetailSale = (items: { productId: string; quantity: number }[]) => {
+    if (!authorizeDirectorMutation('process a retail sale')) {
+      return { success: false, message: 'Director authorization was canceled or failed.' };
+    }
     for (const item of items) {
       const fg = finishedGoods.find(p => p.id === item.productId);
       if (!fg || fg.currentStock < item.quantity) {
@@ -1558,6 +1582,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const addCommitment = (comData: Omit<SupplyDemandCommitment, 'id'>) => {
+    if (!authorizeDirectorMutation('add a supply or production commitment')) return;
     const newCom: SupplyDemandCommitment = {
       ...comData,
       id: `com-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
@@ -1581,6 +1606,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateCommitmentStatus = (id: string, status: SupplyDemandCommitment['status'], fulfilledQty?: number) => {
+    if (!authorizeDirectorMutation('update a commitment')) return;
     const com = commitments.find(c => c.id === id);
     setCommitments(prev => prev.map(c => {
       if (c.id === id) {
@@ -1615,6 +1641,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const cancelCommitment = (id: string, reason: string) => {
+    if (!authorizeDirectorMutation('cancel a commitment')) return;
     const com = commitments.find(c => c.id === id);
     setCommitments(prev => prev.map(c => {
       if (c.id === id) {
@@ -1649,6 +1676,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const updateCommitmentPriority = (id: string, priority: 'high' | 'medium' | 'low') => {
+    if (!authorizeDirectorMutation('change commitment priority')) return;
     setCommitments(prev => prev.map(c => c.id === id ? { ...c, priority } : c));
     triggerManualCloudSync();
   };
@@ -1662,6 +1690,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const submitIsoEvaluation = (ratingData: Omit<IsoEvaluationRating, 'date' | 'evaluatorRole'>) => {
+    if (!authorizeDirectorMutation('submit an ISO 25010 evaluation')) return;
     const newRating: IsoEvaluationRating = {
       ...ratingData,
       date: new Date().toLocaleDateString(),
@@ -1676,7 +1705,28 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return (user.password || '') === passwordAttempt.trim();
   };
 
+  const authorizeDirectorMutation = (action: string): boolean => {
+    if (currentRole !== 'director') return true;
+
+    const passwordAttempt = window.prompt(`Director / PMO re-authentication required to ${action}. Enter your account password:`);
+    if (passwordAttempt === null || !passwordAttempt.trim()) return false;
+    if (verifyUserPassword(currentUser.id, passwordAttempt)) return true;
+
+    window.alert('Authentication failed. No changes were made.');
+    logAuditAction({
+      category: 'security',
+      subsystem: 'Director / PMO Authorization',
+      action: 'DIRECTOR_REAUTH_FAILED',
+      description: `Failed re-authentication attempt to ${action}`,
+      severity: 'warning'
+    });
+    return false;
+  };
+
   const updateUserProfile = (userId: string, updates: Partial<UserProfile>): { success: boolean; message: string } => {
+    if (currentRole === 'director' && !authorizeDirectorMutation('update your profile')) {
+      return { success: false, message: 'Director authorization was canceled or failed.' };
+    }
     // Only lead developer can modify other account users; standard users can only modify their own profile
     if (currentRole !== 'developer' && currentUser.id !== userId) {
       return { success: false, message: 'Unauthorized. Only the Lead Developer has access to manage other account users.' };
