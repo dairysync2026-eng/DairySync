@@ -440,7 +440,7 @@ export const DairyBoxPos: React.FC = () => {
                       <th className="w-[31%] px-3 py-3">Purchased Items</th>
                       <th className="w-[8%] px-3 py-3 text-center">Units</th>
                       <th className="w-[11%] px-3 py-3 text-right">Total Amount</th>
-                      <th className="w-[4%] px-3 py-3 text-center">View</th>
+                      <th className="w-[4%] px-3 py-3 text-center">Receipt</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white text-[11px]">
@@ -467,8 +467,8 @@ export const DairyBoxPos: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setSelectedSaleReceipt(sale.receiptNo)}
-                            aria-label={`View sale ${sale.receiptNo}`}
-                            title="View sale details"
+                            aria-label={`View receipt ${sale.receiptNo} and purchased products`}
+                            title="View receipt and purchased products"
                             className="rounded-md p-1.5 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700"
                           >
                             <Eye className="h-4 w-4" />
@@ -499,7 +499,7 @@ export const DairyBoxPos: React.FC = () => {
           <section role="dialog" aria-modal="true" aria-labelledby="sale-details-title" className="w-full max-w-lg rounded-2xl bg-white p-5 text-slate-900 shadow-2xl">
             <header className="flex items-start justify-between border-b border-slate-200 pb-3">
               <div>
-                <h2 id="sale-details-title" className="font-extrabold">Sale Details</h2>
+                <h2 id="sale-details-title" className="font-extrabold">Sale Receipt</h2>
                 <p className="mt-1 font-mono text-xs text-slate-500">{selectedSale.receiptNo}</p>
               </div>
               <button type="button" onClick={() => setSelectedSaleReceipt(null)} aria-label="Close sale details" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
