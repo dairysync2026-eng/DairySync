@@ -34,8 +34,6 @@ export const WipProduction: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string>(finishedGoods[0]?.id || '');
   const [targetQtyStr, setTargetQtyStr] = useState<string>('300');
-  const [multiplierStr, setMultiplierStr] = useState<string>('1.0');
-  const [multiplierPreset, setMultiplierPreset] = useState<string>('1.0');
   const [assignedStaff, setAssignedStaff] = useState<string>(currentUser.name);
   const [batchNotes, setBatchNotes] = useState<string>('');
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -48,52 +46,22 @@ export const WipProduction: React.FC = () => {
   const selectedProduct = finishedGoods.find(p => p.id === selectedProductId);
   const baseBatch = selectedProduct?.batchUnitQuantity || 100;
 
-  // Linked handlers for typeable target quantity and formula multiplier
+  // Batch materials scale automatically from the requested output quantity.
   const handleTargetQtyChange = (val: string) => {
     setTargetQtyStr(val);
-    const num = parseFloat(val);
-    if (!isNaN(num) && num > 0 && baseBatch > 0) {
-      const calculatedMult = Number((num / baseBatch).toFixed(2));
-      setMultiplierStr(String(calculatedMult));
-      setMultiplierPreset('custom');
-    }
-  };
-
-  const handleMultiplierChange = (val: string) => {
-    setMultiplierStr(val);
-    const mult = parseFloat(val);
-    if (!isNaN(mult) && mult > 0 && baseBatch > 0) {
-      const calculatedQty = Math.round(mult * baseBatch);
-      setTargetQtyStr(String(calculatedQty));
-      setMultiplierPreset('custom');
-    }
-  };
-
-  const handlePresetChange = (presetVal: string) => {
-    setMultiplierPreset(presetVal);
-    if (presetVal !== 'custom') {
-      const mult = parseFloat(presetVal);
-      setMultiplierStr(presetVal);
-      const calculatedQty = Math.round(mult * baseBatch);
-      setTargetQtyStr(String(calculatedQty));
-    }
   };
 
   const handleProductSelect = (prodId: string) => {
     setSelectedProductId(prodId);
-    const prod = finishedGoods.find(p => p.id === prodId);
-    const newBase = prod?.batchUnitQuantity || 100;
-    const mult = parseFloat(multiplierStr) || 1;
-    setTargetQtyStr(String(Math.round(mult * newBase)));
   };
 
   const targetQty = Math.max(1, parseFloat(targetQtyStr) || 1);
-  const multiplier = Math.max(0.01, parseFloat(multiplierStr) || (targetQty / baseBatch));
+  const recipeScale = targetQty / baseBatch;
 
   // Calculate BOM requirements dynamically
   const computedBom = selectedProduct ? selectedProduct.recipe.map(r => {
     const ing = ingredients.find(i => i.id === r.ingredientId);
-    const needed = r.quantityRequired * multiplier;
+    const needed = r.quantityRequired * recipeScale;
     const available = ing ? ing.currentStock : 0;
     const isSufficient = available >= needed;
     return {
@@ -468,9 +436,9 @@ export const WipProduction: React.FC = () => {
                 </select>
               </div>
 
-              {/* Target Batch Quantity & Formula Multiplier Controls */}
+              {/* Target Batch Quantity */}
               <div className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
                   {/* Target Batch Quantity */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -498,7 +466,7 @@ export const WipProduction: React.FC = () => {
                           type="button"
                           onClick={() => {
                             if ('add' in btn) {
-                              handleTargetQtyChange(String((parseFloat(targetQtyStr) || 0) + btn.add));
+                              handleTargetQtyChange(String((parseFloat(targetQtyStr) || 0) + (btn.add || 0)));
                             } else if (btn.val) {
                               handleTargetQtyChange(String(btn.val));
                             }
@@ -511,46 +479,6 @@ export const WipProduction: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Formula Multiplier: Dropdown Menu + Numeric Input */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Formula Multiplier
-                    </label>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Dropdown Menu */}
-                      <select
-                        value={multiplierPreset}
-                        onChange={e => handlePresetChange(e.target.value)}
-                        className="w-full px-2.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-bold focus:outline-none focus:border-emerald-500 shadow-sm"
-                      >
-                        <option value="0.5">0.5x (Half)</option>
-                        <option value="1.0">1.0x (Standard)</option>
-                        <option value="1.5">1.5x (Medium)</option>
-                        <option value="2.0">2.0x (Double)</option>
-                        <option value="3.0">3.0x (Triple)</option>
-                        <option value="5.0">5.0x (Commercial)</option>
-                        <option value="custom">Custom...</option>
-                      </select>
-
-                      {/* Typeable Input */}
-                      <div className="relative">
-                        <input
-                          type="number"
-                          step="0.05"
-                          min="0.01"
-                          value={multiplierStr}
-                          onChange={e => handleMultiplierChange(e.target.value)}
-                          placeholder="1.0"
-                          className="w-full px-3 py-2.5 pr-7 bg-white border-2 border-emerald-400 rounded-2xl text-xs text-slate-900 font-mono font-extrabold shadow-sm focus:outline-none focus:border-emerald-600"
-                        />
-                        <span className="absolute right-2.5 top-2.5 text-xs text-slate-400 font-bold">x</span>
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Base formula: {baseBatch} units per 1.0x batch.
-                    </p>
-                  </div>
                 </div>
 
                 <div>
@@ -569,7 +497,7 @@ export const WipProduction: React.FC = () => {
               <div className="p-4 rounded-2xl bg-slate-50 border-2 border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Required Bill of Materials (BOM)</span>
-                  <span className="text-[10px] text-indigo-600 font-mono font-bold">Multiplier: {multiplier.toFixed(2)}x ({targetQty} units)</span>
+                  <span className="text-[10px] text-indigo-600 font-mono font-bold">Target batch: {targetQty} units</span>
                 </div>
 
                 <div className="divide-y divide-slate-200 text-xs">
