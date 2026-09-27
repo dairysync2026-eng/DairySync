@@ -14,7 +14,6 @@ import { IsoEvaluationModal } from './components/IsoEvaluationModal';
 import { ReportsModal } from './components/ReportsModal';
 import { LoginPage } from './components/LoginPage';
 import { AccessRestricted } from './components/AccessRestricted';
-import { QuickActionsMenu } from './components/QuickActionsMenu';
 import { ScrollableTabBar } from './components/ScrollableTabBar';
 import { 
   LayoutDashboard, 
@@ -150,10 +149,7 @@ const MainLayout: React.FC = () => {
           </div>
         </footer>
 
-        {/* Active Modals & Floating Quick Actions Menu */}
-        <div className="print:hidden">
-          <QuickActionsMenu />
-        </div>
+        {/* Active Modals */}
         {showIsoSurvey && <IsoEvaluationModal onClose={() => setShowIsoSurvey(false)} />}
         {showReports && <ReportsModal onClose={() => setShowReports(false)} />}
 
