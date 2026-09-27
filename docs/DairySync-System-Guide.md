@@ -52,7 +52,7 @@ The current application stores its operational state in browser `localStorage` a
 - Developer session switching between role accounts.
 - Return to the developer account.
 - Role-based tab access enforcement.
-- Audit Trail and System Manual access limited to Developer and Director / PMO roles.
+- Audit Trail access limited to Developer and Director / PMO; System Manual access limited to Developer.
 - Audit search by user ID and action type, with quick ranges and exact timestamp bounds.
 - Automatic return to the dashboard when a selected tab becomes unauthorized.
 - Profile editing with username and email conflict checks.
@@ -91,7 +91,7 @@ The main layout provides:
 6. ROP Procurement
 7. Dairy Box POS
 8. Audit Trail
-9. System Manual (Developer and Director / PMO only)
+9. System Manual (Developer only)
 
 ---
 

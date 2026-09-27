@@ -35,7 +35,7 @@ import {
 
 export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
   developer: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
-  director: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
+  director: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit'],
   procurement: ['dashboard', 'procurement', 'ingredients'],
   plant_manager: ['dashboard', 'finished', 'wip', 'ingredients', 'procurement'],
   production_staff: ['dashboard', 'wip', 'ingredients'],

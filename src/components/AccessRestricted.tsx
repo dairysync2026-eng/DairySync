@@ -45,7 +45,7 @@ export const AccessRestricted: React.FC<AccessRestrictedProps> = ({
       case 'procurement': return ['Developer (Superuser)', 'Director', 'Admin Asst IV (Procurement)', 'Plant Manager'];
       case 'pos': return ['Developer (Superuser)', 'Director', 'Dairy Box Store Outlet'];
       case 'audit': return ['Lead Developer (Superuser)', 'Director / PMO Supervisor'];
-      case 'documentation': return ['Lead Developer (Superuser)', 'Director / PMO Supervisor'];
+      case 'documentation': return ['Lead Developer (Superuser)'];
       default: return ['Developer (Superuser)', 'Director'];
     }
   };

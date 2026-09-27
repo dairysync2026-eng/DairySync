@@ -7,7 +7,7 @@ import { AccessRestricted } from './AccessRestricted';
 export const SystemDocumentation: React.FC = () => {
   const { currentRole } = useDairySync();
 
-  if (currentRole !== 'developer' && currentRole !== 'director') {
+  if (currentRole !== 'developer') {
     return <AccessRestricted requiredTab="documentation" onNavigateHome={() => window.location.reload()} />;
   }
 
