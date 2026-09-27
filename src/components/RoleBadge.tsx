@@ -17,7 +17,7 @@ export const RoleBadge: React.FC = () => {
 
   const getRoleBadgeConfig = () => {
     switch (currentRole) {
-      case 'Developer':
+      case 'developer':
         return {
           icon: Terminal,
           bg: 'bg-slate-900 border-indigo-500 text-white',
@@ -25,7 +25,7 @@ export const RoleBadge: React.FC = () => {
           desc: 'Unrestricted master access: all 7 subsystems unlocked, live RBAC role simulation & full administrative operations.',
           isDev: true
         };
-      case 'Director':
+      case 'director':
         return {
           icon: ShieldAlert,
           bg: 'bg-purple-50 border-purple-200 text-purple-900',
@@ -33,7 +33,7 @@ export const RoleBadge: React.FC = () => {
           desc: 'High-level executive oversight, budget allocation, production planning & ISO 25010 compliance monitoring.',
           isDev: false
         };
-      case 'Procurement':
+      case 'procurement':
         return {
           icon: Truck,
           bg: 'bg-amber-50 border-amber-200 text-amber-900',
@@ -41,7 +41,7 @@ export const RoleBadge: React.FC = () => {
           desc: 'Managing raw ingredient Reorder Points (ROP), supplier purchase orders & packaging procurement.',
           isDev: false
         };
-      case 'Plant_manager':
+      case 'plant_manager':
         return {
           icon: Factory,
           bg: 'bg-teal-50 border-teal-200 text-teal-900',
@@ -49,7 +49,7 @@ export const RoleBadge: React.FC = () => {
           desc: 'Inventory reconciliation, WIP batch scheduling, cold storage monitoring & FEFO compliance.',
           isDev: false
         };
-      case 'Production_Staff':
+      case 'production_staff':
         return {
           icon: UserCheck,
           bg: 'bg-indigo-50 border-indigo-200 text-indigo-900',
@@ -57,12 +57,20 @@ export const RoleBadge: React.FC = () => {
           desc: 'Requesting raw stock, logging daily ingredient consumption & advancing batch processing steps.',
           isDev: false
         };
-      case 'Store_outlet':
+      case 'store_outlet':
         return {
           icon: ShoppingCart,
           bg: 'bg-emerald-50 border-emerald-200 text-emerald-900',
           badgeText: 'MMSU Dairy Box Store Outlet View',
           desc: 'Walk-in retail POS sales entry, real-time central cold-storage stock sync & demand logging.',
+          isDev: false
+        };
+      default:
+        return {
+          icon: Terminal,
+          bg: 'bg-slate-900 border-indigo-500 text-white',
+          badgeText: 'System User',
+          desc: 'Secure workspace access.',
           isDev: false
         };
     }
@@ -72,18 +80,18 @@ export const RoleBadge: React.FC = () => {
   const Icon = config.icon;
 
   const roleLabels: Record<UserRole, { short: string; roleName: string }> = {
-    Developer: { short: 'DEV', roleName: 'Lead Dev Command' },
-    Director: { short: 'PMO', roleName: 'Director Dashboard' },
-    Procurement: { short: 'ROP', roleName: 'Procurement Desk' },
-    Plant_manager: { short: 'PLANT', roleName: 'Plant Manager' },
-    Production_Staff: { short: 'PROD', roleName: 'Production Staff' },
-    Store_outlet: { short: 'POS', roleName: 'Store Outlet POS' },
+    developer: { short: 'DEV', roleName: 'Lead Dev Command' },
+    director: { short: 'PMO', roleName: 'Director Dashboard' },
+    procurement: { short: 'ROP', roleName: 'Procurement Desk' },
+    plant_manager: { short: 'PLANT', roleName: 'Plant Manager' },
+    production_staff: { short: 'PROD', roleName: 'Production Staff' },
+    store_outlet: { short: 'POS', roleName: 'Store Outlet POS' },
   };
 
   return (
     <div className="space-y-2.5">
       {/* Developer Superuser Active Supervisory Strip */}
-      {isDeveloperActive && currentRole !== 'Developer' && (
+      {isDeveloperActive && currentRole !== 'developer' && (
         <div className="p-3.5 bg-slate-900 text-white rounded-3xl border-2 border-indigo-500 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-center space-x-3 min-w-0">
             <div className="p-2 bg-indigo-600 text-white rounded-xl shrink-0 shadow-xs">

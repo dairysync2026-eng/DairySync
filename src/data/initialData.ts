@@ -13,7 +13,7 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-dev',
     name: 'Selwyn Dominic Martinez',
-    role: 'Developer',
+    role: 'developer',
     title: 'Lead System Developer',
     department: 'Information Systems & Software Engineering Unit',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
@@ -25,7 +25,7 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-1',
     name: 'Edward Domingo',
-    role: 'Director',
+    role: 'director',
     title: 'Center Director / PMO Supervisor',
     department: 'PCC-MMSU Executive Office',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
@@ -36,7 +36,7 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-2',
     name: 'Selwyn Dominic Martinez',
-    role: 'Procurement',
+    role: 'procurement',
     title: 'Admin Assist. IV (Procurement)',
     department: 'Supply & Procurement Unit',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
@@ -47,7 +47,7 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-3',
     name: 'Shyna Jee Silva',
-    role: 'Plant_manager',
+    role: 'plant_manager',
     title: 'Plant Manager / Internal Custodian',
     department: 'Dairy Processing Facility',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
@@ -58,7 +58,7 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-4',
     name: 'Jerwin Jake Yasay',
-    role: 'Production_Staff',
+    role: 'production_staff',
     title: 'Production Staff',
     department: 'Processing Plant Operations',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
@@ -69,7 +69,7 @@ export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-5',
     name: 'Dairy Box Batac Outlet Staff',
-    role: 'Store_outlet',
+    role: 'store_outlet',
     title: 'Retail Store Lead Specialist',
     department: 'MMSU Dairy Box Retail Outlet',
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150',
@@ -495,7 +495,7 @@ export const INITIAL_ALERTS: SystemAlert[] = [
     message: 'Finished goods stock (860 bottles) exceeds cold-storage allocation threshold (800). Pause new batch manufacturing to avoid cold storage overcrowding.',
     severity: 'warning',
     read: false,
-    targetRole: ['Director', 'Plant_manager', 'Production_Staff']
+    targetRole: ['director', 'plant_manager', 'production_staff']
   },
   {
     id: 'rop-ing-3',
@@ -505,7 +505,7 @@ export const INITIAL_ALERTS: SystemAlert[] = [
     message: 'Current stock (12.0 kg) is below Reorder Point (18.0 kg). Lead time is 3 days. Generate procurement order immediately.',
     severity: 'critical',
     read: false,
-    targetRole: ['Procurement', 'Plant_manager', 'Director']
+    targetRole: ['procurement', 'plant_manager', 'director']
   },
   {
     id: 'rop-ing-7',
@@ -515,7 +515,7 @@ export const INITIAL_ALERTS: SystemAlert[] = [
     message: 'Stock at 380 pcs (ROP threshold 500 pcs). Immediate reorder required.',
     severity: 'critical',
     read: false,
-    targetRole: ['Procurement', 'Plant_manager']
+    targetRole: ['procurement', 'plant_manager']
   },
   {
     id: 'alt-4',
@@ -580,7 +580,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-4',
     userName: 'Jerwin Jake Yasay',
-    userRole: 'Production_Staff',
+    userRole: 'production_staff',
     userTitle: 'Lead Dairy Plant Operator',
     terminalOrStation: 'Processing Floor Terminal #2',
     severity: 'info'
@@ -603,7 +603,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-4',
     userName: 'Jerwin Jake Yasay',
-    userRole: 'Production_Staff',
+    userRole: 'production_staff',
     userTitle: 'Lead Dairy Plant Operator',
     terminalOrStation: 'Processing Floor Terminal #2',
     severity: 'info'
@@ -627,7 +627,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-2',
     userName: 'Sean Dave Martinez',
-    userRole: 'Procurement',
+    userRole: 'procurement',
     userTitle: 'Admin Asst IV / Procurement Officer',
     terminalOrStation: 'Procurement Workstation #1',
     severity: 'warning'
@@ -651,7 +651,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-5',
     userName: 'Dairy Box Outlet Staff',
-    userRole: 'Store_outlet',
+    userRole: 'store_outlet',
     userTitle: 'Retail Sales Custodian',
     terminalOrStation: 'Dairy Box MMSU POS Register #1',
     severity: 'success'
@@ -674,7 +674,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-3',
     userName: 'Sander James Silva',
-    userRole: 'Plant_manager',
+    userRole: 'plant_manager',
     userTitle: 'Plant Manager & Internal Custodian',
     terminalOrStation: 'Plant Management Office',
     severity: 'info'
@@ -697,7 +697,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-1',
     userName: 'Ernesto T. Domingo',
-    userRole: 'Director',
+    userRole: 'director',
     userTitle: 'Center Director / PMO Supervisor',
     terminalOrStation: 'Executive Director Console',
     severity: 'info'
@@ -717,7 +717,7 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     },
     userId: 'usr-dev',
     userName: 'Engr. Alexis Vance',
-    userRole: 'Developer',
+    userRole: 'developer',
     userTitle: 'Lead Software Engineer & System Developer',
     terminalOrStation: 'Admin Workstation Batac IT Unit',
     severity: 'info'

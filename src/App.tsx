@@ -16,7 +16,6 @@ import { LoginPage } from './components/LoginPage';
 import { AccessRestricted } from './components/AccessRestricted';
 import { QuickActionsMenu } from './components/QuickActionsMenu';
 import { ScrollableTabBar } from './components/ScrollableTabBar';
-import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import { 
   LayoutDashboard, 
   Package, 
@@ -66,7 +65,6 @@ const MainLayout: React.FC = () => {
         {/* Top Navbar */}
         <div className="print:hidden">
           <Header 
-            onOpenIsoSurvey={() => setShowIsoSurvey(true)}
             onOpenReports={() => setShowReports(true)}
           />
         </div>
@@ -150,7 +148,6 @@ const MainLayout: React.FC = () => {
         {/* Active Modals & Floating Quick Actions Menu */}
         <div className="print:hidden">
           <QuickActionsMenu />
-          <OfflineIndicator />
         </div>
         {showIsoSurvey && <IsoEvaluationModal onClose={() => setShowIsoSurvey(false)} />}
         {showReports && <ReportsModal onClose={() => setShowReports(false)} />}

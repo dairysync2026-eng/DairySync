@@ -53,7 +53,6 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     transactions,
     auditLogs,
     resetToDefaultData,
-    triggerManualCloudSync,
     currentUser,
     loginAsRoleUser,
     updateUserProfile
@@ -224,18 +223,11 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
             </div>
           </div>
           <p className="text-xs text-slate-300 mt-2 font-medium max-w-2xl leading-relaxed">
-            Logged in as <strong>{currentUser.name}</strong> ({currentUser.title}). Full developer oversight over all subsystem states, database storage synchronization, RBAC access control policies, and live operational simulation.
+            Logged in as <strong>{currentUser.name}</strong> ({currentUser.title}). Full developer oversight over all subsystem states, RBAC access control policies, and live operational simulation.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            onClick={triggerManualCloudSync}
-            className="flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3.5 py-2.5 rounded-2xl shadow-sm transition-all"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Force Cloud Sync</span>
-          </button>
           <button
             onClick={onOpenReports}
             className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-700 transition-all"
@@ -600,7 +592,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {users.map(u => {
                   const isCurrent = currentUser.id === u.id;
-                  const isDev = u.role === 'Developer';
+                  const isDev = u.role === 'developer';
                   const showPass = showPasswordMap[u.id] || false;
 
                   return (

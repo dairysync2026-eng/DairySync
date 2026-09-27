@@ -151,25 +151,54 @@ const DairySyncContext = createContext<DairySyncContextType | undefined>(undefin
 
 const LOCAL_STORAGE_KEY = 'dairysync_pcc_mmsu_state_v1';
 
+const normalizeRole = (role: string | undefined | null): UserRole => {
+  const normalized = (role ?? 'developer').trim().toLowerCase();
+
+  switch (normalized) {
+    case 'developer':
+      return 'developer';
+    case 'director':
+      return 'director';
+    case 'procurement':
+      return 'procurement';
+    case 'plant_manager':
+    case 'plantmanager':
+      return 'plant_manager';
+    case 'production_staff':
+    case 'production':
+      return 'production_staff';
+    case 'store_outlet':
+    case 'storeoutlet':
+    case 'dairybox':
+      return 'store_outlet';
+    default:
+      return 'developer';
+  }
+};
+
 export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<UserProfile[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_users`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as UserProfile[];
-        const hasDev = parsed.some(u => u.role === 'developer');
+        const normalizedParsed = parsed.map(user => ({
+          ...user,
+          role: normalizeRole(user.role)
+        }));
+        const hasDev = normalizedParsed.some(u => u.role === 'developer');
         if (!hasDev) {
           const devUser = INITIAL_USERS.find(u => u.role === 'developer');
           if (devUser) {
-            return [devUser, ...parsed];
+            return [{ ...devUser, role: normalizeRole(devUser.role) }, ...normalizedParsed];
           }
         }
-        return parsed;
+        return normalizedParsed;
       } catch {
-        return INITIAL_USERS;
+        return INITIAL_USERS.map(user => ({ ...user, role: normalizeRole(user.role) }));
       }
     }
-    return INITIAL_USERS;
+    return INITIAL_USERS.map(user => ({ ...user, role: normalizeRole(user.role) }));
   });
 
   useEffect(() => {
@@ -182,7 +211,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_role`);
-    return (saved as UserRole) || 'developer';
+    return normalizeRole(saved || 'developer');
   });
 
   // Track if a Developer superuser session is active across role switching
@@ -395,11 +424,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_audit_logs`, JSON.stringify(auditLogs));
   }, [auditLogs]);
 
-  const currentUser = users.find(u => u.role === currentRole) || users[0];
+  const currentUser = users.find(u => normalizeRole(u.role) === currentRole) || users[0];
 
   const setCurrentRole = (role: UserRole) => {
-    setCurrentRoleState(role);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_role`, role);
+    const safeRole = normalizeRole(role);
+    setCurrentRoleState(safeRole);
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_role`, safeRole);
   };
 
   const login = (identifier: string, pass: string) => {
@@ -417,20 +447,22 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (matchedUser.password && matchedUser.password !== cleanPass) {
         return { success: false, message: `Incorrect password for ${matchedUser.name}.` };
       }
-      setCurrentRole(matchedUser.role);
+      const safeRole = normalizeRole(matchedUser.role);
+      setCurrentRole(safeRole);
       setIsAuthenticated(true);
-      const isDev = matchedUser.role === 'developer';
+      const isDev = safeRole === 'developer';
       setDeveloperActive(isDev);
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(true));
       return { success: true, message: `Logged in as ${matchedUser.name} (${matchedUser.title})` };
     }
 
     // Role keyword fallback
-    const roleMatch = users.find(u => u.role === cleanId as UserRole);
+    const roleMatch = users.find(u => normalizeRole(u.role) === normalizeRole(cleanId));
     if (roleMatch) {
-      setCurrentRole(roleMatch.role);
+      const safeRole = normalizeRole(roleMatch.role);
+      setCurrentRole(safeRole);
       setIsAuthenticated(true);
-      const isDev = roleMatch.role === 'developer';
+      const isDev = safeRole === 'developer';
       setDeveloperActive(isDev);
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(true));
       return { success: true, message: `Logged in as ${roleMatch.name} (${roleMatch.title})` };
@@ -440,26 +472,27 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const loginAsRoleUser = (role: UserRole) => {
+    const targetRole = normalizeRole(role);
     // Lead developer has master clearance to switch between all account users without doing a re-login
     // If an authenticated user is neither currently a developer nor has an active developer session, reject it
-    if (isAuthenticated && !isDeveloperActive && currentRole !== 'developer' && role !== currentRole) {
+    if (isAuthenticated && !isDeveloperActive && currentRole !== 'developer' && targetRole !== currentRole) {
       console.warn('RBAC Notice: Only the Lead Developer has access to switch between all account users.');
       return;
     }
-    const matched = users.find(u => u.role === role);
+    const matched = users.find(u => normalizeRole(u.role) === targetRole);
     if (matched) {
       // If switching from developer or if developer session was active, maintain isDeveloperActive = true!
       if (currentRole === 'developer' || isDeveloperActive) {
         setDeveloperActive(true);
       }
-      setCurrentRole(matched.role);
+      setCurrentRole(targetRole);
       setIsAuthenticated(true);
       localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(true));
     }
   };
 
   const returnToDeveloperAccount = () => {
-    const devUser = users.find(u => u.role === 'developer');
+    const devUser = users.find(u => normalizeRole(u.role) === 'developer');
     if (devUser) {
       setCurrentRole('developer');
       setDeveloperActive(true);

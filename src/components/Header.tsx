@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
-import { UserRole } from '../types';
 import { 
   Bell, 
   CloudCheck, 
   Cloud, 
-  Award, 
   FileText, 
   ShieldCheck, 
   User, 
@@ -22,16 +20,13 @@ import {
   Terminal
 } from 'lucide-react';
 import { ProfileEditModal } from './ProfileEditModal';
-import { OfflineStatusBadge } from './pwa/OfflineIndicator';
 import { PWAInstallButton } from './pwa/PWAInstallButton';
 
 interface HeaderProps {
-  onOpenIsoSurvey: () => void;
   onOpenReports: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onOpenIsoSurvey,
   onOpenReports
 }) => {
   const { 
@@ -42,8 +37,6 @@ export const Header: React.FC<HeaderProps> = ({
     alerts, 
     markAlertRead, 
     clearAllAlerts,
-    cloudSyncStatus,
-    triggerManualCloudSync,
     resetToDefaultData,
     logout,
     loginAsRoleUser,
@@ -51,34 +44,12 @@ export const Header: React.FC<HeaderProps> = ({
     returnToDeveloperAccount
   } = useDairySync();
 
-  const [timeString, setTimeString] = useState('');
   const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeString(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' PST');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
   const unreadAlerts = alerts.filter(a => !a.read);
-
-  const getRoleLabel = (role: UserRole) => {
-    switch(role) {
-      case 'Developer': return 'Lead Developer & Super Admin';
-      case 'Director': return 'Director / PMO Supervisor';
-      case 'Procurement': return 'Admin Asst IV (Procurement)';
-      case 'Plant_manager': return 'Plant Manager / Internal Custodian';
-      case 'Production_Staff': return 'Production Staff';
-      case 'Store_outlet': return 'Dairy Box Store Outlet';
-    }
-  };
 
   return (
     <header className="bg-white text-slate-900 border-b-2 border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -105,30 +76,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* PST Clock */}
-          <div className="hidden lg:flex items-center space-x-3 bg-slate-50 px-3.5 py-1.5 rounded-2xl border border-slate-200">
-            <div className="text-xs text-slate-700 font-mono font-bold flex items-center space-x-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>{timeString || '08:00:00 PST'}</span>
-            </div>
-          </div>
-
-          {/* Desktop Top Actions, Offline Indicator & Role Switcher (Hidden on Mobile) */}
+          {/* Desktop Top Actions & Role Switcher (Hidden on Mobile) */}
           <div className="hidden sm:flex items-center space-x-2 sm:space-x-3">
-            {/* Requirement 18: Small Status Indicator (Green for Online, Amber for Offline/Cached) */}
-            <OfflineStatusBadge compact={true} />
-
             {/* Install PWA Button */}
             <PWAInstallButton />
-
-            {/* ISO 25010 Quality Rating */}
-            <button
-              onClick={onOpenIsoSurvey}
-              className="p-2 bg-slate-100 hover:bg-slate-200 text-emerald-600 rounded-xl border border-slate-200 transition-colors"
-              title="ISO 25010 Quality Evaluation Scorecard"
-            >
-              <Award className="w-4 h-4" />
-            </button>
 
             {/* Reports */}
             <button
@@ -209,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Quick Developer Switching Indicator when viewing another dashboard */}
-            {isDeveloperActive && currentRole !== 'Developer' && (
+            {isDeveloperActive && currentRole !== 'developer' && (
               <button
                 onClick={() => setShowRoleDropdown(prev => !prev)}
                 className="hidden md:flex items-center space-x-2 bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-200 text-indigo-900 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs"
@@ -235,12 +186,7 @@ export const Header: React.FC<HeaderProps> = ({
                   className="w-5 h-5 rounded-full object-cover border border-emerald-400" 
                 />
                 <div className="text-left hidden sm:block">
-                  <p className="font-bold text-[11px] leading-tight">
-                    {currentUser.nickname || currentUser.name.split(' ')[0]}
-                  </p>
-                  <p className="text-[9px] text-emerald-300 uppercase font-mono">
-                    {currentUser.title ? currentUser.title.split('/')[0].trim() : getRoleLabel(currentRole).split(' ')[0]}
-                  </p>
+                  <span className="sr-only">{currentUser.nickname || currentUser.name}</span>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
@@ -284,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Edit Profile & Credentials</span>
                   </button>
 
-                  {(currentRole === 'Developer' || isDeveloperActive) && (
+                  {(currentRole === 'developer' || isDeveloperActive) && (
                     <>
                       <div className="px-2 py-1.5 border-b border-indigo-100 bg-indigo-50/70 rounded-xl mb-1.5 flex items-center justify-between">
                         <div>
@@ -299,7 +245,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </span>
                       </div>
 
-                      {currentRole !== 'Developer' && (
+                      {currentRole !== 'developer' && (
                         <button
                           onClick={() => {
                             returnToDeveloperAccount();
@@ -469,9 +415,6 @@ export const Header: React.FC<HeaderProps> = ({
                   alt={currentUser.name}
                   className="w-6 h-6 rounded-full object-cover border border-emerald-400"
                 />
-                <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-900 ${
-                  cloudSyncStatus === 'offline' ? 'bg-amber-500' : 'bg-emerald-400'
-                }`} />
               </div>
               <ChevronDown className={`w-3.5 h-3.5 text-slate-300 transition-transform duration-200 ${
                 showMobileMenu ? 'rotate-180 text-white' : ''
@@ -531,23 +474,6 @@ export const Header: React.FC<HeaderProps> = ({
                 Quick Tools & System Status
               </p>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                {/* Online / Offline Status Badge */}
-                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center">
-                  <OfflineStatusBadge compact={true} />
-                </div>
-
-                {/* ISO 25010 Quality Rating */}
-                <button
-                  onClick={() => {
-                    onOpenIsoSurvey();
-                    setShowMobileMenu(false);
-                  }}
-                  className="p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl font-bold text-slate-800 flex items-center justify-center space-x-2 transition-colors"
-                >
-                  <Award className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="truncate">ISO Scorecard</span>
-                </button>
-
                 {/* System Reports */}
                 <button
                   onClick={() => {
@@ -585,7 +511,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Lead Developer Exclusive Account Switching */}
-            {(currentRole === 'Developer' || isDeveloperActive) && (
+            {(currentRole === 'developer' || isDeveloperActive) && (
               <div className="p-3 bg-indigo-50/80 border-2 border-indigo-200 rounded-2xl space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
@@ -599,7 +525,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
 
-                {currentRole !== 'Developer' && (
+                {currentRole !== 'developer' && (
                   <button
                     onClick={() => {
                       returnToDeveloperAccount();
