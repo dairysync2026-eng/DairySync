@@ -22,7 +22,7 @@ interface SubsystemDashboardProps {
 }
 
 export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavigateTab }) => {
-  const { ingredients, transactions, currentUser } = useDairySync();
+  const { ingredients, transactions, currentUser, canAccessTab } = useDairySync();
 
   // Procurement specific computations
   const criticalRopItems = ingredients.filter(i => i.currentStock <= i.reorderPoint);
@@ -30,6 +30,26 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
   const rawMilk = ingredients.find(i => i.category === 'milk');
   const packagingItems = ingredients.filter(i => i.category === 'packaging');
   const lowPackagingCount = packagingItems.filter(i => i.currentStock <= i.reorderPoint).length;
+  const authorizedSubsystems = [
+    {
+      id: 'procurement',
+      label: 'ROP Procurement',
+      title: 'Reorder Point Orders',
+      meta: criticalRopItems.length > 0 ? `${criticalRopItems.length} Items Below ROP` : 'All Stocks Healthy',
+      className: 'bg-white hover:bg-amber-50/50 border-2 border-amber-200 rounded-2xl',
+      labelClass: 'text-amber-700',
+      metaClass: 'text-amber-600 font-bold'
+    },
+    {
+      id: 'ingredients',
+      label: 'Raw Ingredients',
+      title: 'Inventory Levels',
+      meta: `${ingredients.length} Stock Materials`,
+      className: 'bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl',
+      labelClass: 'text-slate-600',
+      metaClass: 'text-slate-500 font-medium'
+    }
+  ].filter(card => canAccessTab(card.id));
 
   // Recent procurement transactions (stock additions / purchase orders)
   const recentPurchases = transactions.filter(t => t.action === 'in_restock').slice(0, 5);
@@ -84,31 +104,20 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
             <span className="text-[10px] text-amber-700 font-medium mt-1">Summary of ROP & Raw Stock</span>
           </div>
 
-          <button
-            onClick={() => onNavigateTab('procurement')}
-            className="p-3 bg-white hover:bg-amber-50/50 border-2 border-amber-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-amber-700 uppercase">ROP Procurement</span>
-              <ArrowRight className="w-3.5 h-3.5 text-amber-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Reorder Point Orders</span>
-            <span className="text-[10px] text-amber-600 font-bold mt-1">
-              {criticalRopItems.length > 0 ? `${criticalRopItems.length} Items Below ROP` : 'All Stocks Healthy'}
-            </span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('ingredients')}
-            className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Raw Ingredients</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Inventory Levels</span>
-            <span className="text-[10px] text-slate-500 font-medium mt-1">{ingredients.length} Stock Materials</span>
-          </button>
+          {authorizedSubsystems.map(card => (
+            <button
+              key={card.id}
+              onClick={() => onNavigateTab(card.id)}
+              className={`p-3 flex flex-col justify-between text-left transition-all group ${card.className}`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className={`text-[10px] font-bold uppercase ${card.labelClass}`}>{card.label}</span>
+                <ArrowRight className={`w-3.5 h-3.5 ${card.id === 'procurement' ? 'text-amber-600' : 'text-slate-500'} group-hover:translate-x-0.5 transition-transform`} />
+              </div>
+              <span className="text-xs font-black text-slate-900 mt-1">{card.title}</span>
+              <span className={`text-[10px] mt-1 ${card.metaClass}`}>{card.meta}</span>
+            </button>
+          ))}
         </div>
       </div>
 

@@ -20,7 +20,7 @@ interface SubsystemDashboardProps {
 }
 
 export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavigateTab }) => {
-  const { finishedGoods, transactions, currentUser } = useDairySync();
+  const { finishedGoods, transactions, currentUser, canAccessTab } = useDairySync();
 
   // Calculate POS sales and metrics
   const posSalesTransactions = transactions.filter(t => t.action === 'out_sale' && t.itemType === 'finished_good');
@@ -31,6 +31,26 @@ export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
 
   const totalFinishedUnits = finishedGoods.reduce((sum, fg) => sum + fg.currentStock, 0);
   const totalRetailValuation = finishedGoods.reduce((sum, fg) => sum + (fg.currentStock * fg.unitPrice), 0);
+  const authorizedSubsystems = [
+    {
+      id: 'pos',
+      label: 'Dairy Box POS',
+      title: 'Walk-in Register',
+      meta: 'Ready for Checkout',
+      className: 'bg-white hover:bg-emerald-50/50 border-2 border-emerald-200 rounded-2xl',
+      labelClass: 'text-emerald-700',
+      metaClass: 'text-emerald-600 font-bold'
+    },
+    {
+      id: 'finished',
+      label: 'Cold Storage',
+      title: 'Finished Goods Chiller',
+      meta: `${totalFinishedUnits} Units in Stock`,
+      className: 'bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl',
+      labelClass: 'text-slate-600',
+      metaClass: 'text-slate-500 font-medium'
+    }
+  ].filter(card => canAccessTab(card.id));
 
   // Fast moving products
   const topProducts = [...finishedGoods].sort((a, b) => b.currentStock - a.currentStock).slice(0, 5);
@@ -85,29 +105,20 @@ export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
             <span className="text-[10px] text-emerald-700 font-medium mt-1">Store Sales & Stock</span>
           </div>
 
-          <button
-            onClick={() => onNavigateTab('pos')}
-            className="p-3 bg-white hover:bg-emerald-50/50 border-2 border-emerald-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-emerald-700 uppercase">Dairy Box POS</span>
-              <ArrowRight className="w-3.5 h-3.5 text-emerald-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Walk-in Register</span>
-            <span className="text-[10px] text-emerald-600 font-bold mt-1">Ready for Checkout</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('finished')}
-            className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Cold Storage</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Finished Goods Chiller</span>
-            <span className="text-[10px] text-slate-500 font-medium mt-1">{totalFinishedUnits} Units in Stock</span>
-          </button>
+          {authorizedSubsystems.map(card => (
+            <button
+              key={card.id}
+              onClick={() => onNavigateTab(card.id)}
+              className={`p-3 flex flex-col justify-between text-left transition-all group ${card.className}`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className={`text-[10px] font-bold uppercase ${card.labelClass}`}>{card.label}</span>
+                <ArrowRight className={`w-3.5 h-3.5 ${card.id === 'pos' ? 'text-emerald-600' : 'text-slate-500'} group-hover:translate-x-0.5 transition-transform`} />
+              </div>
+              <span className="text-xs font-black text-slate-900 mt-1">{card.title}</span>
+              <span className={`text-[10px] mt-1 ${card.metaClass}`}>{card.meta}</span>
+            </button>
+          ))}
         </div>
       </div>
 

@@ -21,7 +21,7 @@ interface SubsystemDashboardProps {
 }
 
 export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNavigateTab }) => {
-  const { finishedGoods, wipBatches, ingredients, currentUser } = useDairySync();
+  const { finishedGoods, wipBatches, ingredients, currentUser, canAccessTab } = useDairySync();
 
   const totalColdCapacity = finishedGoods.reduce((sum, fg) => sum + fg.coldStorageCapacity, 0);
   const currentColdStock = finishedGoods.reduce((sum, fg) => sum + fg.currentStock, 0);
@@ -29,6 +29,49 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
 
   const activeWipBatches = wipBatches.filter(b => b.status !== 'completed' && b.status !== 'cancelled');
   const rawMilk = ingredients.find(i => i.category === 'milk');
+
+  const subsystemCards = [
+    {
+      id: 'finished',
+      label: 'Cold Storage',
+      title: 'Finished Goods',
+      meta: `${coldOccupancyPct}% Occupied`,
+      className: 'bg-white hover:bg-teal-50/50 border-2 border-teal-200 rounded-2xl',
+      textColor: 'text-teal-700',
+      accent: 'text-teal-600',
+      onClick: () => onNavigateTab('finished')
+    },
+    {
+      id: 'wip',
+      label: 'WIP Batches',
+      title: 'Processing Lines',
+      meta: `${activeWipBatches.length} Active Runs`,
+      className: 'bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl',
+      textColor: 'text-slate-600',
+      accent: 'text-slate-500',
+      onClick: () => onNavigateTab('wip')
+    },
+    {
+      id: 'ingredients',
+      label: 'Raw Ingredients',
+      title: 'Bulk Storage',
+      meta: `${rawMilk?.currentStock ?? 0} L Milk Silo`,
+      className: 'bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl',
+      textColor: 'text-slate-600',
+      accent: 'text-slate-500',
+      onClick: () => onNavigateTab('ingredients')
+    },
+    {
+      id: 'procurement',
+      label: 'Procurement',
+      title: 'ROP Watch',
+      meta: 'Buffer Monitoring',
+      className: 'bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl',
+      textColor: 'text-slate-600',
+      accent: 'text-slate-500',
+      onClick: () => onNavigateTab('procurement')
+    }
+  ].filter(card => canAccessTab(card.id));
 
   // Nearest shelf life products
   const expiringSoon = [...finishedGoods].sort((a, b) => a.shelfLifeDays - b.shelfLifeDays).slice(0, 4);
@@ -83,65 +126,20 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
             <span className="text-[10px] text-teal-700 font-medium mt-1">Custody & Facility</span>
           </div>
 
-          <button
-            onClick={() => onNavigateTab('finished')}
-            className="p-3 bg-white hover:bg-teal-50/50 border-2 border-teal-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-teal-700 uppercase">Cold Storage</span>
-              <ArrowRight className="w-3.5 h-3.5 text-teal-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Finished Goods</span>
-            <span className="text-[10px] text-teal-600 font-bold mt-1">{coldOccupancyPct}% Occupied</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('wip')}
-            className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-600 uppercase">WIP Batches</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Processing Lines</span>
-            <span className="text-[10px] text-slate-500 font-medium mt-1">{activeWipBatches.length} Active Runs</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('ingredients')}
-            className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Raw Ingredients</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Bulk Storage</span>
-            <span className="text-[10px] text-slate-500 font-medium mt-1">{rawMilk?.currentStock} L Milk Silo</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('procurement')}
-            className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Procurement</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">ROP Watch</span>
-            <span className="text-[10px] text-slate-500 font-medium mt-1">Buffer Monitoring</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('audit')}
-            className="p-3 bg-indigo-50/80 hover:bg-indigo-100/70 border-2 border-indigo-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-indigo-700 uppercase">Audit Trail</span>
-              <ArrowRight className="w-3.5 h-3.5 text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Accountability</span>
-            <span className="text-[10px] text-indigo-600 font-bold mt-1">Stock Provenance</span>
-          </button>
+          {subsystemCards.map(card => (
+            <button
+              key={card.id}
+              onClick={card.onClick}
+              className={`p-3 flex flex-col justify-between text-left transition-all group ${card.className}`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className={`text-[10px] font-bold uppercase ${card.textColor}`}>{card.label}</span>
+                <ArrowRight className={`w-3.5 h-3.5 ${card.accent} group-hover:translate-x-0.5 transition-transform`} />
+              </div>
+              <span className="text-xs font-black text-slate-900 mt-1">{card.title}</span>
+              <span className={`text-[10px] font-medium mt-1 ${card.accent}`}>{card.meta}</span>
+            </button>
+          ))}
         </div>
       </div>
 

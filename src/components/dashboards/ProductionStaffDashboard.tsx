@@ -20,7 +20,7 @@ interface SubsystemDashboardProps {
 }
 
 export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ onNavigateTab }) => {
-  const { wipBatches, ingredients, currentUser, advanceWipBatchStep } = useDairySync();
+  const { wipBatches, ingredients, currentUser, advanceWipBatchStep, canAccessTab } = useDairySync();
 
   const activeBatches = wipBatches.filter(b => b.status !== 'completed' && b.status !== 'cancelled');
   const completedToday = wipBatches.filter(b => b.status === 'completed');
@@ -28,6 +28,26 @@ export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ on
   const totalTargetUnits = activeBatches.reduce((sum, b) => sum + b.targetQuantity, 0);
 
   const rawMilk = ingredients.find(i => i.category === 'milk');
+  const authorizedSubsystems = [
+    {
+      id: 'wip',
+      label: 'WIP Batches',
+      title: 'Active Batch Operations',
+      meta: `${activeBatches.length} Active Runs`,
+      className: 'bg-white hover:bg-indigo-50/50 border-2 border-indigo-200 rounded-2xl',
+      labelClass: 'text-indigo-700',
+      metaClass: 'text-indigo-600 font-bold'
+    },
+    {
+      id: 'ingredients',
+      label: 'Raw Ingredients',
+      title: 'Stock Requisitions',
+      meta: 'Raw Milk & Flavors',
+      className: 'bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl',
+      labelClass: 'text-slate-600',
+      metaClass: 'text-slate-500 font-medium'
+    }
+  ].filter(card => canAccessTab(card.id));
 
   const getNextStep = (status: WipBatch['status']): WipStep | null => {
     switch (status) {
@@ -101,29 +121,20 @@ export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ on
             <span className="text-[10px] text-indigo-700 font-medium mt-1">Daily Run Summary</span>
           </div>
 
-          <button
-            onClick={() => onNavigateTab('wip')}
-            className="p-3 bg-white hover:bg-indigo-50/50 border-2 border-indigo-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-indigo-700 uppercase">WIP Batches</span>
-              <ArrowRight className="w-3.5 h-3.5 text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Active Batch Operations</span>
-            <span className="text-[10px] text-indigo-600 font-bold mt-1">{activeBatches.length} Active Runs</span>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('ingredients')}
-            className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Raw Ingredients</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <span className="text-xs font-black text-slate-900 mt-1">Stock Requisitions</span>
-            <span className="text-[10px] text-slate-500 font-medium mt-1">Raw Milk & Flavors</span>
-          </button>
+          {authorizedSubsystems.map(card => (
+            <button
+              key={card.id}
+              onClick={() => onNavigateTab(card.id)}
+              className={`p-3 flex flex-col justify-between text-left transition-all group ${card.className}`}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className={`text-[10px] font-bold uppercase ${card.labelClass}`}>{card.label}</span>
+                <ArrowRight className={`w-3.5 h-3.5 ${card.id === 'wip' ? 'text-indigo-600' : 'text-slate-500'} group-hover:translate-x-0.5 transition-transform`} />
+              </div>
+              <span className="text-xs font-black text-slate-900 mt-1">{card.title}</span>
+              <span className={`text-[10px] mt-1 ${card.metaClass}`}>{card.meta}</span>
+            </button>
+          ))}
         </div>
       </div>
 
