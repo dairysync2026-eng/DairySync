@@ -29,7 +29,7 @@ import {
   ShieldCheck,
   BookOpen
 } from 'lucide-react';
-import { SystemDocumentation } from './components/SystemDocumentation';
+import { SystemDocumentation } from './components/SystemDocumentation.tsx';
 
 const MainLayout: React.FC = () => {
   const { isAuthenticated, canAccessTab, currentRole } = useDairySync();
