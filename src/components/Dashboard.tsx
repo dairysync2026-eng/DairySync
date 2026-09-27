@@ -67,7 +67,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       const product = finishedGoods.find(fg => fg.id === t.itemId);
       return sum + (t.quantity * (product?.unitPrice || 0));
     }, 0);
-  const feedingAllocatedTotal = finishedGoods.reduce((sum, fg) => sum + fg.allocatedFeedingProgram, 0);
 
   // 4. Executive Metrics (Director & Developer)
   const finishedValuation = finishedGoods.reduce((sum, fg) => sum + (fg.currentStock * fg.unitPrice), 0);
@@ -92,7 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Conditional Summary Cards by Role */}
         {currentRole === 'procurement' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-white border-2 border-rose-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold uppercase text-rose-600 tracking-wider">Critical ROP Items</span>
@@ -198,24 +197,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Cold Chiller Status</span>
-                <div className="p-2 bg-teal-50 text-teal-600 rounded-xl">
-                  <Snowflake className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-3xl font-black text-teal-700 font-mono">{coldOccupancyPct}%</span>
-                <span className="text-xs text-teal-600 font-bold ml-1.5">Chiller Intake Ready</span>
-                <p className="text-[11px] text-slate-500 mt-1 font-medium">3.8°C nominal storage temp</p>
-              </div>
-            </div>
           </div>
         )}
 
         {currentRole === 'store_outlet' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-white border-2 border-emerald-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold uppercase text-emerald-600 tracking-wider">Retail Ready Stock</span>
@@ -240,20 +226,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="mt-3">
                 <span className="text-2xl font-black text-slate-900 font-mono">₱{retailSalesToday.toLocaleString()}</span>
                 <p className="text-[11px] text-slate-500 mt-1 font-medium">Gross walk-in register receipts</p>
-              </div>
-            </div>
-
-            <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">School Feeding Reserve</span>
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
-                  <TrendingUp className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-3xl font-black text-slate-900 font-mono">{feedingAllocatedTotal}</span>
-                <span className="text-xs text-amber-600 font-bold ml-1.5">Units Protected</span>
-                <p className="text-[11px] text-slate-500 mt-1 font-medium">Reserved for DepEd allocation</p>
               </div>
             </div>
 

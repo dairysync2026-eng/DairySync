@@ -116,7 +116,7 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Your Authorized Subsystems</span>
           </span>
-          <span className="text-[11px] text-slate-500 font-medium">5 Active Subsystems</span>
+          <span className="text-[11px] text-slate-500 font-medium">4 Active Subsystems</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-6 gap-3">
