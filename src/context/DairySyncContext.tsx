@@ -1520,6 +1520,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           previousStock: fg.currentStock,
           newStock: newStock,
           referenceId: receiptRef,
+          unitPrice: fg.unitPrice,
           performedBy: currentUser.name,
           notes: 'MMSU Dairy Box Retail Sale'
         });

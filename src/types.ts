@@ -137,6 +137,7 @@ export interface StockTransaction {
   previousStock: number;
   newStock: number;
   referenceId?: string;
+  unitPrice?: number;
   performedBy: string;
   notes?: string;
 }

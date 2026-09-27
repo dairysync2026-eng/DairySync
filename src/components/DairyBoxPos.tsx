@@ -1,14 +1,40 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
-import { ShoppingCart, Plus, Minus, Trash2, CheckCircle2, Receipt, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, CheckCircle2, Receipt, AlertCircle, History, X } from 'lucide-react';
 
 export const DairyBoxPos: React.FC = () => {
-  const { finishedGoods, processRetailSale } = useDairySync();
+  const { finishedGoods, transactions, processRetailSale } = useDairySync();
   
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [lastReceipt, setLastReceipt] = useState<any | null>(null);
   const [coldStockNotice, setColdStockNotice] = useState<string | null>(null);
+  const [showSalesHistory, setShowSalesHistory] = useState(false);
+
+  const salesHistory = useMemo(() => {
+    const groupedSales = new Map<string, typeof transactions>();
+    transactions
+      .filter(transaction => transaction.action === 'out_sale' && transaction.itemType === 'finished_good')
+      .forEach(transaction => {
+        const receiptNo = transaction.referenceId || transaction.id;
+        const saleItems = groupedSales.get(receiptNo) || [];
+        groupedSales.set(receiptNo, [...saleItems, transaction]);
+      });
+
+    return Array.from(groupedSales, ([receiptNo, items]) => ({
+      receiptNo,
+      timestamp: items[0].timestamp,
+      cashier: items[0].performedBy,
+      items,
+      totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
+      totalAmount: items.every(item => typeof item.unitPrice === 'number')
+        ? items.reduce((sum, item) => sum + item.quantity * (item.unitPrice || 0), 0)
+        : null
+    })).sort((a, b) => {
+      const timeA = new Date(a.timestamp.replace(/\s+PST$/, '')).getTime();
+      const timeB = new Date(b.timestamp.replace(/\s+PST$/, '')).getTime();
+      return timeB - timeA;
+    });
+  }, [transactions]);
 
   const addToCart = (productId: string) => {
     setFeedback(null);
@@ -48,21 +74,6 @@ export const DairyBoxPos: React.FC = () => {
 
     const res = processRetailSale(cart);
     if (res.success) {
-      setLastReceipt({
-        receiptNo: `POS-REC-${Math.floor(1000 + Math.random() * 9000)}`,
-        date: new Date().toLocaleString() + ' PST',
-        items: cart.map(i => {
-          const fg = finishedGoods.find(p => p.id === i.productId);
-          return {
-            name: fg?.name || '',
-            qty: i.quantity,
-            price: fg?.unitPrice || 0,
-            subtotal: (fg?.unitPrice || 0) * i.quantity
-          };
-        }),
-        total: totalAmount
-      });
-
       setFeedback({ type: 'success', text: res.message });
       setColdStockNotice('Cold stock has been updated and synced to the inventory ledger after this sale.');
       setCart([]);
@@ -75,7 +86,7 @@ export const DairyBoxPos: React.FC = () => {
     <div className="space-y-6">
       
       {/* Header */}
-      <div className="bg-white border-2 border-slate-200 p-6 rounded-3xl shadow-sm flex items-center justify-between text-slate-900">
+      <div className="bg-white border-2 border-slate-200 p-5 sm:p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-slate-900">
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center space-x-2 tracking-tight">
             <ShoppingCart className="w-6 h-6 text-emerald-600" />
@@ -85,6 +96,15 @@ export const DairyBoxPos: React.FC = () => {
             Walk-in sales terminal with instant cold storage inventory deduction
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowSalesHistory(true)}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+        >
+          <History className="h-4 w-4" />
+          <span>Sales History</span>
+          <span className="rounded-full bg-white px-2 py-0.5 font-mono text-[10px]">{salesHistory.length}</span>
+        </button>
       </div>
 
       {feedback && (
@@ -223,25 +243,63 @@ export const DairyBoxPos: React.FC = () => {
 
       </div>
 
-      {/* Last Receipt Preview Modal */}
-      {lastReceipt && (
-        <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm space-y-3 max-w-md text-slate-900">
-          <div className="flex items-center justify-between border-b-2 border-slate-100 pb-2">
-            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Latest POS Sale Digital Receipt</span>
-            <span className="text-[10px] font-mono font-bold text-slate-500">{lastReceipt.receiptNo}</span>
-          </div>
-          <div className="text-xs space-y-1 text-slate-700 font-medium">
-            {lastReceipt.items.map((i: any, idx: number) => (
-              <div key={idx} className="flex justify-between">
-                <span>{i.name} x {i.qty}</span>
-                <span className="font-mono font-bold">₱{i.subtotal}.00</span>
+      {showSalesHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-3 sm:p-6" role="presentation">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pos-sales-history-title"
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl"
+          >
+            <header className="flex items-center justify-between border-b border-slate-200 p-4 sm:p-5">
+              <div>
+                <h2 id="pos-sales-history-title" className="text-lg font-extrabold">Sales History</h2>
+                <p className="mt-1 text-xs text-slate-500">Completed Dairy Box POS transactions</p>
               </div>
-            ))}
-            <div className="pt-2 border-t-2 border-slate-100 flex justify-between font-bold text-slate-900 text-sm">
-              <span>Total Paid:</span>
-              <span className="text-emerald-600 font-mono font-extrabold">₱{lastReceipt.total}.00</span>
+              <button
+                type="button"
+                onClick={() => setShowSalesHistory(false)}
+                aria-label="Close sales history"
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+            <div className="overflow-y-auto p-4 sm:p-5">
+              {salesHistory.length === 0 ? (
+                <p className="py-12 text-center text-sm text-slate-500">No completed sales recorded yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {salesHistory.map(sale => (
+                    <article key={sale.receiptNo} className="rounded-xl border border-slate-200 p-4">
+                      <div className="flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="font-mono text-sm font-bold text-slate-900">{sale.receiptNo}</h3>
+                          <p className="mt-1 text-xs text-slate-500">{sale.timestamp} · {sale.cashier}</p>
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <p className="text-xs font-semibold text-slate-600">{sale.totalQuantity} units</p>
+                          <p className="mt-1 text-sm font-extrabold text-emerald-700">
+                            {sale.totalAmount === null ? 'Total unavailable' : `₱${sale.totalAmount.toLocaleString()}.00`}
+                          </p>
+                        </div>
+                      </div>
+                      <ul className="mt-3 space-y-2 text-xs">
+                        {sale.items.map(item => (
+                          <li key={item.id} className="flex justify-between gap-3 text-slate-700">
+                            <span>{item.itemName} × {item.quantity}</span>
+                            <span className="shrink-0 font-mono text-slate-500">
+                              {typeof item.unitPrice === 'number' ? `₱${(item.quantity * item.unitPrice).toLocaleString()}.00` : `${item.quantity} ${item.unit}`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+          </section>
         </div>
       )}
 
