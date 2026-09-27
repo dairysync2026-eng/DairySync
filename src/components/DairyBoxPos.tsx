@@ -208,7 +208,7 @@ export const DairyBoxPos: React.FC = () => {
       )}
 
       {(feedback?.type === 'success' || coldStockNotice) && (
-        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3" role="status" aria-live="polite">
+        <div className="fixed bottom-5 left-5 z-40 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3" role="status" aria-live="polite">
           {feedback?.type === 'success' && (
             <button
               type="button"
