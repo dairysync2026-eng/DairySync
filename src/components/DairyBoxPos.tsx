@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { ShoppingCart, Plus, Minus, Trash2, Receipt, AlertCircle, History, X, Search, Printer, Eye, DollarSign, PackageCheck, TrendingUp } from 'lucide-react';
 import { ExportMenu } from './ExportMenu';
@@ -14,6 +14,12 @@ export const DairyBoxPos: React.FC = () => {
   const [salesSearch, setSalesSearch] = useState('');
   const [salesPeriod, setSalesPeriod] = useState<'all' | 'today' | '7days'>('all');
   const [selectedSaleReceipt, setSelectedSaleReceipt] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!coldStockNotice) return;
+    const timeoutId = window.setTimeout(() => setColdStockNotice(null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [coldStockNotice]);
 
   const salesHistory = useMemo(() => {
     const groupedSales = new Map<string, typeof transactions>();
@@ -198,19 +204,17 @@ export const DairyBoxPos: React.FC = () => {
       )}
 
       {coldStockNotice && (
-        <div className="relative">
-          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 shadow-sm max-w-xl">
-            <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                <AlertCircle className="w-4 h-4" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-extrabold text-amber-900">Cold Stock Updated</p>
-                <p className="text-xs text-amber-800 mt-1">{coldStockNotice}</p>
-              </div>
-              <button onClick={() => setColdStockNotice(null)} className="text-amber-600 hover:text-amber-900 font-bold">✕</button>
-            </div>
-          </div>
+        <div className="fixed bottom-5 right-5 z-40 animate-in fade-in slide-in-from-bottom-3" role="status" aria-live="polite">
+          <button
+            type="button"
+            onClick={() => setColdStockNotice(null)}
+            aria-label={`Cold stock updated. ${coldStockNotice}`}
+            title={`Cold Stock Updated: ${coldStockNotice}`}
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-amber-700 shadow-lg shadow-amber-950/10 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+          >
+            <AlertCircle className="h-5 w-5" />
+            <span className="sr-only">Cold Stock Updated</span>
+          </button>
         </div>
       )}
 
