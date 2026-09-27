@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface TabItem {
   id: string;
@@ -121,6 +121,8 @@ export const ScrollableTabBar: React.FC<ScrollableTabBarProps> = ({
     setIsDragging(false);
   };
 
+  const visibleTabs = tabs.filter(tab => canAccessTab(tab.id));
+
   return (
     <div className="relative group print:hidden select-none">
       {/* Outer Shell matching the design in user image with rounded corners and border */}
@@ -155,10 +157,9 @@ export const ScrollableTabBar: React.FC<ScrollableTabBarProps> = ({
             isDragging ? 'cursor-grabbing' : ''
           } [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent`}
         >
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
-            const isAllowed = canAccessTab(tab.id);
 
             return (
               <button
@@ -168,33 +169,18 @@ export const ScrollableTabBar: React.FC<ScrollableTabBarProps> = ({
                 className={`flex items-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-150 ${
                   isActive
                     ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-200 scale-100'
-                    : isAllowed
-                    ? 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 active:scale-98'
-                    : 'text-slate-400 bg-slate-50/80 hover:bg-rose-50 hover:text-rose-600 border border-transparent hover:border-rose-200'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100 active:scale-98'
                 }`}
-                title={
-                  isAllowed
-                    ? tab.label
-                    : `${tab.label} (Access Restricted to Authorized Personnel)`
-                }
+                  title={tab.label}
               >
                 <Icon
                   className={`w-4 h-4 shrink-0 ${
                     isActive
                       ? 'text-white'
-                      : isAllowed
-                      ? 'text-slate-500'
-                      : 'text-slate-400'
+                        : 'text-slate-500'
                   }`}
                 />
                 <span>{tab.label}</span>
-                {!isAllowed && (
-                  <Lock
-                    className={`w-3.5 h-3.5 ml-1 shrink-0 ${
-                      isActive ? 'text-rose-300' : 'text-rose-500'
-                    }`}
-                  />
-                )}
               </button>
             );
           })}
