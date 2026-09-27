@@ -74,18 +74,16 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Your Authorized Subsystems</span>
           </span>
-          <span className="text-[11px] text-slate-500 font-medium">2 Active Subsystems • 4 Locked by RBAC</span>
+          <span className="text-[11px] text-slate-500 font-medium">2 Active Subsystems</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
-          {/* 1. Command Center (Current) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="p-3 bg-amber-50/80 border-2 border-amber-300 rounded-2xl flex flex-col justify-between">
             <span className="text-[10px] font-bold text-amber-800 uppercase">Command Center</span>
             <span className="text-xs font-black text-amber-950 mt-1">Procurement Hub (Active)</span>
             <span className="text-[10px] text-amber-700 font-medium mt-1">Summary of ROP & Raw Stock</span>
           </div>
 
-          {/* 2. ROP Procurement (Authorized) */}
           <button
             onClick={() => onNavigateTab('procurement')}
             className="p-3 bg-white hover:bg-amber-50/50 border-2 border-amber-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
@@ -100,7 +98,6 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
             </span>
           </button>
 
-          {/* 3. Raw Ingredients (Authorized) */}
           <button
             onClick={() => onNavigateTab('ingredients')}
             className="p-3 bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl flex flex-col justify-between text-left transition-all group"
@@ -111,62 +108,6 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
             </div>
             <span className="text-xs font-black text-slate-900 mt-1">Inventory Levels</span>
             <span className="text-[10px] text-slate-500 font-medium mt-1">{ingredients.length} Stock Materials</span>
-          </button>
-
-          {/* 4. WIP Batches (Restricted) */}
-          <button
-            onClick={() => onNavigateTab('wip')}
-            className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between text-left opacity-70 hover:opacity-100 hover:border-rose-200 transition-all"
-            title="Restricted subsystem - click to inspect RBAC authorization policy"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">WIP Batches</span>
-              <Lock className="w-3 h-3 text-rose-500" />
-            </div>
-            <span className="text-xs font-bold text-slate-600 mt-1">Production Runs</span>
-            <span className="text-[10px] text-rose-600 font-bold mt-1">Restricted</span>
-          </button>
-
-          {/* 5. Cold Storage (Restricted) */}
-          <button
-            onClick={() => onNavigateTab('finished')}
-            className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between text-left opacity-70 hover:opacity-100 hover:border-rose-200 transition-all"
-            title="Restricted subsystem - click to inspect RBAC authorization policy"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Cold Storage</span>
-              <Lock className="w-3 h-3 text-rose-500" />
-            </div>
-            <span className="text-xs font-bold text-slate-600 mt-1">Finished Goods</span>
-            <span className="text-[10px] text-rose-600 font-bold mt-1">Restricted</span>
-          </button>
-
-          {/* 6. Supply & Demand Sync (Restricted) */}
-          <button
-            onClick={() => onNavigateTab('sync')}
-            className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between text-left opacity-70 hover:opacity-100 hover:border-rose-200 transition-all"
-            title="Restricted subsystem - click to inspect RBAC authorization policy"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Supply & Demand</span>
-              <Lock className="w-3 h-3 text-rose-500" />
-            </div>
-            <span className="text-xs font-bold text-slate-600 mt-1">Commitments</span>
-            <span className="text-[10px] text-rose-600 font-bold mt-1">Restricted</span>
-          </button>
-
-          {/* 7. Dairy Box POS (Restricted) */}
-          <button
-            onClick={() => onNavigateTab('pos')}
-            className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col justify-between text-left opacity-70 hover:opacity-100 hover:border-rose-200 transition-all"
-            title="Restricted subsystem - click to inspect RBAC authorization policy"
-          >
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Dairy Box POS</span>
-              <Lock className="w-3 h-3 text-rose-500" />
-            </div>
-            <span className="text-xs font-bold text-slate-600 mt-1">Retail Checkout</span>
-            <span className="text-[10px] text-rose-600 font-bold mt-1">Restricted</span>
           </button>
         </div>
       </div>
