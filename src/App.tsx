@@ -26,8 +26,10 @@ import {
   ShoppingCart,
   Award,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  BookOpen
 } from 'lucide-react';
+import { SystemDocumentation } from './components/SystemDocumentation';
 
 const MainLayout: React.FC = () => {
   const { isAuthenticated, canAccessTab, currentRole } = useDairySync();
@@ -56,7 +58,8 @@ const MainLayout: React.FC = () => {
     { id: 'sync', label: 'Supply & Demand', icon: TrendingUp },
     { id: 'procurement', label: 'ROP Procurement', icon: Truck },
     { id: 'pos', label: 'Dairy Box POS', icon: ShoppingCart },
-    { id: 'audit', label: 'Audit Trail', icon: ShieldCheck }
+    { id: 'audit', label: 'Audit Trail', icon: ShieldCheck },
+    { id: 'documentation', label: 'System Manual', icon: BookOpen }
   ];
 
   return (
@@ -115,6 +118,8 @@ const MainLayout: React.FC = () => {
                 {activeTab === 'pos' && <DairyBoxPos />}
 
                 {activeTab === 'audit' && <AuditTrail />}
+
+                {activeTab === 'documentation' && <SystemDocumentation />}
               </>
             )}
           </div>

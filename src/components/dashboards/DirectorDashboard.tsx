@@ -15,8 +15,7 @@ import {
   ArrowRight,
   Truck,
   Factory,
-  Package,
-  ShoppingCart
+  Package
 } from 'lucide-react';
 
 interface SubsystemDashboardProps {
@@ -153,17 +152,6 @@ export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({
             <span className="text-[10px] font-bold text-slate-500 uppercase">Purchasing</span>
             <div className="flex items-center justify-between mt-1">
               <span className="text-xs font-black text-slate-900">ROP Procurement</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </button>
-
-          <button
-            onClick={() => onNavigateTab('pos')}
-            className="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-left transition-all group"
-          >
-            <span className="text-[10px] font-bold text-slate-500 uppercase">Retail Outlet</span>
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-xs font-black text-slate-900">Dairy Box POS</span>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>

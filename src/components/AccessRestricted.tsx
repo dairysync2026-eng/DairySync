@@ -31,6 +31,7 @@ export const AccessRestricted: React.FC<AccessRestrictedProps> = ({
       case 'procurement': return 'ROP Procurement Management';
       case 'pos': return 'Dairy Box Point of Sale (POS)';
       case 'audit': return 'Operational & Regulatory Audit Trail';
+      case 'documentation': return 'System Manual & Documentation';
       default: return tab.toUpperCase();
     }
   };
@@ -44,6 +45,7 @@ export const AccessRestricted: React.FC<AccessRestrictedProps> = ({
       case 'procurement': return ['Developer (Superuser)', 'Director', 'Admin Asst IV (Procurement)', 'Plant Manager'];
       case 'pos': return ['Developer (Superuser)', 'Director', 'Dairy Box Store Outlet'];
       case 'audit': return ['Lead Developer (Superuser)', 'Director / PMO Supervisor'];
+      case 'documentation': return ['Lead Developer (Superuser)', 'Director / PMO Supervisor'];
       default: return ['Developer (Superuser)', 'Director'];
     }
   };

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { PrintStockReportModal } from './PrintStockReportModal';
 import { ExportMenu } from './ExportMenu';
+import { downloadCsv } from '../utils/csv';
 
 export interface ExpiryInfo {
   dateStr?: string;
@@ -281,7 +282,6 @@ export const RawIngredients: React.FC = () => {
   };
 
   const handleExportIngredientsCsv = () => {
-    const exportData = filtered.length > 0 ? filtered : ingredients;
     const headers = [
       'SKU',
       'Name',
@@ -299,34 +299,27 @@ export const RawIngredients: React.FC = () => {
       'Location',
       'Last Restocked'
     ];
-    const rows = exportData.map(i => {
+    const rows = filtered.map(i => {
       const exp = getIngredientExpiryInfo(i.expiryDate);
       return [
-        `"${i.sku}"`,
-        `"${i.name}"`,
-        `"${i.category}"`,
+        i.sku,
+        i.name,
+        i.category,
         i.currentStock,
-        `"${i.unit}"`,
+        i.unit,
         i.reorderPoint,
         i.safetyStock,
         i.maxStock,
-        `"${i.expiryDate || 'N/A'}"`,
-        `"${exp.label}"`,
+        i.expiryDate || 'N/A',
+        exp.label,
         i.costPerUnit,
         (i.currentStock * i.costPerUnit).toFixed(2),
-        `"${i.supplier}"`,
-        `"${i.location}"`,
-        `"${i.lastRestocked}"`
+        i.supplier,
+        i.location,
+        i.lastRestocked
       ];
     });
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `DairySync_Raw_Ingredients_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(`DairySync_Raw_Ingredients_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
   };
 
   const clearFilters = () => {

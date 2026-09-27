@@ -25,6 +25,7 @@ import {
 import { BatchExpirationWidget } from './BatchExpirationWidget';
 import { PrintStockReportModal } from './PrintStockReportModal';
 import { ExportMenu } from './ExportMenu';
+import { downloadCsv } from '../utils/csv';
 
 interface FinishedGoodsProps {
   onNavigateTab?: (tab: string) => void;
@@ -232,7 +233,6 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
   };
 
   const handleExportFinishedGoodsCsv = () => {
-    const dataToExport = filteredGoods.length > 0 ? filteredGoods : finishedGoods;
     const headers = [
       'SKU',
       'Name',
@@ -248,10 +248,10 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       'Shelf Life Days',
       'Storage Location'
     ];
-    const rows = dataToExport.map(fg => [
-      `"${fg.sku}"`,
-      `"${fg.name}"`,
-      `"${fg.category}"`,
+    const rows = filteredGoods.map(fg => [
+      fg.sku,
+      fg.name,
+      fg.category,
       fg.currentStock,
       fg.safetyStock ?? 50,
       fg.coldStorageCapacity,
@@ -261,16 +261,9 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       fg.allocatedFeedingProgram,
       fg.allocatedRetail,
       fg.shelfLifeDays,
-      `"${fg.location}"`
+      fg.location
     ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `DairySync_Cold_Storage_Inventory_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(`DairySync_Cold_Storage_Inventory_${new Date().toISOString().split('T')[0]}.csv`, headers, rows);
   };
 
   return (

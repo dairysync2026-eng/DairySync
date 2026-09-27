@@ -34,8 +34,8 @@ import {
 } from '../data/initialData';
 
 export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
-  developer: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit'],
-  director: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit'],
+  developer: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
+  director: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
   procurement: ['dashboard', 'procurement', 'ingredients'],
   plant_manager: ['dashboard', 'finished', 'wip', 'ingredients', 'procurement'],
   production_staff: ['dashboard', 'wip', 'ingredients'],
@@ -158,6 +158,10 @@ const normalizeRole = (role: string | undefined | null): UserRole => {
     case 'developer':
       return 'developer';
     case 'director':
+    case 'pmo':
+    case 'pmo/director':
+    case 'director/pmo':
+    case 'pmo_director':
       return 'director';
     case 'procurement':
       return 'procurement';
@@ -172,7 +176,7 @@ const normalizeRole = (role: string | undefined | null): UserRole => {
     case 'dairybox':
       return 'store_outlet';
     default:
-      return 'developer';
+      return 'production_staff';
   }
 };
 

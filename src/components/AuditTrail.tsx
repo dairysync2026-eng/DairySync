@@ -35,7 +35,6 @@ export const AuditTrail: React.FC = () => {
     auditLogs, 
     currentUser, 
     currentRole,
-    isDeveloperActive,
     users, 
     logAuditAction, 
     clearAuditLogs, 
@@ -43,7 +42,7 @@ export const AuditTrail: React.FC = () => {
   } = useDairySync();
 
   // Enforce access control: only Lead Developer and Director can access Audit Trail
-  const isAuthorized = currentRole === 'developer' || currentRole === 'director' || isDeveloperActive;
+  const isAuthorized = currentRole === 'developer' || currentRole === 'director';
 
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +51,8 @@ export const AuditTrail: React.FC = () => {
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [selectedActionType, setSelectedActionType] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7days' | '30days'>('all');
+  const [fromTimestamp, setFromTimestamp] = useState('');
+  const [toTimestamp, setToTimestamp] = useState('');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   
   // Modal states
@@ -88,6 +89,7 @@ export const AuditTrail: React.FC = () => {
         const matchesSearch = 
           log.description.toLowerCase().includes(query) ||
           log.action.toLowerCase().includes(query) ||
+          log.userId.toLowerCase().includes(query) ||
           log.userName.toLowerCase().includes(query) ||
           log.subsystem.toLowerCase().includes(query) ||
           (log.details?.itemOrBatch && String(log.details.itemOrBatch).toLowerCase().includes(query)) ||
@@ -120,21 +122,30 @@ export const AuditTrail: React.FC = () => {
         return false;
       }
 
-      // 6. Date filter
+      // 6. Timestamp bounds and quick date filter
+      const logDate = new Date(log.timestamp.replace(/\s+PST$/, ''));
+      const logTime = logDate.getTime();
+      if (fromTimestamp && (!Number.isFinite(logTime) || logTime < new Date(fromTimestamp).getTime())) {
+        return false;
+      }
+      const toLimit = toTimestamp ? new Date(toTimestamp).getTime() + 60_000 - 1 : null;
+      if (toLimit !== null && (!Number.isFinite(logTime) || logTime > toLimit)) {
+        return false;
+      }
+
       if (dateFilter !== 'all') {
-        const logDate = new Date(log.timestamp.replace(' PST', ''));
         const now = new Date();
-        if (!isNaN(logDate.getTime())) {
-          const diffHours = (now.getTime() - logDate.getTime()) / (1000 * 3600);
-          if (dateFilter === 'today' && diffHours > 24) return false;
-          if (dateFilter === '7days' && diffHours > 24 * 7) return false;
-          if (dateFilter === '30days' && diffHours > 24 * 30) return false;
-        }
+        if (!Number.isFinite(logTime)) return false;
+        const diffHours = (now.getTime() - logTime) / (1000 * 3600);
+        if (diffHours < 0) return false;
+        if (dateFilter === 'today' && diffHours > 24) return false;
+        if (dateFilter === '7days' && diffHours > 24 * 7) return false;
+        if (dateFilter === '30days' && diffHours > 24 * 30) return false;
       }
 
       return true;
     });
-  }, [auditLogs, searchTerm, selectedCategory, selectedUser, selectedSeverity, selectedActionType, dateFilter]);
+  }, [auditLogs, searchTerm, selectedCategory, selectedUser, selectedSeverity, selectedActionType, dateFilter, fromTimestamp, toTimestamp]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -154,8 +165,10 @@ export const AuditTrail: React.FC = () => {
     if (selectedSeverity !== 'all') parts.push(`Severity: ${selectedSeverity}`);
     if (selectedActionType !== 'all') parts.push(`Action: ${selectedActionType}`);
     if (dateFilter !== 'all') parts.push(`Range: ${dateFilter === 'today' ? 'Past 24h' : dateFilter === '7days' ? 'Past 7d' : 'Past 30d'}`);
+    if (fromTimestamp) parts.push(`From: ${fromTimestamp.replace('T', ' ')}`);
+    if (toTimestamp) parts.push(`To: ${toTimestamp.replace('T', ' ')}`);
     return parts.length > 0 ? parts.join(' | ') : 'All Subsystems & Operators';
-  }, [searchTerm, selectedCategory, selectedUser, selectedSeverity, selectedActionType, dateFilter]);
+  }, [searchTerm, selectedCategory, selectedUser, selectedSeverity, selectedActionType, dateFilter, fromTimestamp, toTimestamp]);
 
   // Handler for Manual Audit Log Submission
   const handleCreateManualAudit = (e: React.FormEvent) => {
@@ -253,7 +266,7 @@ export const AuditTrail: React.FC = () => {
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                Centralized provenance tracking user actions, BOM deductions, WIP step advances & cold storage changes
+                Local browser audit records for user actions, BOM deductions, WIP step advances & cold storage changes
               </p>
             </div>
           </div>
@@ -294,9 +307,9 @@ export const AuditTrail: React.FC = () => {
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Audit Logs</p>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">{stats.total}</span>
-            <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Synchronized</span>
+            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Browser Local</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1 truncate">Recorded system-wide events</p>
+          <p className="text-[11px] text-slate-500 mt-1 truncate">Cloud SQL audit API is not configured</p>
         </div>
 
         <div className="bg-white border-2 border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm">
@@ -355,19 +368,19 @@ export const AuditTrail: React.FC = () => {
             <button
               onClick={() => setIsFiltersOpen(!isFiltersOpen)}
               className={`flex items-center justify-center space-x-2 px-4 py-2.5 rounded-2xl text-xs font-bold border transition-all ${
-                isFiltersOpen || selectedCategory !== 'all' || selectedUser !== 'all' || selectedSeverity !== 'all' || selectedActionType !== 'all' || dateFilter !== 'all'
+                isFiltersOpen || selectedCategory !== 'all' || selectedUser !== 'all' || selectedSeverity !== 'all' || selectedActionType !== 'all' || dateFilter !== 'all' || fromTimestamp || toTimestamp
                   ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                   : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
               <span>Filters</span>
-              {(selectedCategory !== 'all' || selectedUser !== 'all' || selectedSeverity !== 'all' || selectedActionType !== 'all' || dateFilter !== 'all') && (
+              {(selectedCategory !== 'all' || selectedUser !== 'all' || selectedSeverity !== 'all' || selectedActionType !== 'all' || dateFilter !== 'all' || fromTimestamp || toTimestamp) && (
                 <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
               )}
             </button>
 
-            {(searchTerm || selectedCategory !== 'all' || selectedUser !== 'all' || selectedSeverity !== 'all' || selectedActionType !== 'all' || dateFilter !== 'all') && (
+            {(searchTerm || selectedCategory !== 'all' || selectedUser !== 'all' || selectedSeverity !== 'all' || selectedActionType !== 'all' || dateFilter !== 'all' || fromTimestamp || toTimestamp) && (
               <button
                 onClick={() => {
                   setSearchTerm('');
@@ -376,6 +389,8 @@ export const AuditTrail: React.FC = () => {
                   setSelectedSeverity('all');
                   setSelectedActionType('all');
                   setDateFilter('all');
+                  setFromTimestamp('');
+                  setToTimestamp('');
                 }}
                 className="px-3 py-2.5 rounded-2xl text-xs font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition-colors"
                 title="Reset all filters"
@@ -388,7 +403,7 @@ export const AuditTrail: React.FC = () => {
 
         {/* Expandable Filter Controls */}
         {isFiltersOpen && (
-          <div className="pt-3 border-t-2 border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 animate-in fade-in duration-150">
+          <div className="pt-3 border-t-2 border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 animate-in fade-in duration-150">
             
             {/* Subsystem / Category */}
             <div>
@@ -414,7 +429,7 @@ export const AuditTrail: React.FC = () => {
             {/* User / Operator */}
             <div>
               <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
-                Operator / User
+                User ID / Operator
               </label>
               <select
                 value={selectedUser}
@@ -424,7 +439,7 @@ export const AuditTrail: React.FC = () => {
                 <option value="all">All Operators</option>
                 {users.map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.name} ({u.role})
+                    {u.id} - {u.name} ({u.role})
                   </option>
                 ))}
               </select>
@@ -480,6 +495,31 @@ export const AuditTrail: React.FC = () => {
                 <option value="7days">Past 7 Days</option>
                 <option value="30days">Past 30 Days</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+                From Timestamp
+              </label>
+              <input
+                type="datetime-local"
+                value={fromTimestamp}
+                onChange={e => setFromTimestamp(e.target.value)}
+                className="w-full min-w-0 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-500 mb-1">
+                To Timestamp
+              </label>
+              <input
+                type="datetime-local"
+                value={toTimestamp}
+                min={fromTimestamp || undefined}
+                onChange={e => setToTimestamp(e.target.value)}
+                className="w-full min-w-0 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:outline-none focus:border-indigo-500"
+              />
             </div>
 
           </div>
