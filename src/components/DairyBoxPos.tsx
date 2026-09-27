@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
-import { ShoppingCart, Plus, Minus, Trash2, Receipt, AlertCircle, History, X, Search, Printer, Eye, DollarSign, PackageCheck, TrendingUp } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Receipt, AlertCircle, History, X, Search, Printer, Eye, DollarSign, PackageCheck, TrendingUp, CheckCircle2 } from 'lucide-react';
 import { ExportMenu } from './ExportMenu';
 import { downloadCsv } from '../utils/csv';
 
@@ -20,6 +20,12 @@ export const DairyBoxPos: React.FC = () => {
     const timeoutId = window.setTimeout(() => setColdStockNotice(null), 5000);
     return () => window.clearTimeout(timeoutId);
   }, [coldStockNotice]);
+
+  useEffect(() => {
+    if (feedback?.type !== 'success') return;
+    const timeoutId = window.setTimeout(() => setFeedback(null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [feedback]);
 
   const salesHistory = useMemo(() => {
     const groupedSales = new Map<string, typeof transactions>();
@@ -194,17 +200,28 @@ export const DairyBoxPos: React.FC = () => {
         </button>
       </div>
 
-      {feedback && (
-        <div className={`p-4 rounded-2xl border-2 text-xs flex items-center justify-between font-semibold ${
-          feedback.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
-        }`}>
+      {feedback?.type === 'error' && (
+        <div className="p-4 rounded-2xl border-2 text-xs flex items-center justify-between font-semibold bg-rose-50 border-rose-200 text-rose-800">
           <span className="font-bold">{feedback.text}</span>
           <button onClick={() => setFeedback(null)} className="text-slate-400 hover:text-slate-900 font-bold">✕</button>
         </div>
       )}
 
-      {coldStockNotice && (
-        <div className="fixed bottom-5 right-5 z-40 animate-in fade-in slide-in-from-bottom-3" role="status" aria-live="polite">
+      {(feedback?.type === 'success' || coldStockNotice) && (
+        <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3" role="status" aria-live="polite">
+          {feedback?.type === 'success' && (
+            <button
+              type="button"
+              onClick={() => setFeedback(null)}
+              aria-label={feedback.text}
+              title={feedback.text}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-emerald-300 bg-emerald-50 text-emerald-700 shadow-lg shadow-emerald-950/10 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            >
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="sr-only">Sale processed and synchronized</span>
+            </button>
+          )}
+          {coldStockNotice && (
           <button
             type="button"
             onClick={() => setColdStockNotice(null)}
@@ -215,6 +232,7 @@ export const DairyBoxPos: React.FC = () => {
             <AlertCircle className="h-5 w-5" />
             <span className="sr-only">Cold Stock Updated</span>
           </button>
+          )}
         </div>
       )}
 
