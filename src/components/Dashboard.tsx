@@ -1,7 +1,6 @@
 import React from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { DeveloperDashboard } from './dashboards/DeveloperDashboard';
-import { DirectorDashboard } from './dashboards/DirectorDashboard';
 import { ProcurementDashboard } from './dashboards/ProcurementDashboard';
 import { PlantManagerDashboard } from './dashboards/PlantManagerDashboard';
 import { ProductionStaffDashboard } from './dashboards/ProductionStaffDashboard';
@@ -249,7 +248,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
 
-        {(currentRole === 'director' || currentRole === 'developer') && (
+        {currentRole === 'developer' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
@@ -311,14 +310,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Primary Role Specific Subsystem Dashboard */}
       {currentRole === 'developer' && (
         <DeveloperDashboard 
-          onNavigateTab={onNavigateTab} 
-          onOpenIsoSurvey={onOpenIsoSurvey} 
-          onOpenReports={onOpenReports} 
-        />
-      )}
-
-      {currentRole === 'director' && (
-        <DirectorDashboard 
           onNavigateTab={onNavigateTab} 
           onOpenIsoSurvey={onOpenIsoSurvey} 
           onOpenReports={onOpenReports} 
