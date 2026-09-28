@@ -4,13 +4,17 @@ import { ShoppingCart, Plus, Minus, Trash2, Receipt, AlertCircle, History, X, Se
 import { ExportMenu } from './ExportMenu';
 import { downloadCsv } from '../utils/csv';
 
-export const DairyBoxPos: React.FC = () => {
+interface DairyBoxPosProps {
+  salesHistoryOnly?: boolean;
+}
+
+export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = false }) => {
   const { finishedGoods, transactions, processRetailSale } = useDairySync();
   
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [coldStockNotice, setColdStockNotice] = useState<string | null>(null);
-  const [showSalesHistory, setShowSalesHistory] = useState(false);
+  const [showSalesHistory, setShowSalesHistory] = useState(salesHistoryOnly);
   const [salesSearch, setSalesSearch] = useState('');
   const [salesPeriod, setSalesPeriod] = useState<'all' | 'today' | '7days'>('all');
   const [selectedSaleReceipt, setSelectedSaleReceipt] = useState<string | null>(null);
@@ -177,7 +181,8 @@ export const DairyBoxPos: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      
+      {!salesHistoryOnly && (
+        <>
       {/* Header */}
       <div className="bg-white border-2 border-slate-200 p-5 sm:p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-slate-900">
         <div>
@@ -345,14 +350,19 @@ export const DairyBoxPos: React.FC = () => {
         </div>
 
       </div>
+        </>
+      )}
 
       {showSalesHistory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-2 sm:p-5" role="presentation">
+        <div
+          className={salesHistoryOnly ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-2 sm:p-5'}
+          role={salesHistoryOnly ? undefined : 'presentation'}
+        >
           <section
-            role="dialog"
-            aria-modal="true"
+            role={salesHistoryOnly ? 'region' : 'dialog'}
+            aria-modal={salesHistoryOnly ? undefined : true}
             aria-labelledby="pos-sales-history-title"
-            className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl"
+            className={`flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm ${salesHistoryOnly ? 'max-h-[75vh] max-w-none' : 'max-h-[92vh] max-w-6xl shadow-2xl'}`}
           >
             <header className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div className="flex min-w-0 items-center gap-3">
@@ -385,7 +395,7 @@ export const DairyBoxPos: React.FC = () => {
                 >
                   <Printer className="h-4 w-4" />
                 </button>
-                <button
+                {!salesHistoryOnly && <button
                   type="button"
                   onClick={() => setShowSalesHistory(false)}
                   aria-label="Close sales history"
@@ -393,7 +403,7 @@ export const DairyBoxPos: React.FC = () => {
                   className="rounded-xl p-2.5 text-slate-400 hover:bg-slate-200 hover:text-slate-800"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </button>}
               </div>
             </header>
             <div className="min-h-0 space-y-5 overflow-y-auto p-4 sm:p-6">
@@ -504,13 +514,13 @@ export const DairyBoxPos: React.FC = () => {
             </div>
             <footer className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <p className="text-[11px] text-slate-500">Showing {filteredSales.length} of {salesHistory.length} total registered receipts</p>
-              <button
+              {!salesHistoryOnly && <button
                 type="button"
                 onClick={() => setShowSalesHistory(false)}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700"
               >
                 Close Sales History
-              </button>
+              </button>}
             </footer>
           </section>
         </div>
