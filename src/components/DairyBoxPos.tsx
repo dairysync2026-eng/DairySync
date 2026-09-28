@@ -353,7 +353,7 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
         </>
       )}
 
-      {showSalesHistory && (
+      {(showSalesHistory || salesHistoryOnly) && (
         <div
           className={salesHistoryOnly ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-2 sm:p-5'}
           role={salesHistoryOnly ? undefined : 'presentation'}
@@ -526,7 +526,7 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
         </div>
       )}
 
-      {selectedSale && showSalesHistory && (
+      {selectedSale && (showSalesHistory || salesHistoryOnly) && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
           <section role="dialog" aria-modal="true" aria-labelledby="sale-details-title" className="w-full max-w-lg rounded-2xl bg-white p-5 text-slate-900 shadow-2xl">
             <header className="flex items-start justify-between border-b border-slate-200 pb-3">
