@@ -150,6 +150,20 @@ interface DairySyncContextType {
 const DairySyncContext = createContext<DairySyncContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'dairysync_pcc_mmsu_state_v1';
+const DIRECTOR_READ_ONLY_ACTIONS = new Set([
+  'add a raw material',
+  'update raw material stock',
+  'bulk update raw material stock',
+  'delete raw materials',
+  'add a finished product',
+  'update finished goods stock',
+  'update finished goods safety stock',
+  'bulk update finished goods stock',
+  'delete finished goods',
+  'create a production batch',
+  'advance a production batch',
+  'cancel a production batch'
+]);
 
 const normalizeRole = (role: string | undefined | null): UserRole => {
   const normalized = (role ?? 'developer').trim().toLowerCase();
@@ -1707,6 +1721,10 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const authorizeDirectorMutation = (action: string): boolean => {
     if (currentRole !== 'director') return true;
+    if (DIRECTOR_READ_ONLY_ACTIONS.has(action)) {
+      window.alert('Director / PMO access to Raw Ingredients, WIP Batches, and Cold Storage is read-only.');
+      return false;
+    }
 
     const passwordAttempt = window.prompt(`Director / PMO re-authentication required to ${action}. Enter your account password:`);
     if (passwordAttempt === null || !passwordAttempt.trim()) return false;

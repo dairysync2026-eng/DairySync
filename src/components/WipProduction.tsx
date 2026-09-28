@@ -28,8 +28,10 @@ export const WipProduction: React.FC = () => {
     createWipBatch, 
     advanceWipBatchStep,
     cancelWipBatch,
-    currentUser
+    currentUser,
+    currentRole
   } = useDairySync();
+  const isDirectorReadOnly = currentRole === 'director';
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string>(finishedGoods[0]?.id || '');
@@ -130,9 +132,10 @@ export const WipProduction: React.FC = () => {
           <p className="text-xs text-slate-500 mt-1 font-medium">
             Real-time batch lifecycle tracking with automated Bill of Materials (BOM) ingredient deduction
           </p>
+          {isDirectorReadOnly && <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Director / PMO · Read only</span>}
         </div>
 
-        <button
+        {!isDirectorReadOnly && <button
           onClick={() => {
             setFeedbackMessage(null);
             setShowCreateModal(true);
@@ -141,7 +144,7 @@ export const WipProduction: React.FC = () => {
         >
           <Plus className="w-4 h-4" />
           <span>Start New Production Batch</span>
-        </button>
+        </button>}
       </div>
 
       {/* Global Feedback Banner */}
@@ -224,7 +227,7 @@ export const WipProduction: React.FC = () => {
                       </div>
 
                       {/* Advance Step Button */}
-                      {batch.status !== 'completed' && (
+                      {batch.status !== 'completed' && !isDirectorReadOnly && (
                         <div className="pt-2 border-t border-slate-100 flex justify-end">
                           {batch.status === 'scheduled' && (
                             <div className="flex items-center space-x-2 w-full">
@@ -292,7 +295,7 @@ export const WipProduction: React.FC = () => {
       <HistoricalBatchesTable />
 
       {/* Cancellation Confirmation & Reason Modal */}
-      {batchToCancel && (
+      {batchToCancel && !isDirectorReadOnly && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-slate-900 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -406,7 +409,7 @@ export const WipProduction: React.FC = () => {
       )}
 
       {/* Start Production Batch Modal with Automated BOM Inspection */}
-      {showCreateModal && (
+      {showCreateModal && !isDirectorReadOnly && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-200 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-slate-900">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

@@ -3,15 +3,18 @@ import { useDairySync } from '../context/DairySyncContext';
 import { Truck, AlertTriangle, CheckCircle2, ShoppingBag, Send, FileText } from 'lucide-react';
 
 export const Procurement: React.FC = () => {
-  const { ingredients, updateIngredientStock } = useDairySync();
+  const { ingredients, updateIngredientStock, currentRole } = useDairySync();
+  const isDirectorReadOnly = currentRole === 'director';
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
 
   const ropTriggered = ingredients.filter(i => i.currentStock <= i.reorderPoint);
 
   const handleSimulateRestock = (id: string, ropQty: number) => {
+    if (isDirectorReadOnly) return;
     const item = ingredients.find(i => i.id === id);
     if (!item) return;
-    updateIngredientStock(id, item.currentStock + ropQty, `Procurement Order Restock (+${ropQty} ${item.unit})`);
+    const updated = updateIngredientStock(id, item.currentStock + ropQty, `Procurement Order Restock (+${ropQty} ${item.unit})`);
+    if (!updated) return;
     setOrderedIds(prev => [...prev, id]);
   };
 
@@ -28,6 +31,7 @@ export const Procurement: React.FC = () => {
           <p className="text-xs text-slate-500 mt-1 font-medium">
             Predictive procurement triggers for raw materials, flavorings, PET bottles & packaging to prevent production halts
           </p>
+          {isDirectorReadOnly && <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Director / PMO · Read only</span>}
         </div>
       </div>
 
@@ -82,13 +86,15 @@ export const Procurement: React.FC = () => {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => handleSimulateRestock(item.id, recommendedOrder)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl flex items-center space-x-1.5 shadow-sm transition-colors"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Issue Restock Purchase Order</span>
-                    </button>
+                    {!isDirectorReadOnly && (
+                      <button
+                        onClick={() => handleSimulateRestock(item.id, recommendedOrder)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-2xl flex items-center space-x-1.5 shadow-sm transition-colors"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Issue Restock Purchase Order</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               );

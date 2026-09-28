@@ -102,8 +102,10 @@ export const RawIngredients: React.FC = () => {
   const { 
     ingredients, 
     addIngredient, 
-    updateIngredientStock
+    updateIngredientStock,
+    currentRole
   } = useDairySync();
+  const isDirectorReadOnly = currentRole === 'director';
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -414,6 +416,7 @@ export const RawIngredients: React.FC = () => {
           <p className="text-xs text-slate-500 mt-1 font-medium">
             Raw materials, batch expiry tracking, safety buffers & inventory management
           </p>
+          {isDirectorReadOnly && <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Director / PMO · Read only</span>}
         </div>
 
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
@@ -460,14 +463,14 @@ export const RawIngredients: React.FC = () => {
             <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportIngredientsCsv} />
           </div>
 
-          <button
+          {!isDirectorReadOnly && <button
             id="btn-add-new-material"
             onClick={() => setShowAddModal(true)}
             className="flex min-h-10 w-full items-center justify-center space-x-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700 sm:min-w-44 sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Material</span>
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -691,11 +694,9 @@ export const RawIngredients: React.FC = () => {
                 const isBelowSafety = ing.currentStock <= ing.safetyStock;
 
                 return (
-                  <tr 
+                  <tr
                     key={ing.id}
-                    className={`transition-colors hover:bg-slate-50/80 ${
-                      exp.isFlagged ? 'bg-amber-50/30' : ''
-                    }`}
+                    className={`transition-colors hover:bg-slate-50/80 ${exp.isFlagged ? 'bg-amber-50/30' : ''}`}
                   >
                     {/* Material & SKU */}
                     <td className="py-3.5 px-4">
@@ -771,13 +772,15 @@ export const RawIngredients: React.FC = () => {
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => openAdjustModal(ing)}
-                        className="inline-flex items-center space-x-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-3 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
-                      >
-                        <RefreshCw className="w-3 h-3 text-indigo-600" />
-                        <span>Update</span>
-                      </button>
+                      {!isDirectorReadOnly && (
+                        <button
+                          onClick={() => openAdjustModal(ing)}
+                          className="inline-flex items-center space-x-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-3 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
+                        >
+                          <RefreshCw className="w-3 h-3 text-indigo-600" />
+                          <span>Update</span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -864,16 +867,16 @@ export const RawIngredients: React.FC = () => {
                     <span>Unit Cost: </span>
                     <strong className="text-slate-900 font-mono font-bold">₱{ing.costPerUnit}.00</strong>
                   </div>
-
-                  <button
-                    onClick={() => openAdjustModal(ing)}
-                    className="flex items-center space-x-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-3.5 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Update Stock</span>
-                  </button>
+                  {!isDirectorReadOnly && (
+                    <button
+                      onClick={() => openAdjustModal(ing)}
+                      className="flex items-center space-x-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 px-3.5 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Update Stock</span>
+                    </button>
+                  )}
                 </div>
-
               </div>
             );
           })}
@@ -881,7 +884,7 @@ export const RawIngredients: React.FC = () => {
       )}
 
       {/* Update Stock & Expiry Modal */}
-      {stockModalItem && (
+      {stockModalItem && !isDirectorReadOnly && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-slate-900">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -967,7 +970,7 @@ export const RawIngredients: React.FC = () => {
       )}
 
       {/* Add New Material Modal */}
-      {showAddModal && (
+      {showAddModal && !isDirectorReadOnly && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-200 rounded-3xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-slate-900 animate-in fade-in zoom-in-95 duration-150">
             {/* Fixed Header */}
