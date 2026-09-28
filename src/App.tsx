@@ -114,7 +114,11 @@ const MainLayout: React.FC = () => {
 
                 {activeTab === 'procurement' && <Procurement />}
 
-                {activeTab === 'pos' && <DairyBoxPos />}
+                {activeTab === 'pos' && (
+                  currentRole === 'director'
+                    ? <DairyBoxPos salesHistoryOnly />
+                    : <DairyBoxPos />
+                )}
 
                 {activeTab === 'audit' && <AuditTrail />}
 
