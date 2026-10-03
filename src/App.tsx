@@ -31,7 +31,7 @@ import {
 import { SystemDocumentation } from './components/SystemDocumentation.tsx';
 
 const MainLayout: React.FC = () => {
-  const { isAuthenticated, canAccessTab, currentRole } = useDairySync();
+  const { isAuthenticated, isAuthReady, canAccessTab, currentRole } = useDairySync();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
   // Modal states
@@ -44,6 +44,10 @@ const MainLayout: React.FC = () => {
       setActiveTab('dashboard');
     }
   }, [currentRole]);
+
+  if (!isAuthReady) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-300 text-sm">Checking secure session…</div>;
+  }
 
   if (!isAuthenticated) {
     return <LoginPage />;

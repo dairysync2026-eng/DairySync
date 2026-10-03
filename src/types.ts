@@ -16,7 +16,6 @@ export interface UserProfile {
   email: string;
   username: string;
   nickname?: string;
-  password?: string;
 }
 
 export type IngredientCategory = 'milk' | 'sweetener' | 'flavoring' | 'packaging' | 'additive' | (string & {});

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
-import { UserRole } from '../types';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../services/firebase';
 import { 
   ShieldCheck, 
   Lock, 
@@ -17,7 +18,7 @@ import {
 import { AuthHandshakeModal } from './decryption/AuthHandshakeModal';
 
 export const LoginPage: React.FC = () => {
-  const { users, login } = useDairySync();
+  const { users, login, authError } = useDairySync();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +32,7 @@ export const LoginPage: React.FC = () => {
   const [handshakeError, setHandshakeError] = useState<string | null>(null);
   const [handshakeUser, setHandshakeUser] = useState<{ name: string; role: string } | null>(null);
 
-  const handleCustomLogin = (e: React.FormEvent) => {
+  const handleCustomLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -42,58 +43,60 @@ export const LoginPage: React.FC = () => {
       return;
     }
 
-    // Identify matching user
+    // The local directory is used for username lookup and display only.
     const matched = users.find(u => 
       u.email.toLowerCase() === cleanId.toLowerCase() || 
-      u.username.toLowerCase() === cleanId.toLowerCase() ||
-      u.id.toLowerCase() === cleanId.toLowerCase() ||
-      u.role === cleanId.toLowerCase() as UserRole
+      u.username.toLowerCase() === cleanId.toLowerCase()
     );
-
-    // Check credential validity
-    let isValid = false;
-    let failMsg = 'Invalid credentials. User not registered in PCC-MMSU system.';
-
-    if (matched) {
-      setHandshakeUser({ name: matched.name, role: matched.role });
-      if (matched.password && matched.password !== password.trim()) {
-        failMsg = `Incorrect security password for ${matched.name}.`;
-      } else {
-        isValid = true;
-      }
-    }
+    setHandshakeUser(matched ? { name: matched.name, role: matched.role } : { name: cleanId, role: 'Verifying account' });
 
     // Launch High-Tech Authentication Handshake Animation
     setIsHandshaking(true);
     setHandshakeStatus('authenticating');
     setHandshakeError(null);
 
-    if (isValid) {
-      // Allow handshake sequence to play through steps then succeed
-      setTimeout(() => {
-        setHandshakeStatus('success');
-      }, 1000);
+    const result = await login(cleanId, password);
+    if (result.success) {
+      setHandshakeStatus('success');
     } else {
-      // Allow verification check to run briefly then fail
       setTimeout(() => {
         setHandshakeStatus('error');
-        setHandshakeError(failMsg);
+        setHandshakeError(result.message);
       }, 750);
     }
   };
 
   const handleHandshakeComplete = () => {
     setIsHandshaking(false);
-    const res = login(identifier, password);
-    if (!res.success) {
-      setErrorMessage(res.message);
-    }
+    setSuccessMessage(`Signed in as ${handshakeUser?.name || identifier}.`);
   };
 
   const handleDismissHandshakeError = () => {
     setIsHandshaking(false);
     setErrorMessage(handshakeError);
     setHandshakeStatus('authenticating');
+  };
+
+  const handlePasswordReset = async () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    const cleanId = identifier.trim().toLowerCase();
+    const matchedUser = users.find(user => user.email.toLowerCase() === cleanId || user.username.toLowerCase() === cleanId);
+    const email = matchedUser?.email || (cleanId.includes('@') ? cleanId : null);
+    if (!email) {
+      setErrorMessage('Enter the email address registered to your Firebase account, then request a reset link.');
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccessMessage('If the account is registered, Firebase has sent a password reset link to its email address.');
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      setErrorMessage(code === 'auth/operation-not-allowed'
+        ? 'Password reset is unavailable because Firebase Email/Password sign-in is not enabled.'
+        : 'Could not send a reset link. Check the account email and Firebase Auth configuration.');
+    }
   };
 
   return (
@@ -155,10 +158,10 @@ export const LoginPage: React.FC = () => {
               </p>
             </div>
 
-            {errorMessage && (
+            {(errorMessage || authError) && (
               <div className="mb-4 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-300 text-xs font-semibold flex items-center space-x-2.5">
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{errorMessage}</span>
+                <span>{errorMessage || authError}</span>
               </div>
             )}
 
@@ -224,6 +227,13 @@ export const LoginPage: React.FC = () => {
               >
                 <span>Log In to DairySync</span>
                 <ArrowRight className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                className="w-full py-2 text-xs font-semibold text-indigo-300 hover:text-white transition-colors"
+              >
+                Forgot password? Send a Firebase reset link
               </button>
             </form>
           </div>

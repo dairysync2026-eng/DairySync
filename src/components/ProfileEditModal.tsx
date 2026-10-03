@@ -5,16 +5,10 @@ import {
   User, 
   Camera, 
   Upload, 
-  Lock, 
-  Mail, 
-  Key, 
-  Eye, 
-  EyeOff, 
   CheckCircle2, 
-  AlertCircle, 
-  ShieldCheck,
-  ShieldAlert,
+  AlertCircle,
   Sparkles,
+  Mail,
   RefreshCw
 } from 'lucide-react';
 
@@ -34,7 +28,7 @@ const AVATAR_PRESETS = [
 ];
 
 export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
-  const { currentUser, updateUserProfile, verifyUserPassword } = useDairySync();
+  const { currentUser, updateUserProfile } = useDairySync();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
@@ -43,30 +37,11 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
   const [username, setUsername] = useState(currentUser.username || '');
   const [nickname, setNickname] = useState(currentUser.nickname || '');
   const [avatar, setAvatar] = useState(currentUser.avatar || '');
-  const [email, setEmail] = useState(currentUser.email || '');
-
-  // Password fields
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Authentication process states for sensitive changes (email / password)
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [sentCode, setSentCode] = useState<string | null>(null);
-  const [codeCountdown, setCodeCountdown] = useState(0);
 
   // Feedback states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Check if sensitive credentials have changed
-  const isEmailChanged = email.trim().toLowerCase() !== (currentUser.email || '').trim().toLowerCase();
-  const isPasswordChanged = newPassword.trim().length > 0;
-  const requiresAuthentication = isEmailChanged || isPasswordChanged;
 
   // Handle local file upload for profile picture
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,37 +60,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  // Trigger 6-digit OTP verification email simulation
-  const handleSendVerificationCode = () => {
-    if (!currentPassword) {
-      setErrorMsg('Please enter your current password first before requesting an authentication code.');
-      return;
-    }
-
-    const isValidPass = verifyUserPassword(currentUser.id, currentPassword);
-    if (!isValidPass) {
-      setErrorMsg('Current password verification failed. Please check your current password.');
-      return;
-    }
-
-    // Generate 6-digit code
-    const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setSentCode(randomCode);
-    setCodeCountdown(60);
-    setErrorMsg(null);
-
-    // Timer countdown
-    const interval = setInterval(() => {
-      setCodeCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -139,77 +83,22 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
       return;
     }
 
-    // Sensitive field authentication check
-    if (requiresAuthentication) {
-      if (!currentPassword) {
-        setErrorMsg('Authentication required: Enter your current password to authorize email or password modifications.');
-        return;
-      }
-
-      const isCurrentPasswordCorrect = verifyUserPassword(currentUser.id, currentPassword);
-      if (!isCurrentPasswordCorrect) {
-        setErrorMsg('Authentication Failed: The current password you entered is incorrect.');
-        return;
-      }
-
-      if (isEmailChanged) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email.trim())) {
-          setErrorMsg('Please enter a valid email address.');
-          return;
-        }
-      }
-
-      if (isPasswordChanged) {
-        if (newPassword.length < 6) {
-          setErrorMsg('New password must be at least 6 characters long.');
-          return;
-        }
-        if (newPassword !== confirmPassword) {
-          setErrorMsg('New password and confirmation do not match.');
-          return;
-        }
-      }
-
-      // If a verification code was dispatched, verify it
-      if (sentCode && verificationCode.trim() !== sentCode) {
-        setErrorMsg('The 6-digit authentication security code entered is invalid or expired.');
-        return;
-      }
-    }
-
     setIsSubmitting(true);
-
-    setTimeout(() => {
-      const updates: any = {
+    const updates = {
         name: name.trim(),
         title: title.trim(),
         username: username.trim(),
         nickname: nickname.trim(),
         avatar: avatar.trim() || currentUser.avatar
       };
-
-      if (isEmailChanged) {
-        updates.email = email.trim();
-      }
-
-      if (isPasswordChanged) {
-        updates.password = newPassword.trim();
-      }
-
-      const result = updateUserProfile(currentUser.id, updates);
-
-      setIsSubmitting(false);
-
-      if (!result.success) {
-        setErrorMsg(result.message);
-      } else {
-        setSuccessMsg('Profile and credentials updated successfully!');
-        setTimeout(() => {
-          onClose();
-        }, 1200);
-      }
-    }, 400);
+    const result = updateUserProfile(currentUser.id, updates);
+    setIsSubmitting(false);
+    if (!result.success) {
+      setErrorMsg(result.message);
+      return;
+    }
+    setSuccessMsg('Profile updated successfully.');
+    setTimeout(onClose, 900);
   };
 
   return (
@@ -223,9 +112,9 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
               <User className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-extrabold tracking-tight">Edit Profile & Credentials</h2>
+              <h2 className="text-lg font-extrabold tracking-tight">Edit Profile</h2>
               <p className="text-xs text-slate-300 mt-0.5">
-                Update display information, profile picture, username, and authenticated credentials
+                Update display information and profile picture
               </p>
             </div>
           </div>
@@ -269,7 +158,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
               {title || 'No title set'}
             </p>
             <p className="text-[11px] font-mono text-slate-400 mt-0.5">
-              @{username || currentUser.username} • {email || currentUser.email}
+              @{username || currentUser.username} • {currentUser.email}
             </p>
           </div>
           <span className="text-[10px] font-mono font-bold uppercase px-2.5 py-1 bg-white border border-slate-200 rounded-xl text-slate-700">
@@ -427,161 +316,15 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
 
           </div>
 
-          {/* Section 2: Security Credentials & Authentication Process */}
-          <div className="border-t border-slate-200 pt-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
-                <Lock className="w-3.5 h-3.5 text-amber-600" />
-                <span>Security & Credential Management</span>
-              </h3>
-              {requiresAuthentication && (
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 flex items-center space-x-1">
-                  <ShieldAlert className="w-3 h-3 text-amber-600" />
-                  <span>Auth Verification Active</span>
-                </span>
-              )}
+          {/* Firebase credentials are managed by Authentication, not the profile document. */}
+          <div className="border-t border-slate-200 pt-5">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3 text-[11px] leading-relaxed text-amber-900">
+              <strong>Firebase Authentication manages this account’s email and password.</strong> Use the Forgot Password link on the sign-in screen to reset credentials. This editor changes display information only.
             </div>
-
-            <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl text-[11px] text-amber-900 leading-relaxed">
-              <strong>Authentication Security Protocol:</strong> Changing your <strong>Email</strong> or <strong>Password</strong> requires verifying your current password. An authentication verification confirmation will be executed before changes apply.
+            <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
+              <Mail className="h-4 w-4 text-slate-500" />
+              <span>Firebase account: <strong className="font-mono">{currentUser.email}</strong></span>
             </div>
-
-            {/* Email Field */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1">
-                <Mail className="w-3.5 h-3.5 text-slate-500" />
-                <span>Account Email Address</span>
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@pcc-mmsu.gov.ph"
-                className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-              />
-              {isEmailChanged && (
-                <p className="text-[10px] text-amber-700 font-semibold mt-1 flex items-center space-x-1">
-                  <span>* Email change detected. Current password verification required.</span>
-                </p>
-              )}
-            </div>
-
-            {/* Password Fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center space-x-1">
-                  <Key className="w-3.5 h-3.5 text-slate-500" />
-                  <span>New Password</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showNewPassword ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Leave blank to keep current"
-                    className="w-full text-xs px-3.5 py-2.5 pr-9 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password</label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat new password"
-                    className="w-full text-xs px-3.5 py-2.5 pr-9 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Authentication Verification Section (Triggered if Email or Password is changed) */}
-            {requiresAuthentication && (
-              <div className="p-4 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-3.5 animate-in fade-in">
-                <div className="flex items-center space-x-2 text-amber-400">
-                  <ShieldCheck className="w-4 h-4" />
-                  <h4 className="text-xs font-extrabold uppercase tracking-wide">
-                    Authentication Verification Gate
-                  </h4>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-200 mb-1">
-                    Current Password Verification <span className="text-rose-400">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showCurrentPassword ? "text" : "password"}
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      placeholder="Enter your current password to authorize changes"
-                      className="w-full text-xs px-3.5 py-2.5 pr-9 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 font-mono"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
-                    >
-                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Optional 2FA simulation code */}
-                <div className="pt-1 border-t border-slate-800">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[11px] font-bold text-slate-300">
-                      Security Code Verification (Optional 2-Step Check)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleSendVerificationCode}
-                      disabled={codeCountdown > 0}
-                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 disabled:text-slate-500 flex items-center space-x-1"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${codeCountdown > 0 ? 'animate-spin' : ''}`} />
-                      <span>{codeCountdown > 0 ? `Resend in ${codeCountdown}s` : 'Send Code to Email'}</span>
-                    </button>
-                  </div>
-
-                  {sentCode && (
-                    <div className="mb-2 p-2 rounded-xl bg-amber-950/80 border border-amber-800/80 text-[11px] text-amber-300 flex items-center justify-between">
-                      <span>Simulated Email OTP Sent to {currentUser.email}:</span>
-                      <strong className="font-mono text-xs bg-amber-900 px-2 py-0.5 rounded text-amber-100">{sentCode}</strong>
-                    </div>
-                  )}
-
-                  <input
-                    type="text"
-                    value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
-                    placeholder={sentCode ? "Enter the 6-digit code sent above" : "Click 'Send Code to Email' or authorize via password above"}
-                    maxLength={6}
-                    className="w-full text-xs px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400 font-mono tracking-widest"
-                  />
-                </div>
-
-              </div>
-            )}
-
           </div>
 
           {/* Modal Actions */}
@@ -607,7 +350,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Profile & Credentials</span>
+                  <span>Save Profile</span>
                 </>
               )}
             </button>

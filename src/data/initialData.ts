@@ -19,8 +19,7 @@ export const INITIAL_USERS: UserProfile[] = [
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
     email: 'developer@pcc-mmsu.gov.ph',
     username: 'Developer',
-    nickname: 'Lead Developer',
-    password: 'dev2026'
+    nickname: 'Lead Developer'
   },
   {
     id: 'usr-1',
@@ -30,8 +29,7 @@ export const INITIAL_USERS: UserProfile[] = [
     department: 'PCC-MMSU Executive Office',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
     email: 'dr.domingo@pcc-mmsu.gov.ph',
-    username: 'Director',
-    password: 'pcc2026'
+    username: 'Director'
   },
   {
     id: 'usr-2',
@@ -41,8 +39,7 @@ export const INITIAL_USERS: UserProfile[] = [
     department: 'Supply & Procurement Unit',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
     email: 'procurement@pcc-mmsu.gov.ph',
-    username: 'Procurement',
-    password: 'procure2026'
+    username: 'Procurement'
   },
   {
     id: 'usr-3',
@@ -52,8 +49,7 @@ export const INITIAL_USERS: UserProfile[] = [
     department: 'Dairy Processing Facility',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
     email: 'plant.manager@pcc-mmsu.gov.ph',
-    username: 'Plantmanager',
-    password: 'plant2026'
+    username: 'Plantmanager'
   },
   {
     id: 'usr-4',
@@ -63,8 +59,7 @@ export const INITIAL_USERS: UserProfile[] = [
     department: 'Processing Plant Operations',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
     email: 'production@pcc-mmsu.gov.ph',
-    username: 'Production',
-    password: 'dairy2026'
+    username: 'Production'
   },
   {
     id: 'usr-5',
@@ -74,8 +69,7 @@ export const INITIAL_USERS: UserProfile[] = [
     department: 'MMSU Dairy Box Retail Outlet',
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150',
     email: 'dairybox@pcc-mmsu.gov.ph',
-    username: 'Dairybox',
-    password: 'store2026'
+    username: 'Dairybox'
   }
 ];
 

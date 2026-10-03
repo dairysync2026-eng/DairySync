@@ -20,18 +20,12 @@ import {
   Code2,
   FileText,
   UserCheck,
-  Lock,
-  Key,
   X,
   UserCog,
-  Eye,
-  EyeOff,
   Sparkles,
-  ShieldAlert,
-  Unlock
+  ShieldAlert
 } from 'lucide-react';
 import { ScrambleText } from '../decryption/ScrambleText';
-import { MicroPulseLock } from '../decryption/MicroPulseLock';
 
 interface SubsystemDashboardProps {
   onNavigateTab: (tab: string) => void;
@@ -64,13 +58,9 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     name: '',
     nickname: '',
     username: '',
-    email: '',
     title: '',
-    department: '',
-    password: ''
+    department: ''
   });
-  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
-  const [pulseMap, setPulseMap] = useState<Record<string, boolean>>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const handleStartEditUser = (u: UserProfile) => {
@@ -79,10 +69,8 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
       name: u.name,
       nickname: u.nickname || '',
       username: u.username,
-      email: u.email,
       title: u.title,
-      department: u.department,
-      password: u.password || ''
+      department: u.department
     });
     setStatusMessage(null);
   };
@@ -93,47 +81,15 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
       name: editFormData.name,
       nickname: editFormData.nickname,
       username: editFormData.username,
-      email: editFormData.email,
       title: editFormData.title,
-      department: editFormData.department,
-      password: editFormData.password
+      department: editFormData.department
     });
 
     if (res.success) {
-      setStatusMessage(`Account credentials for ${editFormData.name} updated successfully.`);
+      setStatusMessage(`Profile information for ${editFormData.name} updated successfully.`);
       setEditingUser(null);
     } else {
       setStatusMessage(res.message || 'Failed to update user.');
-    }
-  };
-
-  const togglePasswordReveal = (userId: string) => {
-    const willReveal = !showPasswordMap[userId];
-    setShowPasswordMap(prev => ({
-      ...prev,
-      [userId]: willReveal
-    }));
-    if (willReveal) {
-      setPulseMap(prev => ({ ...prev, [userId]: true }));
-      setTimeout(() => {
-        setPulseMap(prev => ({ ...prev, [userId]: false }));
-      }, 900);
-    }
-  };
-
-  const toggleAllPasswords = () => {
-    const anyRevealed = users.some(u => showPasswordMap[u.id]);
-    const nextState = !anyRevealed;
-    const newMap: Record<string, boolean> = {};
-    const newPulse: Record<string, boolean> = {};
-    users.forEach(u => {
-      newMap[u.id] = nextState;
-      if (nextState) newPulse[u.id] = true;
-    });
-    setShowPasswordMap(newMap);
-    if (nextState) {
-      setPulseMap(newPulse);
-      setTimeout(() => setPulseMap({}), 900);
     }
   };
 
@@ -408,23 +364,6 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
               </div>
 
               <div className="flex items-center space-x-2 self-end sm:self-auto">
-                {/* Master Decrypt All / Lock All Toggle */}
-                <button
-                  type="button"
-                  onClick={toggleAllPasswords}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border transition-all flex items-center space-x-1.5 shadow-sm cursor-pointer ${
-                    users.some(u => showPasswordMap[u.id])
-                      ? 'bg-emerald-950/70 border-emerald-500/50 text-emerald-300 hover:bg-emerald-950'
-                      : 'bg-indigo-950/70 border-indigo-500/50 text-indigo-300 hover:bg-indigo-950'
-                  }`}
-                  title="Toggle cryptographic scramble decryption for all credentials"
-                >
-                  <Unlock className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>
-                    {users.some(u => showPasswordMap[u.id]) ? 'Re-encrypt All' : 'Decrypt All Credentials'}
-                  </span>
-                </button>
-
                 <button
                   onClick={() => {
                     setShowAllUsersModal(false);
@@ -449,8 +388,8 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                   <p className="font-extrabold text-indigo-900">
                     RBAC Enforcement Policy: Exclusive Lead Developer Clearance
                   </p>
-                  <p className="text-indigo-800 leading-relaxed">
-                    Under the PCC-MMSU security model, only the <strong>Lead Developer</strong> profile has system-wide permissions to access, view credentials, and switch between all registered staff accounts. All other operational accounts are strictly isolated to their individual assigned duties.
+                    <p className="text-indigo-800 leading-relaxed">
+                    Under the PCC-MMSU security model, only the <strong>Lead Developer</strong> profile has system-wide permissions to view user profile metadata and simulate registered staff dashboards. Authentication credentials are managed by Firebase and are never displayed here.
                   </p>
                 </div>
               </div>
@@ -488,7 +427,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                     <div className="flex items-center space-x-2">
                       <UserCog className="w-5 h-5 text-indigo-600" />
                       <h4 className="font-bold text-slate-900 text-sm">
-                        Edit Credentials for {editingUser.name} ({editingUser.role.toUpperCase()})
+                        Edit Profile for {editingUser.name} ({editingUser.role.toUpperCase()})
                       </h4>
                     </div>
                     <button
@@ -531,13 +470,8 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                     </div>
 
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">Email Address</label>
-                      <input
-                        type="email"
-                        value={editFormData.email}
-                        onChange={e => setEditFormData({ ...editFormData, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono focus:outline-none focus:border-indigo-500"
-                      />
+                      <label className="font-bold text-slate-700 block mb-1">Firebase Auth Email</label>
+                      <p className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 font-mono text-slate-600">{editingUser.email}</p>
                     </div>
 
                     <div>
@@ -560,15 +494,6 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                       />
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="font-bold text-slate-700 block mb-1">Password</label>
-                      <input
-                        type="text"
-                        value={editFormData.password}
-                        onChange={e => setEditFormData({ ...editFormData, password: e.target.value })}
-                        className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono focus:outline-none focus:border-indigo-500"
-                      />
-                    </div>
                   </div>
 
                   <div className="flex justify-end space-x-2 pt-2">
@@ -582,7 +507,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                       onClick={handleSaveEditUser}
                       className="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm transition-all"
                     >
-                      Save Account Changes
+                      Save Profile Changes
                     </button>
                   </div>
                 </div>
@@ -593,8 +518,6 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                 {users.map(u => {
                   const isCurrent = currentUser.id === u.id;
                   const isDev = u.role === 'developer';
-                  const showPass = showPasswordMap[u.id] || false;
-
                   return (
                     <div
                       key={u.id}
@@ -649,40 +572,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                             <span className="text-slate-800 font-medium">{u.email}</span>
                           </div>
 
-                          {/* Password with Micro-Pulse Decryption Lock / Unlock & Scramble Effect */}
-                          <div className={`relative overflow-hidden p-2 rounded-xl border transition-all duration-300 flex items-center justify-between ${
-                            showPass 
-                              ? 'bg-emerald-50/70 border-emerald-300 shadow-xs' 
-                              : 'bg-slate-100/90 border-slate-200'
-                          }`}>
-                            {/* Expanding SVG Ripple Pulse Wave that sweeps across the row when unlocked */}
-                            {pulseMap[u.id] && (
-                              <span 
-                                className="absolute inset-0 pointer-events-none bg-radial from-emerald-400/25 via-indigo-500/15 to-transparent animate-pulse"
-                                aria-hidden="true"
-                              />
-                            )}
-
-                            <div className="relative z-10 flex items-center space-x-2">
-                              <span className="text-slate-500 font-semibold">Password:</span>
-                              <span className="text-slate-900 font-bold">
-                                <ScrambleText
-                                  text={u.password || 'none'}
-                                  isRevealed={showPass}
-                                  scrambleDurationMs={500}
-                                  className={showPass ? 'text-slate-900' : 'text-slate-400'}
-                                />
-                              </span>
-                            </div>
-
-                            <div className="relative z-10 flex items-center">
-                              <MicroPulseLock
-                                isUnlocked={showPass}
-                                onToggle={() => togglePasswordReveal(u.id)}
-                                title={showPass ? 'Re-encrypt password' : 'Micro-Pulse Decrypt & Unlock'}
-                              />
-                            </div>
-                          </div>
+                          <p className="text-[10px] text-slate-400">Credentials are securely managed by Firebase Authentication.</p>
                         </div>
                       </div>
 

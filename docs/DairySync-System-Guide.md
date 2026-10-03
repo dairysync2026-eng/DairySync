@@ -4,7 +4,7 @@
 
 **Institution:** Philippine Carabao Center at Mariano Marcos State University (PCC-MMSU), Batac City, Ilocos Norte  
 **Application:** DairySync Cloud Inventory and Production Management System  
-**Guide version:** Source-verified September 28, 2026
+**Guide version:** Source-verified October 3, 2026
 **Deployment:** Firebase Hosting at https://dairysync-pcc-94978.web.app  
 **Repository:** https://github.com/dairysync2026-eng/DairySync
 
@@ -27,7 +27,7 @@ The application is designed around the PCC-MMSU workflow:
 
 ### Source-verified storage note
 
-The current application stores its operational state in browser `localStorage` and caches critical inventory in IndexedDB for offline use. Firebase is configured for the web application and Firebase Hosting/Analytics, but the current code does not yet use Firestore or Cloud SQL as the primary operational database. A centralized cloud database would require a subsequent data-service migration.
+Authentication uses Firebase Authentication Email/Password with a trusted Firebase custom `role` claim. Operational state remains in browser `localStorage` and IndexedDB; Cloud SQL/Firestore is not yet the primary operational database. Therefore Firebase sign-in establishes identity but does not secure client-side inventory mutations against a modified browser. A trusted backend and centralized data-service migration are still required for server-enforced data security.
 
 ---
 
@@ -36,7 +36,7 @@ The current application stores its operational state in browser `localStorage` a
 | Role | Authorized areas |
 |---|---|
 | Developer / Super Administrator | All dashboards, inventory, WIP, cold storage, supply-demand, procurement, POS, audit, user administration, reset, and system tools |
-| Director / PMO Supervisor | All operational and oversight areas |
+| Director / PMO Supervisor | Oversight and reporting; Raw Ingredients, WIP, and Cold Storage are read-only; POS shows Sales History only |
 | Administrative Assistant IV / Procurement | Dashboard, ROP Procurement, Raw Ingredients |
 | Internal Custodian / Plant Manager | Dashboard, Cold Storage, WIP, Raw Ingredients, Procurement |
 | Production Staff | Dashboard, WIP, Raw Ingredients |
@@ -44,19 +44,22 @@ The current application stores its operational state in browser `localStorage` a
 
 ### Authentication functions
 
-- Login by email, username, user ID, or role keyword.
-- Password validation when a password is configured.
+- Firebase Email/Password sign-in; usernames resolve to registered email addresses.
+- User role is read from a Firebase ID token custom claim; client-selected roles do not grant access.
+- Password reset email through Firebase Authentication.
+- Auth state restoration through Firebase's persisted session listener.
+- Role claims provisioned by a trusted Firebase Admin SDK script; public account creation is not offered.
 - Login handshake animation with success and error states.
 - Logout.
-- Login page on every application startup.
+- Firebase session restoration on app startup; sign-in is required when no valid session exists.
 - Developer session switching between role accounts.
 - Return to the developer account.
 - Role-based tab access enforcement.
 - Audit Trail access limited to Developer and Director / PMO; System Manual access limited to Developer.
 - Audit search by user ID and action type, with quick ranges and exact timestamp bounds.
 - Automatic return to the dashboard when a selected tab becomes unauthorized.
-- Profile editing with username and email conflict checks.
-- Password verification.
+- Profile display metadata editing; Firebase credentials are not stored or displayed in the client.
+- Developer role simulation is a UI view switch and does not sign in as another Firebase user.
 
 ### Security behavior
 
@@ -639,7 +642,7 @@ Ratings are stored with the evaluator role, comments, and date. The Reports moda
 1. Move operational state from localStorage to a centralized cloud database.
 2. Choose Firestore for direct Firebase integration or Cloud SQL MySQL for DBeaver compatibility.
 3. Add a secure backend API if Cloud SQL is selected.
-4. Replace local password handling with Firebase Authentication or server-side authentication.
+4. Move inventory and production writes behind a trusted API that verifies Firebase ID tokens and role claims.
 5. Implement true multi-device synchronization.
 6. Implement Firebase Cloud Messaging if push notifications are required.
 7. Add automated database backups and migration scripts.

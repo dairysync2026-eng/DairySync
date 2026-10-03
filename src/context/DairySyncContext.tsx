@@ -1,4 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  getIdTokenResult,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  type User as FirebaseUser
+} from 'firebase/auth';
 import { 
   UserRole, 
   UserProfile, 
@@ -32,6 +39,7 @@ import {
   INITIAL_TRANSACTIONS,
   INITIAL_AUDIT_LOGS
 } from '../data/initialData';
+import { auth } from '../services/firebase';
 
 export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
   developer: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
@@ -42,6 +50,10 @@ export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
   store_outlet: ['dashboard', 'pos', 'finished']
 };
 
+const isUserRole = (value: unknown): value is UserRole =>
+  value === 'developer' || value === 'director' || value === 'procurement' ||
+  value === 'plant_manager' || value === 'production_staff' || value === 'store_outlet';
+
 interface DairySyncContextType {
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
@@ -50,8 +62,10 @@ interface DairySyncContextType {
   
   // Auth state
   isAuthenticated: boolean;
+  isAuthReady: boolean;
+  authError: string | null;
   isDeveloperActive: boolean;
-  login: (identifier: string, pass: string) => { success: boolean; message: string };
+  login: (identifier: string, pass: string) => Promise<{ success: boolean; message: string }>;
   loginAsRoleUser: (role: UserRole) => void;
   returnToDeveloperAccount: () => void;
   logout: () => void;
@@ -126,7 +140,6 @@ interface DairySyncContextType {
 
   // User Profile & Authentication Actions
   updateUserProfile: (userId: string, updates: Partial<UserProfile>) => { success: boolean; message: string };
-  verifyUserPassword: (userId: string, passwordAttempt: string) => boolean;
 
   // Accessibility Theme Preferences
   themeMode: ThemeMode;
@@ -199,11 +212,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_users`);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as UserProfile[];
-        const normalizedParsed = parsed.map(user => ({
-          ...user,
-          role: normalizeRole(user.role)
-        }));
+        const parsed = JSON.parse(saved) as Array<UserProfile & { password?: string }>;
+        const normalizedParsed = parsed.map(user => {
+          const safeUser = { ...user };
+          delete safeUser.password;
+          return { ...safeUser, role: normalizeRole(user.role) };
+        });
         const hasDev = normalizedParsed.some(u => u.role === 'developer');
         if (!hasDev) {
           const devUser = INITIAL_USERS.find(u => u.role === 'developer');
@@ -226,11 +240,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return false;
   });
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authenticatedRole, setAuthenticatedRole] = useState<UserRole | null>(null);
 
-  const [currentRole, setCurrentRoleState] = useState<UserRole>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_role`);
-    return normalizeRole(saved || 'developer');
-  });
+  const [currentRole, setCurrentRoleState] = useState<UserRole>('production_staff');
 
   // Track if a Developer superuser session is active across role switching
   const [isDeveloperActive, setIsDeveloperActive] = useState<boolean>(() => {
@@ -239,8 +254,51 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const setDeveloperActive = (active: boolean) => {
     setIsDeveloperActive(active);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_dev_active`, JSON.stringify(active));
   };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, user => {
+      void (async () => {
+        if (!user) {
+          setFirebaseUser(null);
+          setAuthenticatedRole(null);
+          setIsAuthenticated(false);
+          setDeveloperActive(false);
+          setIsAuthReady(true);
+          return;
+        }
+
+        try {
+          const token = await getIdTokenResult(user);
+          const claimedRole = token.claims.role;
+          if (!isUserRole(claimedRole)) {
+            setAuthError('This account is not assigned an authorized DairySync role. Contact PCC-MMSU IT administration.');
+            await firebaseSignOut(auth);
+            return;
+          }
+
+          setFirebaseUser(user);
+          setAuthenticatedRole(claimedRole);
+          setCurrentRoleState(claimedRole);
+          setIsAuthenticated(true);
+          setDeveloperActive(claimedRole === 'developer');
+          setAuthError(null);
+        } catch {
+          setAuthError('Could not verify your Firebase session. Please sign in again.');
+          await firebaseSignOut(auth);
+        } finally {
+          setIsAuthReady(true);
+        }
+      })();
+    }, error => {
+      console.error('Firebase auth state error:', error);
+      setAuthError('Unable to restore your Firebase session. Check your connection and try again.');
+      setIsAuthenticated(false);
+      setIsAuthReady(true);
+    });
+
+    return unsubscribe;
+  }, []);
   
   const [ingredients, setIngredients] = useState<RawIngredient[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_ingredients`);
@@ -442,55 +500,66 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_audit_logs`, JSON.stringify(auditLogs));
   }, [auditLogs]);
 
-  const currentUser = users.find(u => normalizeRole(u.role) === currentRole) || users[0];
+  const selectedRoleUser = users.find(u => normalizeRole(u.role) === currentRole) || users[0];
+  const directoryUser = firebaseUser?.email
+    ? users.find(user => user.email.toLowerCase() === firebaseUser.email!.toLowerCase())
+    : undefined;
+  const currentUser = firebaseUser && authenticatedRole && !(isDeveloperActive && currentRole !== 'developer')
+    ? {
+        ...(directoryUser || selectedRoleUser),
+        id: directoryUser?.id || firebaseUser.uid,
+        name: firebaseUser.displayName || directoryUser?.name || firebaseUser.email || selectedRoleUser.name,
+        email: firebaseUser.email || directoryUser?.email || selectedRoleUser.email,
+        username: directoryUser?.username || firebaseUser.email || selectedRoleUser.username,
+        role: authenticatedRole
+      }
+    : selectedRoleUser;
 
   const setCurrentRole = (role: UserRole) => {
+    if (!isAuthenticated || authenticatedRole !== 'developer' || !isDeveloperActive) return;
     const safeRole = normalizeRole(role);
     setCurrentRoleState(safeRole);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_role`, safeRole);
   };
 
-  const login = (identifier: string, pass: string) => {
+  const login = async (identifier: string, pass: string): Promise<{ success: boolean; message: string }> => {
     const cleanId = identifier.trim().toLowerCase();
-    const cleanPass = pass.trim();
-
-    // Check by email, username, or id
-    const matchedUser = users.find(u => 
-      u.email.toLowerCase() === cleanId || 
-      u.username.toLowerCase() === cleanId ||
-      u.id.toLowerCase() === cleanId
+    const directoryUser = users.find(user =>
+      user.email.toLowerCase() === cleanId || user.username.toLowerCase() === cleanId
     );
+    const email = directoryUser?.email || (cleanId.includes('@') ? cleanId : null);
+    if (!email) return { success: false, message: 'Enter your registered email address or username.' };
 
-    if (matchedUser) {
-      if (matchedUser.password && matchedUser.password !== cleanPass) {
-        return { success: false, message: `Incorrect password for ${matchedUser.name}.` };
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, pass);
+      const token = await getIdTokenResult(credential.user, true);
+      const roleClaim = token.claims.role;
+
+      if (!isUserRole(roleClaim)) {
+        await firebaseSignOut(auth);
+        const message = 'This account is not assigned an authorized DairySync role. Contact PCC-MMSU IT administration.';
+        setAuthError(message);
+        return { success: false, message };
       }
-      const safeRole = normalizeRole(matchedUser.role);
-      setCurrentRole(safeRole);
-      setIsAuthenticated(true);
-      const isDev = safeRole === 'developer';
-      setDeveloperActive(isDev);
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(true));
-      return { success: true, message: `Logged in as ${matchedUser.name} (${matchedUser.title})` };
-    }
 
-    // Role keyword fallback
-    const roleMatch = users.find(u => normalizeRole(u.role) === normalizeRole(cleanId));
-    if (roleMatch) {
-      const safeRole = normalizeRole(roleMatch.role);
-      setCurrentRole(safeRole);
-      setIsAuthenticated(true);
-      const isDev = safeRole === 'developer';
-      setDeveloperActive(isDev);
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(true));
-      return { success: true, message: `Logged in as ${roleMatch.name} (${roleMatch.title})` };
+      setAuthError(null);
+      return {
+        success: true,
+        message: `Logged in as ${credential.user.displayName || directoryUser?.name || credential.user.email} (${roleClaim})`
+      };
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      const message = code === 'auth/operation-not-allowed'
+        ? 'Email/password sign-in is not enabled for this Firebase project.'
+        : code === 'auth/network-request-failed'
+          ? 'Unable to reach Firebase Authentication. Check your network and try again.'
+          : 'Invalid email or password.';
+      return { success: false, message };
     }
-
-    return { success: false, message: 'Invalid credentials. Please enter a valid email or username.' };
   };
 
   const loginAsRoleUser = (role: UserRole) => {
     const targetRole = normalizeRole(role);
+    if (!isAuthenticated || !isDeveloperActive || authenticatedRole !== 'developer') return;
     // Lead developer has master clearance to switch between all account users without doing a re-login
     // If an authenticated user is neither currently a developer nor has an active developer session, reject it
     if (isAuthenticated && !isDeveloperActive && currentRole !== 'developer' && targetRole !== currentRole) {
@@ -504,25 +573,21 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setDeveloperActive(true);
       }
       setCurrentRole(targetRole);
-      setIsAuthenticated(true);
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(true));
     }
   };
 
   const returnToDeveloperAccount = () => {
+    if (!isAuthenticated || !isDeveloperActive || authenticatedRole !== 'developer') return;
     const devUser = users.find(u => normalizeRole(u.role) === 'developer');
     if (devUser) {
       setCurrentRole('developer');
       setDeveloperActive(true);
-      setIsAuthenticated(true);
-      localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(true));
     }
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
-    setDeveloperActive(false);
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_auth`, JSON.stringify(false));
+    setAuthError(null);
+    void firebaseSignOut(auth);
   };
 
   const canAccessTab = (tabId: string) => {
@@ -1713,31 +1778,18 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsoRatings(prev => [newRating, ...prev]);
   };
 
-  const verifyUserPassword = (userId: string, passwordAttempt: string): boolean => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return false;
-    return (user.password || '') === passwordAttempt.trim();
-  };
-
   const authorizeDirectorMutation = (action: string): boolean => {
-    if (currentRole !== 'director') return true;
+    if (currentRole !== 'director' || isDeveloperActive) return true;
     if (DIRECTOR_READ_ONLY_ACTIONS.has(action)) {
       window.alert('Director / PMO access to Raw Ingredients, WIP Batches, and Cold Storage is read-only.');
       return false;
     }
 
-    const passwordAttempt = window.prompt(`Director / PMO re-authentication required to ${action}. Enter your account password:`);
-    if (passwordAttempt === null || !passwordAttempt.trim()) return false;
-    if (verifyUserPassword(currentUser.id, passwordAttempt)) return true;
+    const lastSignInTime = auth.currentUser?.metadata.lastSignInTime;
+    const recentlyAuthenticated = lastSignInTime && Date.now() - new Date(lastSignInTime).getTime() < 10 * 60 * 1000;
+    if (recentlyAuthenticated) return true;
 
-    window.alert('Authentication failed. No changes were made.');
-    logAuditAction({
-      category: 'security',
-      subsystem: 'Director / PMO Authorization',
-      action: 'DIRECTOR_REAUTH_FAILED',
-      description: `Failed re-authentication attempt to ${action}`,
-      severity: 'warning'
-    });
+    window.alert(`Please sign out and sign in again before you ${action}.`);
     return false;
   };
 
@@ -1750,20 +1802,14 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return { success: false, message: 'Unauthorized. Only the Lead Developer has access to manage other account users.' };
     }
 
-    // Check if new username or email conflicts with another user
+    if (updates.email !== undefined) return { success: false, message: 'Account email is managed by Firebase Authentication.' };
+
+    // Check if the new username conflicts with another user
     if (updates.username) {
       const cleanUsername = updates.username.trim().toLowerCase();
       const conflict = users.find(u => u.id !== userId && u.username.toLowerCase() === cleanUsername);
       if (conflict) {
         return { success: false, message: `Username "${updates.username}" is already taken.` };
-      }
-    }
-
-    if (updates.email) {
-      const cleanEmail = updates.email.trim().toLowerCase();
-      const conflict = users.find(u => u.id !== userId && u.email.toLowerCase() === cleanEmail);
-      if (conflict) {
-        return { success: false, message: `Email "${updates.email}" is already associated with another account.` };
       }
     }
 
@@ -1774,11 +1820,9 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           ...updates,
           name: updates.name ? updates.name.trim() : u.name,
           username: updates.username ? updates.username.trim() : u.username,
-          email: updates.email ? updates.email.trim() : u.email,
           title: updates.title !== undefined ? updates.title.trim() : u.title,
           avatar: updates.avatar !== undefined ? updates.avatar.trim() : u.avatar,
-          nickname: updates.nickname !== undefined ? updates.nickname.trim() : u.nickname,
-          password: updates.password !== undefined ? updates.password.trim() : u.password
+          nickname: updates.nickname !== undefined ? updates.nickname.trim() : u.nickname
         };
       }
       return u;
@@ -1821,6 +1865,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       currentUser,
       users,
       isAuthenticated,
+      isAuthReady,
+      authError,
       isDeveloperActive,
       login,
       loginAsRoleUser,
@@ -1862,7 +1908,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       syncOfflineQueueWithCloud,
       isOnline,
       updateUserProfile,
-      verifyUserPassword,
       themeMode,
       setThemeMode,
       toggleThemeMode,
