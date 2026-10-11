@@ -7,9 +7,20 @@ export interface OfflineSyncQueueItem {
   id?: number;
   timestamp: string;
   action: string;
-  entity: 'ingredient' | 'finished_good' | 'wip_batch' | 'pos_sale' | 'stock_adjustment';
+  entity:
+    | 'ingredient'
+    | 'finished_good'
+    | 'wip_batch'
+    | 'pos_sale'
+    | 'stock_adjustment'
+    | 'commitment'
+    | 'alert'
+    | 'iso_rating'
+    | 'audit_log'
+    | 'user_profile';
   payload: any;
   userEmail?: string;
+  userUid?: string;
   synced: boolean;
 }
 
@@ -265,6 +276,16 @@ export async function getPendingOfflineActions(): Promise<OfflineSyncQueueItem[]
   } catch {
     return [];
   }
+}
+
+export async function removeOfflineAction(id: number): Promise<void> {
+  const db = await openInventoryDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(['offline_sync_queue'], 'readwrite');
+    const request = tx.objectStore('offline_sync_queue').delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
 }
 
 /**

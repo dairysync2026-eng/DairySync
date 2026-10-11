@@ -27,7 +27,7 @@ The application is designed around the PCC-MMSU workflow:
 
 ### Source-verified storage note
 
-Authentication uses Firebase Authentication Email/Password with a trusted Firebase custom `role` claim. Operational state remains in browser `localStorage` and IndexedDB; Cloud SQL/Firestore is not yet the primary operational database. Therefore Firebase sign-in establishes identity but does not secure client-side inventory mutations against a modified browser. A trusted backend and centralized data-service migration are still required for server-enforced data security.
+Authentication uses Firebase Authentication Email/Password with a trusted Firebase custom `role` claim. Operational collections are connected to Firebase SQL Connect operations, which enforce role checks server-side; localStorage and IndexedDB remain caches and offline storage. The SQL Connect service and Cloud SQL instance must still be provisioned and deployed before the hosted app uses this backend.
 
 ---
 
@@ -35,8 +35,8 @@ Authentication uses Firebase Authentication Email/Password with a trusted Fireba
 
 | Role | Authorized areas |
 |---|---|
-| Developer / Super Administrator | All dashboards, inventory, WIP, cold storage, supply-demand, procurement, POS, audit, user administration, reset, and system tools |
-| Director / PMO Supervisor | Oversight and reporting; Raw Ingredients, WIP, and Cold Storage are read-only; POS shows Sales History only |
+| Developer / Super Administrator | All dashboards, inventory, WIP, product recipes, cold storage, supply-demand, procurement, POS, audit, user administration, reset, and system tools |
+| Director / PMO Supervisor | Oversight and reporting; Raw Ingredients, WIP, and Cold Storage are read-only; Product Recipes can be managed; POS shows Sales History only |
 | Administrative Assistant IV / Procurement | Dashboard, ROP Procurement, Raw Ingredients |
 | Internal Custodian / Plant Manager | Dashboard, Cold Storage, WIP, Raw Ingredients, Procurement |
 | Production Staff | Dashboard, WIP, Raw Ingredients |
@@ -231,7 +231,6 @@ The Cold Storage module tracks processed dairy goods that are ready for distribu
 - Retail unit price.
 - Feeding-program allocation.
 - Dairy Box retail allocation.
-- Bill of materials recipe.
 - Batch output quantity.
 - Shelf-life days.
 - Storage location.
@@ -258,6 +257,8 @@ The Cold Storage module tracks processed dairy goods that are ready for distribu
 ### Automated behavior
 
 Finished goods below safety stock generate low-stock warnings. Finished goods above maximum threshold generate overstock flags. Completed WIP batches add their target quantity to the corresponding finished good.
+
+Product formulas are managed separately from cold-storage inventory in the **Product Recipes** subsystem. Developers, Directors, and Plant Managers can open it from the tab bar or their dashboard and add or edit recipes. Add the required raw materials in Raw Ingredients first; recipe quantities use each material's inventory unit. The recipe and formula output quantity are saved with the product and synchronized through Data Connect. New products start with an empty recipe, and WIP creation remains blocked until a recipe is configured. Director recipe writes use a dedicated Data Connect operation that cannot modify stock or other finished-good fields.
 
 ---
 
@@ -495,7 +496,7 @@ DairySync includes an offline continuity layer.
 - Load cached inventory snapshots.
 - Enqueue offline mutations.
 - Retrieve pending offline mutations.
-- Clear synchronized queue records.
+- Remove an offline queue record only after its supported SQL Connect operation succeeds.
 - Calculate local database statistics.
 - Monitor online and offline browser events.
 - Display offline status.
@@ -508,7 +509,9 @@ DairySync includes an offline continuity layer.
 
 ### Important limitation
 
-The offline queue currently records and clears local offline actions and caches browser state. It is not yet connected to a persistent centralized Firestore or MySQL API.
+All operational collections use Firebase SQL Connect for shared reads and live updates: user profiles, ingredients, finished goods, WIP batches, commitments, alerts, stock transactions, ISO ratings, and audit entries. localStorage and IndexedDB remain as local caches. Pending SQL writes are tagged to the authenticated Firebase UID and acknowledged individually; older unsupported queue actions are retained rather than discarded.
+
+Collection persistence is not the same as a business transaction. POS sales, WIP deductions/completion, and audit records are currently synchronized as separate row mutations. Add atomic SQL Connect mutations and concurrent-stock checks before treating those workflows as safe for simultaneous operators.
 
 ---
 
@@ -552,7 +555,7 @@ The repository includes `.env.example`. The actual `.env.local` file is intentio
 
 ### UserProfile
 
-Stores identity, role, title, department, avatar, email, username, nickname, and password data used by the current local role system.
+Stores a shared profile directory: name, role label, title, department, avatar, email, username, and nickname. Passwords remain exclusively in Firebase Authentication; SQL authorization uses the Firebase custom role claim, not the profile's role label.
 
 ### RawIngredient
 
@@ -580,7 +583,7 @@ Stores alert type, message, severity, read state, timestamp, and target roles.
 
 ### AuditLogEntry
 
-Stores immutable-style operational provenance and user action details for review and reporting.
+Stores operational events and details for review and reporting. New records receive the actor UID and role from the authenticated Firebase token; administrative delete/import operations mean the table is not an immutable audit ledger.
 
 ### IsoEvaluationRating
 
@@ -614,8 +617,8 @@ Ratings are stored with the evaluator role, comments, and date. The Reports moda
 
 | Thesis or requested capability | Current implementation status |
 |---|---|
-| Secure role-based login | Implemented in local application state |
-| Real-time inventory dashboard | Implemented for current browser session and local persistence |
+| Secure role-based login | Firebase Authentication with custom-claim authorization in SQL Connect operations |
+| Real-time inventory dashboard | Shared SQL Connect data with IndexedDB/localStorage cache |
 | Automated stock tracking | Implemented through context actions and stock transactions |
 | Predictive reorder triggers | Implemented as reorder-point and safety-stock checks; not machine-learning prediction |
 | Low-stock alerts | Implemented |
@@ -625,30 +628,27 @@ Ratings are stored with the evaluator role, comments, and date. The Reports moda
 | Raw ingredient management | Implemented |
 | WIP monitoring | Implemented |
 | Reporting and analytics | Implemented through dashboards, reports, PDF, and CSV exports |
-| Multi-user role management | Implemented as local role and user management |
-| Supply-demand synchronization | Implemented as local commitments and allocation tracking |
+| Multi-user role management | Firebase custom claims plus a shared SQL Connect profile directory |
+| Supply-demand synchronization | Shared SQL Connect commitments and allocation tracking |
 | Cloud Hosting | Implemented with Firebase Hosting |
-| Central cloud operational database | Not yet implemented; current state is localStorage and IndexedDB |
-| Offline sync queue | Implemented locally; server reconciliation is not yet connected to a central API |
+| Central cloud operational database | All application data collections are connected to SQL Connect operations; service provisioning and deployment are still required |
+| Offline sync queue | Collection upserts and deletes are retried per authenticated account and acknowledged after server success |
 | Push notifications to mobile devices | UI alert system exists; native push delivery is not currently implemented |
 | Biological carabao health monitoring | Not implemented and outside system scope |
 | Chemical milk composition testing | Not implemented and outside system scope |
-| Cloud SQL MySQL / DBeaver integration | Not implemented; requires backend API and Cloud SQL instance |
+| Cloud SQL PostgreSQL | Configured through Firebase SQL Connect; Cloud SQL instance provisioning and deployment are still required |
 
 ---
 
 ## 19. Known Limitations and Recommended Next Phase
 
-1. Move operational state from localStorage to a centralized cloud database.
-2. Choose Firestore for direct Firebase integration or Cloud SQL MySQL for DBeaver compatibility.
-3. Add a secure backend API if Cloud SQL is selected.
-4. Move inventory and production writes behind a trusted API that verifies Firebase ID tokens and role claims.
-5. Implement true multi-device synchronization.
-6. Implement Firebase Cloud Messaging if push notifications are required.
-7. Add automated database backups and migration scripts.
-8. Add server-side audit immutability and permission enforcement.
-9. Add automated end-to-end tests for login, WIP completion, POS sales, and offline recovery.
-10. Add database-level validation and concurrency protection for stock deductions.
+1. Provision the configured Cloud SQL PostgreSQL instance and deploy SQL Connect schemas and operations.
+2. Replace first-developer browser bootstrap with a reviewed, repeatable migration and seed workflow.
+3. Make POS, WIP, procurement, and other stock-changing business operations atomic across inventory, transactions, and audit records.
+4. Add database-level concurrency protection for concurrent stock deductions.
+5. Implement Firebase Cloud Messaging if push notifications are required.
+6. Add automated database backups and migration scripts.
+7. Add automated end-to-end tests for login, WIP completion, POS sales, and offline recovery.
 
 ---
 
@@ -667,11 +667,12 @@ Ratings are stored with the evaluator role, comments, and date. The Reports moda
 
 1. Log in as Production Staff.
 2. Open WIP Batches.
-3. Create a batch using the selected product recipe.
-4. Confirm automatic BOM and raw-milk deductions.
-5. Advance the batch through each production step.
-6. Complete the batch to transfer units into Cold Storage.
-7. Review audit and transaction records.
+3. Ask a Developer or Plant Manager to configure the finished product's recipe if it has not been set up yet.
+4. Create a batch using the selected product recipe.
+5. Confirm automatic BOM and raw-material deductions.
+6. Advance the batch through each production step.
+7. Complete the batch to transfer units into Cold Storage.
+8. Review audit and transaction records.
 
 ### Store outlet staff
 
@@ -696,4 +697,4 @@ Ratings are stored with the evaluator role, comments, and date. The Reports moda
 
 DairySync provides a unified operational interface for PCC-MMSU dairy inventory and production workflows. Its implemented capabilities cover authentication, role-based access, raw material management, cold storage, WIP production, procurement, supply-demand commitments, POS sales, alerts, auditing, reporting, offline caching, PWA installation, and Firebase Hosting.
 
-The current system is production-deployed as a responsive web application. Its next major architectural step is replacing browser-local operational persistence with a centralized cloud database and secure server API for true multi-user, multi-device synchronization.
+The system remains production-deployed as a responsive web application. The workspace now connects all operational collections to generated, role-checked SQL Connect operations. The live site will use them only after Cloud SQL/SQL Connect provisioning and deployment of a new frontend build.

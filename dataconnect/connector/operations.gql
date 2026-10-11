@@ -1,0 +1,141 @@
+query ListRawIngredients
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @refresh(onMutationExecuted: { operation: "UpsertRawIngredient" })
+  @refresh(onMutationExecuted: { operation: "DeleteRawIngredient" }) {
+  rawIngredients(orderBy: [{ name: ASC }]) {
+    id
+    sku
+    name
+    category
+    currentStock
+    unit
+    reorderPoint
+    safetyStock
+    maxStock
+    avgDailyConsumption
+    leadTimeDays
+    costPerUnit
+    supplier
+    lastRestocked
+    location
+    expiryDate
+  }
+}
+
+mutation UpsertRawIngredient(
+  $id: String!
+  $sku: String!
+  $name: String!
+  $category: String!
+  $currentStock: Float!
+  $unit: String!
+  $reorderPoint: Float!
+  $safetyStock: Float!
+  $maxStock: Float!
+  $avgDailyConsumption: Float!
+  $leadTimeDays: Int!
+  $costPerUnit: Float!
+  $supplier: String!
+  $lastRestocked: String!
+  $location: String!
+  $expiryDate: Date
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'procurement', 'plant_manager']") {
+  rawIngredient_upsert(data: {
+    id: $id
+    sku: $sku
+    name: $name
+    category: $category
+    currentStock: $currentStock
+    unit: $unit
+    reorderPoint: $reorderPoint
+    safetyStock: $safetyStock
+    maxStock: $maxStock
+    avgDailyConsumption: $avgDailyConsumption
+    leadTimeDays: $leadTimeDays
+    costPerUnit: $costPerUnit
+    supplier: $supplier
+    lastRestocked: $lastRestocked
+    location: $location
+    expiryDate: $expiryDate
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation DeleteRawIngredient($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'procurement', 'plant_manager']") {
+  rawIngredient_delete(id: $id)
+}
+
+query ListStockTransactions
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @refresh(onMutationExecuted: { operation: "UpsertStockTransaction" })
+  @refresh(onMutationExecuted: { operation: "DeleteStockTransaction" }) {
+  stockTransactions {
+    id
+    timestamp
+    itemId
+    itemName
+    itemType
+    action
+    quantity
+    unit
+    previousStock
+    newStock
+    referenceId
+    unitPrice
+    performedBy
+    notes
+  }
+}
+
+mutation UpsertStockTransaction(
+  $id: String!
+  $timestamp: String!
+  $itemId: String!
+  $itemName: String!
+  $itemType: String!
+  $action: String!
+  $quantity: Float!
+  $unit: String!
+  $previousStock: Float!
+  $newStock: Float!
+  $referenceId: String
+  $unitPrice: Float
+  $notes: String
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+  stockTransaction_upsert(data: {
+    id: $id
+    timestamp: $timestamp
+    itemId: $itemId
+    itemName: $itemName
+    itemType: $itemType
+    action: $action
+    quantity: $quantity
+    unit: $unit
+    previousStock: $previousStock
+    newStock: $newStock
+    referenceId: $referenceId
+    unitPrice: $unitPrice
+    performedBy_expr: "auth.token.email"
+    notes: $notes
+  })
+}
+
+mutation DeleteStockTransaction($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer']") {
+  stockTransaction_delete(id: $id)
+}
+
+mutation UpdateFinishedGoodRecipe(
+  $id: String!
+  $recipe: [Any!]!
+  $batchUnitQuantity: Float!
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'plant_manager']") {
+  finishedGood_update(id: $id, data: {
+    recipe: $recipe
+    batchUnitQuantity: $batchUnitQuantity
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}

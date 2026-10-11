@@ -9,9 +9,13 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "sqlconnect:generate": "npx firebase-tools@latest dataconnect:sdk:generate",
+    "sqlconnect:emulator": "npx firebase-tools@latest emulators:start --only auth,dataconnect --project demo-dairysync",
+    "sqlconnect:deploy": "npx firebase-tools@latest deploy --only dataconnect --project dairysync-pcc-94978"
   },
   "dependencies": {
+    "@dataconnect/dairysync-generated": "file:src/generated/dairysync",
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",

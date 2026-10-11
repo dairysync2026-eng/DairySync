@@ -1,0 +1,12 @@
+specVersion: "v1"
+serviceId: dairysync-pcc-94978-2-service
+location: asia-southeast1
+schema:
+  source: schema
+  datasource:
+    postgresql:
+      database: dairysync-db
+      cloudSql:
+        instanceId: dairysync-pcc-94978-instance
+connectorDirs:
+  - connector

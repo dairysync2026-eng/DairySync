@@ -93,9 +93,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     batchUnitQuantity: 100,
     shelfLifeDays: 14,
     location: 'Cold Storage Room 1 - Rack A',
-    recipe: [
-      { ingredientId: 'ing-1', ingredientName: 'Raw Carabao Milk', quantityRequired: 30, unit: 'L' }
-    ]
+    recipe: []
   });
 
   // Typeable string input states for adding a new Finished Good
@@ -225,9 +223,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       batchUnitQuantity: 100,
       shelfLifeDays: 14,
       location: 'Cold Storage Room 1 - Rack A',
-      recipe: [
-        { ingredientId: 'ing-1', ingredientName: 'Raw Carabao Milk', quantityRequired: 30, unit: 'L' }
-      ]
+      recipe: []
     });
     setNewUnitPriceStr('50');
     setNewColdStorageLimitStr('500');

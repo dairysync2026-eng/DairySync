@@ -1,0 +1,10 @@
+connectorId: dairysync
+generate:
+  javascriptSdk:
+    outputDir: ../../src/generated/dairysync
+    package: "@dataconnect/dairysync-generated"
+    packageJsonDir: ../..
+    react: false
+    clientCache:
+      maxAge: "5s"
+      storage: memory

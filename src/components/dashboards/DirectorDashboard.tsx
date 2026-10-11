@@ -15,7 +15,8 @@ import {
   ArrowRight,
   Truck,
   Factory,
-  Package
+  Package,
+  ClipboardList
 } from 'lucide-react';
 
 interface SubsystemDashboardProps {
@@ -97,7 +98,7 @@ export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Executive Subsystems Access</span>
           </span>
-          <span className="text-[11px] text-slate-500 font-medium">All 8 Operational Subsystems Authorized</span>
+          <span className="text-[11px] text-slate-500 font-medium">All 9 Operational Subsystems Authorized</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
@@ -131,6 +132,20 @@ export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({
             <div className="flex items-center justify-between mt-1">
               <span className="text-xs font-black text-slate-900">Finished Goods</span>
               <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </button>
+
+          <button
+            onClick={() => onNavigateTab('recipes')}
+            className="p-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-2xl text-left transition-all group"
+          >
+            <span className="text-[10px] font-bold text-indigo-700 uppercase">Production Planning</span>
+            <div className="flex items-center justify-between mt-1">
+              <span className="inline-flex items-center gap-1.5 text-xs font-black text-indigo-950">
+                <ClipboardList className="h-3.5 w-3.5" />
+                Product Recipes
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 text-indigo-500 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </button>
 

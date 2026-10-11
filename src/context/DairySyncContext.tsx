@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   getIdTokenResult,
   onAuthStateChanged,
@@ -15,6 +15,7 @@ import {
   SupplyDemandCommitment, 
   SystemAlert, 
   StockTransaction,
+  BomIngredientRequirement,
   IsoEvaluationRating,
   WipStep,
   AuditLogEntry,
@@ -26,9 +27,19 @@ import {
 import { 
   cacheInventoryToIndexedDb, 
   getPendingOfflineActions, 
-  clearOfflineQueue,
-  enqueueOfflineAction
+  removeOfflineAction,
+  enqueueOfflineAction,
+  OfflineSyncQueueItem
 } from '../services/inventoryDb';
+import {
+  deleteSqlConnectEntity,
+  isSqlConnectEntity,
+  seedSqlConnectEntity,
+  saveSqlConnectEntity,
+  sqlConnectCollections,
+  SqlConnectEntity
+} from '../services/dairySyncCloud';
+import { useSqlConnectCollection, SqlCollectionStatus } from '../hooks/useSqlConnectCollection';
 import { 
   INITIAL_USERS, 
   INITIAL_INGREDIENTS, 
@@ -42,10 +53,10 @@ import {
 import { auth } from '../services/firebase';
 
 export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
-  developer: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
-  director: ['dashboard', 'ingredients', 'wip', 'finished', 'sync', 'procurement', 'pos', 'audit'],
+  developer: ['dashboard', 'ingredients', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
+  director: ['dashboard', 'ingredients', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit'],
   procurement: ['dashboard', 'procurement', 'ingredients'],
-  plant_manager: ['dashboard', 'finished', 'wip', 'ingredients', 'procurement'],
+  plant_manager: ['dashboard', 'finished', 'recipes', 'wip', 'ingredients', 'procurement'],
   production_staff: ['dashboard', 'wip', 'ingredients'],
   store_outlet: ['dashboard', 'pos', 'finished']
 };
@@ -85,6 +96,11 @@ interface DairySyncContextType {
   addIngredient: (ingredient: Omit<RawIngredient, 'id'>) => void;
   updateIngredientStock: (id: string, newStock: number, notes?: string, expiryDate?: string) => boolean;
   addFinishedGood: (product: Omit<FinishedGood, 'id'>) => void;
+  updateFinishedGoodRecipe: (
+    id: string,
+    recipe: BomIngredientRequirement[],
+    batchUnitQuantity: number
+  ) => boolean;
   updateFinishedGoodStock: (id: string, newStock: number, notes?: string) => boolean;
   updateFinishedGoodSafetyStock: (id: string, safetyStock: number) => void;
   
@@ -115,7 +131,7 @@ interface DairySyncContextType {
   clearAllAlerts: () => void;
   
   // ISO 25010 Assessment Action
-  submitIsoEvaluation: (rating: Omit<IsoEvaluationRating, 'date' | 'evaluatorRole'>) => void;
+  submitIsoEvaluation: (rating: Omit<IsoEvaluationRating, 'id' | 'date' | 'evaluatorRole'>) => void;
   
   // Audit Trail Actions
   logAuditAction: (entry: {
@@ -139,6 +155,7 @@ interface DairySyncContextType {
   isOnline: boolean;
 
   // User Profile & Authentication Actions
+  addUserProfile: (profile: Omit<UserProfile, 'id'>) => { success: boolean; message: string };
   updateUserProfile: (userId: string, updates: Partial<UserProfile>) => { success: boolean; message: string };
 
   // Accessibility Theme Preferences
@@ -163,6 +180,8 @@ interface DairySyncContextType {
 const DairySyncContext = createContext<DairySyncContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'dairysync_pcc_mmsu_state_v1';
+const AUTH_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const AUTH_LAST_ACTIVITY_KEY = 'dairysync_auth_last_activity';
 const DIRECTOR_READ_ONLY_ACTIONS = new Set([
   'add a raw material',
   'update raw material stock',
@@ -299,6 +318,82 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || !firebaseUser) return;
+
+    let lastActivityAt = Date.now();
+    let lastBroadcastAt = 0;
+    let timeoutId = 0;
+
+    const scheduleSignOut = () => {
+      window.clearTimeout(timeoutId);
+      const remaining = AUTH_IDLE_TIMEOUT_MS - (Date.now() - lastActivityAt);
+      timeoutId = window.setTimeout(() => {
+        const idleDuration = Date.now() - lastActivityAt;
+        if (idleDuration < AUTH_IDLE_TIMEOUT_MS) {
+          scheduleSignOut();
+          return;
+        }
+
+        setAuthError('You were signed out after 10 minutes of inactivity. Please sign in again.');
+        void firebaseSignOut(auth).catch(error => {
+          console.error('Automatic sign-out after inactivity failed:', error);
+        });
+      }, Math.max(remaining, 0));
+    };
+
+    const broadcastActivity = (timestamp: number) => {
+      try {
+        localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(timestamp));
+      } catch (error) {
+        console.warn('Could not share activity with other DairySync tabs:', error);
+      }
+    };
+
+    const handleActivity = () => {
+      lastActivityAt = Date.now();
+      scheduleSignOut();
+
+      if (lastActivityAt - lastBroadcastAt >= 1000) {
+        lastBroadcastAt = lastActivityAt;
+        broadcastActivity(lastActivityAt);
+      }
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== AUTH_LAST_ACTIVITY_KEY || !event.newValue) return;
+      const sharedActivityAt = Number(event.newValue);
+      if (!Number.isFinite(sharedActivityAt) || sharedActivityAt <= lastActivityAt) return;
+
+      lastActivityAt = sharedActivityAt;
+      scheduleSignOut();
+    };
+
+    const activityEvents: Array<keyof WindowEventMap> = [
+      'pointerdown',
+      'pointermove',
+      'keydown',
+      'scroll',
+      'focus',
+    ];
+    activityEvents.forEach(eventName => {
+      window.addEventListener(eventName, handleActivity, { passive: true });
+    });
+    window.addEventListener('storage', handleStorage);
+    lastActivityAt = Date.now();
+    lastBroadcastAt = lastActivityAt;
+    broadcastActivity(lastActivityAt);
+    scheduleSignOut();
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      activityEvents.forEach(eventName => {
+        window.removeEventListener(eventName, handleActivity);
+      });
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [isAuthenticated, firebaseUser?.uid]);
   
   const [ingredients, setIngredients] = useState<RawIngredient[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_ingredients`);
@@ -414,7 +509,11 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [isoRatings, setIsoRatings] = useState<IsoEvaluationRating[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_iso_ratings`);
-    return saved ? JSON.parse(saved) : [];
+    const parsed: IsoEvaluationRating[] = saved ? JSON.parse(saved) : [];
+    return parsed.map((rating, index) => ({
+      ...rating,
+      id: rating.id || `iso-${Date.now()}-${index}`,
+    }));
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
@@ -428,10 +527,47 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   });
 
-  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('offline');
   const [isOnline, setIsOnline] = useState<boolean>(() => {
     return typeof navigator !== 'undefined' ? navigator.onLine : true;
   });
+  const collectionStatusesRef = useRef(new Map<SqlConnectEntity, SqlCollectionStatus>());
+  const refreshSqlCloudStatus = () => {
+    const statuses = [...collectionStatusesRef.current.values()];
+    const collectionCount = Object.keys(sqlConnectCollections).length;
+    setCloudSyncStatus(
+      statuses.includes('offline')
+        ? 'offline'
+        : statuses.length < collectionCount || statuses.includes('syncing')
+          ? 'syncing'
+          : 'synced'
+    );
+  };
+  const reportSqlCollectionStatus = (entity: SqlConnectEntity, status: SqlCollectionStatus) => {
+    collectionStatusesRef.current.set(entity, status);
+    refreshSqlCloudStatus();
+  };
+  const cloudEnabled = Boolean(firebaseUser && isAuthReady);
+  const canSeedCloudData = authenticatedRole === 'developer';
+  const userEmail = firebaseUser?.email || undefined;
+  const userUid = firebaseUser?.uid;
+
+  useEffect(() => {
+    if (!cloudEnabled) {
+      collectionStatusesRef.current.clear();
+      setCloudSyncStatus('offline');
+    }
+  }, [cloudEnabled]);
+
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: users, setRows: setUsers, adapter: sqlConnectCollections.user_profile, entity: 'user_profile', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: ingredients, setRows: setIngredients, adapter: sqlConnectCollections.ingredient, entity: 'ingredient', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: finishedGoods, setRows: setFinishedGoods, adapter: sqlConnectCollections.finished_good, entity: 'finished_good', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'plant_manager', 'production_staff'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: wipBatches, setRows: setWipBatches, adapter: sqlConnectCollections.wip_batch, entity: 'wip_batch', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'procurement', 'plant_manager'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: commitments, setRows: setCommitments, adapter: sqlConnectCollections.commitment, entity: 'commitment', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: alerts, setRows: setAlerts, adapter: sqlConnectCollections.alert, entity: 'alert', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: transactions, setRows: setTransactions, adapter: sqlConnectCollections.stock_adjustment, entity: 'stock_adjustment', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: isoRatings, setRows: setIsoRatings, adapter: sqlConnectCollections.iso_rating, entity: 'iso_rating', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: auditLogs, setRows: setAuditLogs, adapter: sqlConnectCollections.audit_log, entity: 'audit_log', userEmail, userUid, onStatus: reportSqlCollectionStatus });
 
   // Save changes to localStorage
   useEffect(() => {
@@ -462,7 +598,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      setCloudSyncStatus('synced');
       syncOfflineQueueWithCloud();
     };
 
@@ -514,6 +649,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         role: authenticatedRole
       }
     : selectedRoleUser;
+  const syncIdentityRef = useRef({ firebaseUid: firebaseUser?.uid, email: currentUser.email });
+  syncIdentityRef.current = { firebaseUid: firebaseUser?.uid, email: currentUser.email };
 
   const setCurrentRole = (role: UserRole) => {
     if (!isAuthenticated || authenticatedRole !== 'developer' || !isDeveloperActive) return;
@@ -598,7 +735,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const allowedTabs = ROLE_ALLOWED_TABS[currentRole] || ['dashboard'];
 
   const recordOfflineMutation = async (
-    entity: 'ingredient' | 'finished_good' | 'wip_batch' | 'pos_sale' | 'stock_adjustment',
+    entity: OfflineSyncQueueItem['entity'],
     action: string,
     payload: any
   ) => {
@@ -608,7 +745,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           action,
           entity,
           payload,
-          userEmail: currentUser.email
+          userEmail: currentUser.email,
+          userUid: firebaseUser?.uid,
         });
       } catch (e) {
         console.warn('Failed to record offline mutation:', e);
@@ -626,22 +764,107 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const syncOfflineQueueWithCloud = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setCloudSyncStatus('offline');
+      return;
+    }
+
+    const { firebaseUid, email } = syncIdentityRef.current;
+    if (!firebaseUid) {
+      setCloudSyncStatus('offline');
+      return;
+    }
+
     setCloudSyncStatus('syncing');
+    let syncedCount = 0;
+    const syncedEntities = new Set<SqlConnectEntity>();
     try {
+      await sqlConnectCollections.ingredient.fetch();
       const queue = await getPendingOfflineActions();
-      if (queue.length > 0) {
+      for (const item of queue) {
+        if (item.id === undefined) continue;
+        if (item.userUid) {
+          if (item.userUid !== firebaseUid) continue;
+        } else if (!item.userEmail || !email || item.userEmail.toLowerCase() !== email.toLowerCase()) {
+          continue;
+        }
+
+        try {
+          let handled = false;
+          let syncedEntity: SqlConnectEntity | undefined;
+          if (isSqlConnectEntity(item.entity) && item.action === 'SQL_SEED') {
+            await seedSqlConnectEntity(item.entity, item.payload);
+            syncedEntity = item.entity;
+            handled = true;
+          } else if (isSqlConnectEntity(item.entity) && item.action === 'SQL_UPSERT') {
+            await saveSqlConnectEntity(item.entity, item.payload);
+            syncedEntity = item.entity;
+            handled = true;
+          } else if (isSqlConnectEntity(item.entity) && item.action === 'SQL_DELETE') {
+            const payload = item.payload as { id: string };
+            await deleteSqlConnectEntity(item.entity, payload.id);
+            syncedEntity = item.entity;
+            handled = true;
+          } else if (item.entity === 'ingredient' && ['DELETE_RAW_INGREDIENT', 'SQL_DELETE'].includes(item.action)) {
+            await sqlConnectCollections.ingredient.remove((item.payload as { id: string }).id);
+            syncedEntity = 'ingredient';
+            handled = true;
+          } else if (item.entity === 'ingredient' && ['UPSERT_RAW_INGREDIENT', 'CREATE_INGREDIENT'].includes(item.action)) {
+            await sqlConnectCollections.ingredient.save(item.payload as RawIngredient);
+            syncedEntity = 'ingredient';
+            handled = true;
+          } else if (item.entity === 'stock_adjustment' && item.action === 'UPDATE_INGREDIENT_STOCK') {
+            const payload = item.payload as { id: string; newStock?: number; expiryDate?: string };
+            const ingredient = ingredients.find(candidate => candidate.id === payload.id);
+            if (ingredient) {
+              await sqlConnectCollections.ingredient.save({
+                ...ingredient,
+                currentStock: payload.newStock ?? ingredient.currentStock,
+                expiryDate: payload.expiryDate ?? ingredient.expiryDate,
+              });
+              syncedEntity = 'ingredient';
+              handled = true;
+            }
+          } else if (item.entity === 'stock_adjustment' && item.action === 'UPSERT_STOCK_TRANSACTION') {
+            await sqlConnectCollections.stock_adjustment.save(item.payload as StockTransaction);
+            syncedEntity = 'stock_adjustment';
+            handled = true;
+          } else if (item.entity === 'finished_good' && item.action === 'CREATE_FINISHED_GOOD') {
+            await sqlConnectCollections.finished_good.save(item.payload as FinishedGood);
+            syncedEntity = 'finished_good';
+            handled = true;
+          } else if (item.entity === 'wip_batch' && item.action === 'CREATE_WIP_BATCH') {
+            await sqlConnectCollections.wip_batch.save(item.payload as WipBatch);
+            syncedEntity = 'wip_batch';
+            handled = true;
+          }
+
+          if (handled) {
+            await removeOfflineAction(item.id);
+            if (syncedEntity) syncedEntities.add(syncedEntity);
+            syncedCount += 1;
+          }
+        } catch (error) {
+          console.warn(`Offline action ${item.id} remains queued after SQL Connect failure:`, error);
+        }
+      }
+
+      const pending = await getPendingOfflineActions();
+      for (const entity of syncedEntities) {
+        reportSqlCollectionStatus(entity, 'synced');
+      }
+      if (syncedCount > 0) {
         logAuditAction({
           category: 'security',
           subsystem: 'Offline Sync Engine',
           action: 'OFFLINE_RECONCILIATION',
-          description: `Reconciled ${queue.length} offline queued inventory transactions to cloud ledger.`,
+          description: `Reconciled ${syncedCount} offline actions to SQL Connect.`,
           details: {
-            quantity: queue.length,
-            reason: 'Network connectivity restored; offline mutations committed.'
+            quantity: syncedCount,
+            reason: 'Network connectivity restored; acknowledged SQL Connect mutations were removed from the queue.'
           },
           severity: 'success'
         });
-        await clearOfflineQueue();
       }
       await cacheInventoryToIndexedDb({
         ingredients,
@@ -649,12 +872,17 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         wipBatches,
         transactions,
       });
+      if (pending.length > 0) {
+        for (const item of pending) {
+          if (isSqlConnectEntity(item.entity)) reportSqlCollectionStatus(item.entity, 'offline');
+        }
+        setCloudSyncStatus('offline');
+      } else {
+        refreshSqlCloudStatus();
+      }
     } catch (e) {
       console.warn('Sync error:', e);
-    } finally {
-      setTimeout(() => {
-        setCloudSyncStatus(typeof navigator !== 'undefined' && navigator.onLine ? 'synced' : 'offline');
-      }, 600);
+      setCloudSyncStatus('offline');
     }
   };
 
@@ -950,6 +1178,47 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       severity: 'info'
     });
     triggerManualCloudSync();
+  };
+
+  const updateFinishedGoodRecipe = (
+    id: string,
+    recipe: BomIngredientRequirement[],
+    batchUnitQuantity: number
+  ) => {
+    if (!['developer', 'director', 'plant_manager'].includes(currentRole)) return false;
+    if (!authorizeDirectorMutation('update a finished product recipe')) return false;
+    if (!Number.isFinite(batchUnitQuantity) || batchUnitQuantity <= 0) return false;
+    if (recipe.some(item =>
+      !item.ingredientId ||
+      !item.ingredientName.trim() ||
+      !item.unit.trim() ||
+      !Number.isFinite(item.quantityRequired) ||
+      item.quantityRequired <= 0
+    )) return false;
+    if (new Set(recipe.map(item => item.ingredientId)).size !== recipe.length) return false;
+
+    const target = finishedGoods.find(product => product.id === id);
+    if (!target) return false;
+
+    setFinishedGoods(prev => prev.map(product => product.id === id
+      ? { ...product, recipe, batchUnitQuantity }
+      : product
+    ));
+    logAuditAction({
+      category: 'production',
+      subsystem: 'Finished Goods',
+      action: 'PRODUCT_RECIPE_UPDATED',
+      description: `Updated production recipe for ${target.name} to produce ${batchUnitQuantity} ${target.unit}`,
+      details: {
+        itemOrBatch: target.name,
+        quantity: recipe.length,
+        unit: 'ingredients',
+        reason: 'Product bill of materials updated'
+      },
+      severity: 'info'
+    });
+    triggerManualCloudSync();
+    return true;
   };
 
   const updateFinishedGoodStock = (id: string, newStock: number, notes?: string) => {
@@ -1336,6 +1605,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!product) {
       return { success: false, message: 'Target finished product not found.' };
     }
+    if (product.recipe.length === 0) {
+      return {
+        success: false,
+        message: `No production recipe is configured for ${product.name}. Add its ingredients in Finished Goods before starting a WIP batch.`
+      };
+    }
 
     // Calculate BOM requirements based on recipe multiplier
     const multiplier = batchData.targetQuantity / (product.batchUnitQuantity || 100);
@@ -1657,7 +1932,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     triggerManualCloudSync();
-    return { success: true, message: 'Dairy Box retail transaction processed and synchronized!' };
+    return { success: true, message: 'Dairy Box retail transaction processed.' };
   };
 
   const addCommitment = (comData: Omit<SupplyDemandCommitment, 'id'>) => {
@@ -1768,10 +2043,11 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAlerts(prev => prev.map(a => ({ ...a, read: true })));
   };
 
-  const submitIsoEvaluation = (ratingData: Omit<IsoEvaluationRating, 'date' | 'evaluatorRole'>) => {
+  const submitIsoEvaluation = (ratingData: Omit<IsoEvaluationRating, 'id' | 'date' | 'evaluatorRole'>) => {
     if (!authorizeDirectorMutation('submit an ISO 25010 evaluation')) return;
     const newRating: IsoEvaluationRating = {
       ...ratingData,
+      id: `iso-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       date: new Date().toLocaleDateString(),
       evaluatorRole: currentRole
     };
@@ -1791,6 +2067,57 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     window.alert(`Please sign out and sign in again before you ${action}.`);
     return false;
+  };
+
+  const addUserProfile = (profile: Omit<UserProfile, 'id'>): { success: boolean; message: string } => {
+    if (currentRole !== 'developer' || authenticatedRole !== 'developer') {
+      return { success: false, message: 'Only an authenticated Lead Developer can add account profiles.' };
+    }
+
+    const cleanEmail = profile.email.trim().toLowerCase();
+    const cleanUsername = profile.username.trim();
+    const cleanName = profile.name.trim();
+    if (!cleanName || !cleanUsername || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return { success: false, message: 'Enter a name, username, and valid account email.' };
+    }
+    if (!isUserRole(profile.role)) {
+      return { success: false, message: 'Select a supported DairySync role.' };
+    }
+    if (users.some(user => user.email.toLowerCase() === cleanEmail)) {
+      return { success: false, message: `A profile for ${cleanEmail} already exists.` };
+    }
+    if (users.some(user => user.username.toLowerCase() === cleanUsername.toLowerCase())) {
+      return { success: false, message: `Username "${cleanUsername}" is already taken.` };
+    }
+
+    const newProfile: UserProfile = {
+      ...profile,
+      id: `usr-${crypto.randomUUID()}`,
+      name: cleanName,
+      email: cleanEmail,
+      username: cleanUsername,
+      title: profile.title.trim(),
+      department: profile.department.trim(),
+      avatar: profile.avatar.trim() || users[0]?.avatar || '',
+      nickname: profile.nickname?.trim() || undefined,
+    };
+    setUsers(previous => [...previous, newProfile]);
+    logAuditAction({
+      category: 'security',
+      subsystem: 'User Security',
+      action: 'USER_PROFILE_ADDED',
+      description: `Added account directory profile for ${cleanEmail} with role ${profile.role}.`,
+      details: {
+        itemOrBatch: newProfile.id,
+        reason: 'Lead Developer added a staff account profile',
+      },
+      severity: 'info',
+    });
+    triggerManualCloudSync();
+    return {
+      success: true,
+      message: `Profile for ${cleanName} added. The Firebase account and role claim must also be configured.`,
+    };
   };
 
   const updateUserProfile = (userId: string, updates: Partial<UserProfile>): { success: boolean; message: string } => {
@@ -1885,6 +2212,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       addIngredient,
       updateIngredientStock,
       addFinishedGood,
+      updateFinishedGoodRecipe,
       updateFinishedGoodStock,
       updateFinishedGoodSafetyStock,
       createWipBatch,
@@ -1902,6 +2230,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       clearAuditLogs,
       exportAuditLogsCsv,
       resetToDefaultData,
+      addUserProfile,
       cloudSyncStatus,
       triggerManualCloudSync,
       forceReCacheInventory,

@@ -1,0 +1,155 @@
+type RawIngredient @table(key: "id") {
+  id: String!
+  sku: String! @unique
+  name: String!
+  category: String!
+  currentStock: Float!
+  unit: String!
+  reorderPoint: Float!
+  safetyStock: Float!
+  maxStock: Float!
+  avgDailyConsumption: Float!
+  leadTimeDays: Int!
+  costPerUnit: Float!
+  supplier: String!
+  lastRestocked: String!
+  location: String!
+  expiryDate: Date
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
+type FinishedGood @table(key: "id") {
+  id: String!
+  sku: String! @unique
+  name: String!
+  category: String!
+  currentStock: Float!
+  unit: String!
+  coldStorageCapacity: Float!
+  maxThreshold: Float!
+  safetyStock: Float!
+  unitPrice: Float!
+  allocatedFeedingProgram: Float!
+  allocatedRetail: Float!
+  recipe: [Any!]!
+  batchUnitQuantity: Float!
+  shelfLifeDays: Int!
+  location: String!
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
+type WipBatch @table(key: "id") {
+  id: String!
+  batchNumber: String! @unique
+  productId: String!
+  productName: String!
+  targetQuantity: Float!
+  rawMilkVolumeUsed: Float!
+  ingredientsUsed: [Any!]!
+  status: String!
+  assignedStaff: String!
+  startDate: String!
+  estimatedCompletion: String!
+  completedAt: String
+  cancellationReason: String
+  cancelledAt: String
+  notes: String
+  coldStorageTemp: String!
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
+type SupplyDemandCommitment @table(key: "id") {
+  id: String!
+  type: String!
+  partnerName: String!
+  contactPerson: String
+  scheduledDate: String!
+  itemOrMilk: String!
+  targetQuantity: Float!
+  fulfilledQuantity: Float!
+  unit: String!
+  status: String!
+  priority: String!
+  cancellationReason: String
+  cancelledAt: String
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
+type SystemAlert @table(key: "id") {
+  id: String!
+  timestamp: String!
+  type: String!
+  title: String!
+  message: String!
+  severity: String!
+  read: Boolean!
+  targetRole: [String!]
+}
+
+type StockTransaction @table(key: "id") {
+  id: String!
+  timestamp: String!
+  itemId: String!
+  itemName: String!
+  itemType: String!
+  action: String!
+  quantity: Float!
+  unit: String!
+  previousStock: Float!
+  newStock: Float!
+  referenceId: String
+  unitPrice: Float
+  performedBy: String!
+  notes: String
+}
+
+type IsoEvaluationRating @table(key: "id") {
+  id: String!
+  functionalSuitability: Float!
+  performanceEfficiency: Float!
+  compatibility: Float!
+  interactionCapability: Float!
+  reliability: Float!
+  security: Float!
+  maintainability: Float!
+  flexibility: Float!
+  safety: Float!
+  evaluatorRole: String!
+  comments: String!
+  date: String!
+  evaluatorUid: String! @default(expr: "auth.uid")
+}
+
+type UserProfile @table(key: "id") {
+  id: String!
+  name: String!
+  role: String!
+  title: String!
+  department: String!
+  avatar: String!
+  email: String! @unique
+  username: String! @unique
+  nickname: String
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
+type AuditLogEntry @table(key: "id") {
+  id: String!
+  timestamp: String!
+  category: String!
+  subsystem: String!
+  action: String!
+  description: String!
+  details: Any
+  userId: String! @default(expr: "auth.uid")
+  userName: String!
+  userRole: String! @default(expr: "auth.token.role")
+  userTitle: String!
+  terminalOrStation: String
+  severity: String!
+}

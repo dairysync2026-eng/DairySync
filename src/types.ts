@@ -142,6 +142,7 @@ export interface StockTransaction {
 }
 
 export interface IsoEvaluationRating {
+  id: string;
   functionalSuitability: number;  // 1.0 - 5.0
   performanceEfficiency: number;
   compatibility: number;

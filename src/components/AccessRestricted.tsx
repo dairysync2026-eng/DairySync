@@ -27,6 +27,7 @@ export const AccessRestricted: React.FC<AccessRestrictedProps> = ({
       case 'ingredients': return 'Raw Ingredients Inventory';
       case 'wip': return 'WIP Production Batches';
       case 'finished': return 'Cold Storage Finished Goods';
+      case 'recipes': return 'Product Recipe Management';
       case 'sync': return 'Supply & Demand Synchronization';
       case 'procurement': return 'ROP Procurement Management';
       case 'pos': return 'Dairy Box Point of Sale (POS)';
@@ -41,6 +42,7 @@ export const AccessRestricted: React.FC<AccessRestrictedProps> = ({
       case 'ingredients': return ['Developer (Superuser)', 'Director', 'Plant Manager', 'Production Staff', 'Procurement'];
       case 'wip': return ['Developer (Superuser)', 'Director', 'Plant Manager', 'Production Staff'];
       case 'finished': return ['Developer (Superuser)', 'Director', 'Plant Manager', 'Store Outlet'];
+      case 'recipes': return ['Developer (Superuser)', 'Director', 'Plant Manager'];
       case 'sync': return ['Developer (Superuser)', 'Director / PMO Supervisor'];
       case 'procurement': return ['Developer (Superuser)', 'Director', 'Admin Asst IV (Procurement)', 'Plant Manager'];
       case 'pos': return ['Developer (Superuser)', 'Director', 'Dairy Box Store Outlet'];

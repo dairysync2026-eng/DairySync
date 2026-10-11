@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { RawIngredients } from './components/RawIngredients';
 import { WipProduction } from './components/WipProduction';
 import { FinishedGoods } from './components/FinishedGoods';
+import { ProductRecipes } from './components/ProductRecipes';
 import { SupplyDemandSync } from './components/SupplyDemandSync';
 import { Procurement } from './components/Procurement';
 import { DairyBoxPos } from './components/DairyBoxPos';
@@ -20,6 +21,7 @@ import {
   Package, 
   Layers, 
   Snowflake, 
+  ClipboardList,
   TrendingUp, 
   Truck, 
   ShoppingCart,
@@ -58,6 +60,7 @@ const MainLayout: React.FC = () => {
     { id: 'ingredients', label: 'Raw Ingredients', icon: Package },
     { id: 'wip', label: 'WIP Batches', icon: Layers },
     { id: 'finished', label: 'Cold Storage', icon: Snowflake },
+    { id: 'recipes', label: 'Product Recipes', icon: ClipboardList },
     { id: 'sync', label: 'Supply & Demand', icon: TrendingUp },
     { id: 'procurement', label: 'ROP Procurement', icon: Truck },
     { id: 'pos', label: 'Dairy Box POS', icon: ShoppingCart },
@@ -113,6 +116,8 @@ const MainLayout: React.FC = () => {
                 {activeTab === 'wip' && <WipProduction />}
 
                 {activeTab === 'finished' && <FinishedGoods onNavigateTab={setActiveTab} />}
+
+                {activeTab === 'recipes' && <ProductRecipes />}
 
                 {activeTab === 'sync' && <SupplyDemandSync />}
 

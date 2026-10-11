@@ -13,7 +13,8 @@ import {
   ThermometerSnowflake,
   Clock,
   ShieldCheck,
-  TrendingUp
+  TrendingUp,
+  ClipboardList
 } from 'lucide-react';
 
 interface SubsystemDashboardProps {
@@ -40,6 +41,16 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
       textColor: 'text-teal-700',
       accent: 'text-teal-600',
       onClick: () => onNavigateTab('finished')
+    },
+    {
+      id: 'recipes',
+      label: 'Product Recipes',
+      title: 'Formula Management',
+      meta: `${finishedGoods.filter(product => product.recipe?.length).length}/${finishedGoods.length} configured`,
+      className: 'bg-white hover:bg-indigo-50/50 border-2 border-indigo-200 rounded-2xl',
+      textColor: 'text-indigo-700',
+      accent: 'text-indigo-600',
+      onClick: () => onNavigateTab('recipes')
     },
     {
       id: 'wip',
@@ -136,7 +147,10 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
                 <span className={`text-[10px] font-bold uppercase ${card.textColor}`}>{card.label}</span>
                 <ArrowRight className={`w-3.5 h-3.5 ${card.accent} group-hover:translate-x-0.5 transition-transform`} />
               </div>
-              <span className="text-xs font-black text-slate-900 mt-1">{card.title}</span>
+              <span className="flex items-center gap-1.5 text-xs font-black text-slate-900 mt-1">
+                {card.id === 'recipes' && <ClipboardList className="h-3.5 w-3.5 text-indigo-600" />}
+                {card.title}
+              </span>
               <span className={`text-[10px] font-medium mt-1 ${card.accent}`}>{card.meta}</span>
             </button>
           ))}

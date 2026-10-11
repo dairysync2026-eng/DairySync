@@ -23,7 +23,9 @@ import {
   X,
   UserCog,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  ClipboardList,
+  Plus
 } from 'lucide-react';
 import { ScrambleText } from '../decryption/ScrambleText';
 
@@ -49,10 +51,20 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     resetToDefaultData,
     currentUser,
     loginAsRoleUser,
+    addUserProfile,
     updateUserProfile
   } = useDairySync();
 
   const [showAllUsersModal, setShowAllUsersModal] = useState(false);
+  const [showAddUserForm, setShowAddUserForm] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    name: '',
+    email: '',
+    username: '',
+    role: 'production_staff' as UserRole,
+    title: '',
+    department: ''
+  });
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editFormData, setEditFormData] = useState({
     name: '',
@@ -62,8 +74,10 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     department: ''
   });
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusIsError, setStatusIsError] = useState(false);
 
   const handleStartEditUser = (u: UserProfile) => {
+    setShowAddUserForm(false);
     setEditingUser(u);
     setEditFormData({
       name: u.name,
@@ -73,6 +87,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
       department: u.department
     });
     setStatusMessage(null);
+    setStatusIsError(false);
   };
 
   const handleSaveEditUser = () => {
@@ -87,10 +102,33 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
 
     if (res.success) {
       setStatusMessage(`Profile information for ${editFormData.name} updated successfully.`);
+      setStatusIsError(false);
       setEditingUser(null);
     } else {
       setStatusMessage(res.message || 'Failed to update user.');
+      setStatusIsError(true);
     }
+  };
+
+  const handleAddUserProfile = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const result = addUserProfile({
+      ...newUserForm,
+      avatar: users[0]?.avatar || '',
+    });
+    setStatusMessage(result.message);
+    setStatusIsError(!result.success);
+    if (!result.success) return;
+
+    setNewUserForm({
+      name: '',
+      email: '',
+      username: '',
+      role: 'production_staff',
+      title: '',
+      department: ''
+    });
+    setShowAddUserForm(false);
   };
 
   const totalRawValuation = ingredients.reduce((sum, i) => sum + (i.currentStock * i.costPerUnit), 0);
@@ -121,6 +159,14 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
       count: `${finishedGoods.reduce((s, f) => s + f.currentStock, 0)} units`,
       icon: Snowflake,
       color: 'teal'
+    },
+    {
+      id: 'recipes',
+      name: 'Product Recipe Management',
+      desc: 'Manage production formulas and raw-material quantities',
+      count: `${finishedGoods.filter(product => product.recipe?.length).length}/${finishedGoods.length} configured`,
+      icon: ClipboardList,
+      color: 'violet'
     },
     {
       id: 'sync',
@@ -368,7 +414,9 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                   onClick={() => {
                     setShowAllUsersModal(false);
                     setEditingUser(null);
+                    setShowAddUserForm(false);
                     setStatusMessage(null);
+                    setStatusIsError(false);
                   }}
                   className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
                   title="Close Directory"
@@ -388,8 +436,11 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                   <p className="font-extrabold text-indigo-900">
                     RBAC Enforcement Policy: Exclusive Lead Developer Clearance
                   </p>
-                    <p className="text-indigo-800 leading-relaxed">
+                  <p className="text-indigo-800 leading-relaxed">
                     Under the PCC-MMSU security model, only the <strong>Lead Developer</strong> profile has system-wide permissions to view user profile metadata and simulate registered staff dashboards. Authentication credentials are managed by Firebase and are never displayed here.
+                  </p>
+                  <p className="text-indigo-800 leading-relaxed">
+                    Adding a profile here does not create a Firebase login. Create the account in Firebase Authentication and assign its role claim before the staff member signs in.
                   </p>
                 </div>
               </div>
@@ -414,10 +465,114 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
               </div>
 
               {statusMessage && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs font-semibold flex items-center space-x-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className={`p-3 border rounded-2xl text-xs font-semibold flex items-center space-x-2 ${
+                  statusIsError
+                    ? 'bg-rose-50 border-rose-200 text-rose-800'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                }`}>
+                  {statusIsError
+                    ? <ShieldAlert className="h-4 w-4 shrink-0 text-rose-600" />
+                    : <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />}
                   <span>{statusMessage}</span>
                 </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddUserForm(open => !open);
+                    setEditingUser(null);
+                    setStatusMessage(null);
+                    setStatusIsError(false);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  {showAddUserForm ? 'Cancel Add User' : 'Add Staff Profile'}
+                </button>
+              </div>
+
+              {showAddUserForm && (
+                <form onSubmit={handleAddUserProfile} className="space-y-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5">
+                  <div>
+                    <h4 className="text-sm font-extrabold text-slate-900">Register staff profile</h4>
+                    <p className="mt-1 text-xs text-slate-600">
+                      Use the same email as the Firebase Authentication account. Multiple staff can share a role, but each needs a unique email and username.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
+                    <label className="font-bold text-slate-700">
+                      Full name
+                      <input
+                        required
+                        value={newUserForm.name}
+                        onChange={event => setNewUserForm({ ...newUserForm, name: event.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-medium focus:border-indigo-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="font-bold text-slate-700">
+                      Firebase account email
+                      <input
+                        required
+                        type="email"
+                        value={newUserForm.email}
+                        onChange={event => setNewUserForm({ ...newUserForm, email: event.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-medium focus:border-indigo-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="font-bold text-slate-700">
+                      Username
+                      <input
+                        required
+                        value={newUserForm.username}
+                        onChange={event => setNewUserForm({ ...newUserForm, username: event.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono font-medium focus:border-indigo-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="font-bold text-slate-700">
+                      Role
+                      <select
+                        value={newUserForm.role}
+                        onChange={event => setNewUserForm({ ...newUserForm, role: event.target.value as UserRole })}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-medium focus:border-indigo-500 focus:outline-none"
+                      >
+                        <option value="developer">Developer</option>
+                        <option value="director">Director</option>
+                        <option value="procurement">Procurement</option>
+                        <option value="plant_manager">Plant Manager</option>
+                        <option value="production_staff">Production Staff</option>
+                        <option value="store_outlet">Store Outlet</option>
+                      </select>
+                    </label>
+                    <label className="font-bold text-slate-700">
+                      Official title
+                      <input
+                        required
+                        value={newUserForm.title}
+                        onChange={event => setNewUserForm({ ...newUserForm, title: event.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-medium focus:border-indigo-500 focus:outline-none"
+                      />
+                    </label>
+                    <label className="font-bold text-slate-700">
+                      Department
+                      <input
+                        required
+                        value={newUserForm.department}
+                        onChange={event => setNewUserForm({ ...newUserForm, department: event.target.value })}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-medium focus:border-indigo-500 focus:outline-none"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700"
+                    >
+                      Save Staff Profile
+                    </button>
+                  </div>
+                </form>
               )}
 
               {/* Editing Form (if editing a user) */}

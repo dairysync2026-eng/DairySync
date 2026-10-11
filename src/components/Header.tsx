@@ -305,16 +305,18 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>Sign Out / Lock System</span>
                     </button>
 
-                    <button
-                      onClick={() => {
-                        resetToDefaultData();
-                        setShowRoleDropdown(false);
-                      }}
-                      className="w-full text-left px-3 py-1.5 text-[11px] text-slate-500 font-medium hover:bg-slate-100 rounded-xl flex items-center space-x-2 transition-colors"
-                    >
-                      <RefreshCw className="w-3 h-3 text-slate-400" />
-                      <span>Reset Demo Database State</span>
-                    </button>
+                    {currentRole === 'developer' && (
+                      <button
+                        onClick={() => {
+                          resetToDefaultData();
+                          setShowRoleDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-1.5 text-[11px] text-slate-500 font-medium hover:bg-slate-100 rounded-xl flex items-center space-x-2 transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3 text-slate-400" />
+                        <span>Reset Demo Database State</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -575,16 +577,18 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Footer Session Controls */}
             <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
-              <button
-                onClick={() => {
-                  resetToDefaultData();
-                  setShowMobileMenu(false);
-                }}
-                className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold flex items-center space-x-1.5 py-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-                <span>Reset Demo State</span>
-              </button>
+              {currentRole === 'developer' && (
+                <button
+                  onClick={() => {
+                    resetToDefaultData();
+                    setShowMobileMenu(false);
+                  }}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold flex items-center space-x-1.5 py-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Reset Demo State</span>
+                </button>
+              )}
 
               <button
                 onClick={() => {

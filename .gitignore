@@ -2,6 +2,7 @@ node_modules/
 build/
 dist/
 .firebase/
+dataconnect/.dataconnect/
 coverage/
 .DS_Store
 *.log

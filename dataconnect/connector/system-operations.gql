@@ -1,0 +1,445 @@
+query ListFinishedGoods
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @refresh(onMutationExecuted: { operation: "UpsertFinishedGood" })
+  @refresh(onMutationExecuted: { operation: "SetRetailFinishedGoodStock" })
+  @refresh(onMutationExecuted: { operation: "DeleteFinishedGood" }) {
+  finishedGoods(orderBy: [{ name: ASC }]) {
+    id
+    sku
+    name
+    category
+    currentStock
+    unit
+    coldStorageCapacity
+    maxThreshold
+    safetyStock
+    unitPrice
+    allocatedFeedingProgram
+    allocatedRetail
+    recipe
+    batchUnitQuantity
+    shelfLifeDays
+    location
+  }
+}
+
+mutation UpsertFinishedGood(
+  $id: String!
+  $sku: String!
+  $name: String!
+  $category: String!
+  $currentStock: Float!
+  $unit: String!
+  $coldStorageCapacity: Float!
+  $maxThreshold: Float!
+  $safetyStock: Float!
+  $unitPrice: Float!
+  $allocatedFeedingProgram: Float!
+  $allocatedRetail: Float!
+  $recipe: [Any!]!
+  $batchUnitQuantity: Float!
+  $shelfLifeDays: Int!
+  $location: String!
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager']") {
+  finishedGood_upsert(data: {
+    id: $id
+    sku: $sku
+    name: $name
+    category: $category
+    currentStock: $currentStock
+    unit: $unit
+    coldStorageCapacity: $coldStorageCapacity
+    maxThreshold: $maxThreshold
+    safetyStock: $safetyStock
+    unitPrice: $unitPrice
+    allocatedFeedingProgram: $allocatedFeedingProgram
+    allocatedRetail: $allocatedRetail
+    recipe: $recipe
+    batchUnitQuantity: $batchUnitQuantity
+    shelfLifeDays: $shelfLifeDays
+    location: $location
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation SetRetailFinishedGoodStock(
+  $id: String!
+  $currentStock: Float!
+  $allocatedRetail: Float!
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager', 'store_outlet']") {
+  finishedGood_update(id: $id, data: {
+    currentStock: $currentStock
+    allocatedRetail: $allocatedRetail
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation DeleteFinishedGood($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager']") {
+  finishedGood_delete(id: $id)
+}
+
+query ListWipBatches
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'plant_manager', 'production_staff']")
+  @refresh(onMutationExecuted: { operation: "UpsertWipBatch" })
+  @refresh(onMutationExecuted: { operation: "DeleteWipBatch" }) {
+  wipBatches(orderBy: [{ startDate: DESC }]) {
+    id
+    batchNumber
+    productId
+    productName
+    targetQuantity
+    rawMilkVolumeUsed
+    ingredientsUsed
+    status
+    assignedStaff
+    startDate
+    estimatedCompletion
+    completedAt
+    cancellationReason
+    cancelledAt
+    notes
+    coldStorageTemp
+  }
+}
+
+mutation UpsertWipBatch(
+  $id: String!
+  $batchNumber: String!
+  $productId: String!
+  $productName: String!
+  $targetQuantity: Float!
+  $rawMilkVolumeUsed: Float!
+  $ingredientsUsed: [Any!]!
+  $status: String!
+  $assignedStaff: String!
+  $startDate: String!
+  $estimatedCompletion: String!
+  $completedAt: String
+  $cancellationReason: String
+  $cancelledAt: String
+  $notes: String
+  $coldStorageTemp: String!
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager', 'production_staff']") {
+  wipBatch_upsert(data: {
+    id: $id
+    batchNumber: $batchNumber
+    productId: $productId
+    productName: $productName
+    targetQuantity: $targetQuantity
+    rawMilkVolumeUsed: $rawMilkVolumeUsed
+    ingredientsUsed: $ingredientsUsed
+    status: $status
+    assignedStaff: $assignedStaff
+    startDate: $startDate
+    estimatedCompletion: $estimatedCompletion
+    completedAt: $completedAt
+    cancellationReason: $cancellationReason
+    cancelledAt: $cancelledAt
+    notes: $notes
+    coldStorageTemp: $coldStorageTemp
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation DeleteWipBatch($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager']") {
+  wipBatch_delete(id: $id)
+}
+
+query ListCommitments
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager']")
+  @refresh(onMutationExecuted: { operation: "UpsertCommitment" })
+  @refresh(onMutationExecuted: { operation: "DeleteCommitment" }) {
+  supplyDemandCommitments(orderBy: [{ scheduledDate: ASC }]) {
+    id
+    type
+    partnerName
+    contactPerson
+    scheduledDate
+    itemOrMilk
+    targetQuantity
+    fulfilledQuantity
+    unit
+    status
+    priority
+    cancellationReason
+    cancelledAt
+  }
+}
+
+mutation UpsertCommitment(
+  $id: String!
+  $type: String!
+  $partnerName: String!
+  $contactPerson: String
+  $scheduledDate: String!
+  $itemOrMilk: String!
+  $targetQuantity: Float!
+  $fulfilledQuantity: Float!
+  $unit: String!
+  $status: String!
+  $priority: String!
+  $cancellationReason: String
+  $cancelledAt: String
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager']") {
+  supplyDemandCommitment_upsert(data: {
+    id: $id
+    type: $type
+    partnerName: $partnerName
+    contactPerson: $contactPerson
+    scheduledDate: $scheduledDate
+    itemOrMilk: $itemOrMilk
+    targetQuantity: $targetQuantity
+    fulfilledQuantity: $fulfilledQuantity
+    unit: $unit
+    status: $status
+    priority: $priority
+    cancellationReason: $cancellationReason
+    cancelledAt: $cancelledAt
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation DeleteCommitment($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement']") {
+  supplyDemandCommitment_delete(id: $id)
+}
+
+query ListSystemAlerts
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @refresh(onMutationExecuted: { operation: "UpsertSystemAlert" })
+  @refresh(onMutationExecuted: { operation: "DeleteSystemAlert" }) {
+  systemAlerts(orderBy: [{ timestamp: DESC }]) {
+    id
+    timestamp
+    type
+    title
+    message
+    severity
+    read
+    targetRole
+  }
+}
+
+mutation UpsertSystemAlert(
+  $id: String!
+  $timestamp: String!
+  $type: String!
+  $title: String!
+  $message: String!
+  $severity: String!
+  $read: Boolean!
+  $targetRole: [String!]
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+  systemAlert_upsert(data: {
+    id: $id
+    timestamp: $timestamp
+    type: $type
+    title: $title
+    message: $message
+    severity: $severity
+    read: $read
+    targetRole: $targetRole
+  })
+}
+
+mutation DeleteSystemAlert($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+  systemAlert_delete(id: $id)
+}
+
+query ListIsoRatings
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @refresh(onMutationExecuted: { operation: "UpsertIsoRating" })
+  @refresh(onMutationExecuted: { operation: "DeleteIsoRating" }) {
+  isoEvaluationRatings(orderBy: [{ date: DESC }]) {
+    id
+    functionalSuitability
+    performanceEfficiency
+    compatibility
+    interactionCapability
+    reliability
+    security
+    maintainability
+    flexibility
+    safety
+    evaluatorRole
+    comments
+    date
+    evaluatorUid
+  }
+}
+
+mutation UpsertIsoRating(
+  $id: String!
+  $functionalSuitability: Float!
+  $performanceEfficiency: Float!
+  $compatibility: Float!
+  $interactionCapability: Float!
+  $reliability: Float!
+  $security: Float!
+  $maintainability: Float!
+  $flexibility: Float!
+  $safety: Float!
+  $comments: String!
+  $date: String!
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+  isoEvaluationRating_upsert(data: {
+    id: $id
+    functionalSuitability: $functionalSuitability
+    performanceEfficiency: $performanceEfficiency
+    compatibility: $compatibility
+    interactionCapability: $interactionCapability
+    reliability: $reliability
+    security: $security
+    maintainability: $maintainability
+    flexibility: $flexibility
+    safety: $safety
+    evaluatorRole_expr: "auth.token.role"
+    comments: $comments
+    date: $date
+    evaluatorUid_expr: "auth.uid"
+  })
+}
+
+mutation DeleteIsoRating($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director']") {
+  isoEvaluationRating_delete(id: $id)
+}
+
+query ListAuditLogEntries
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director']")
+  @refresh(onMutationExecuted: { operation: "UpsertAuditLogEntry" })
+  @refresh(onMutationExecuted: { operation: "DeleteAuditLogEntry" }) {
+  auditLogEntries(orderBy: [{ timestamp: DESC }]) {
+    id
+    timestamp
+    category
+    subsystem
+    action
+    description
+    details
+    userId
+    userName
+    userRole
+    userTitle
+    terminalOrStation
+    severity
+  }
+}
+
+mutation UpsertAuditLogEntry(
+  $id: String!
+  $timestamp: String!
+  $category: String!
+  $subsystem: String!
+  $action: String!
+  $description: String!
+  $details: Any
+  $userName: String!
+  $userTitle: String!
+  $terminalOrStation: String
+  $severity: String!
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+  auditLogEntry_upsert(data: {
+    id: $id
+    timestamp: $timestamp
+    category: $category
+    subsystem: $subsystem
+    action: $action
+    description: $description
+    details: $details
+    userId_expr: "auth.uid"
+    userName: $userName
+    userRole_expr: "auth.token.role"
+    userTitle: $userTitle
+    terminalOrStation: $terminalOrStation
+    severity: $severity
+  })
+}
+
+mutation DeleteAuditLogEntry($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director']") {
+  auditLogEntry_delete(id: $id)
+}
+
+query ListUserProfiles
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @refresh(onMutationExecuted: { operation: "UpsertUserProfile" })
+  @refresh(onMutationExecuted: { operation: "UpdateOwnUserProfile" })
+  @refresh(onMutationExecuted: { operation: "DeleteUserProfile" }) {
+  userProfiles(orderBy: [{ name: ASC }]) {
+    id
+    name
+    role
+    title
+    department
+    avatar
+    email
+    username
+    nickname
+  }
+}
+
+mutation UpsertUserProfile(
+  $id: String!
+  $name: String!
+  $role: String!
+  $title: String!
+  $department: String!
+  $avatar: String!
+  $email: String!
+  $username: String!
+  $nickname: String
+) @auth(expr: "auth != null && auth.token.role == 'developer'") {
+  userProfile_upsert(data: {
+    id: $id
+    name: $name
+    role: $role
+    title: $title
+    department: $department
+    avatar: $avatar
+    email: $email
+    username: $username
+    nickname: $nickname
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation UpdateOwnUserProfile(
+  $id: String!
+  $name: String!
+  $title: String!
+  $department: String!
+  $avatar: String!
+  $username: String!
+  $nickname: String
+) @auth(expr: "auth != null && auth.token.role in ['director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+  userProfile_updateMany(
+    where: {
+      id: { eq: $id }
+      email: { eq_expr: "auth.token.email" }
+    }
+    data: {
+      name: $name
+      title: $title
+      department: $department
+      avatar: $avatar
+      username: $username
+      nickname: $nickname
+      updatedAt_expr: "request.time"
+      updatedBy_expr: "auth.uid"
+    }
+  )
+}
+
+mutation DeleteUserProfile($id: String!)
+  @auth(expr: "auth != null && auth.token.role == 'developer'") {
+  userProfile_delete(id: $id)
+}

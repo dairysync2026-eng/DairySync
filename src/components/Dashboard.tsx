@@ -5,7 +5,7 @@ import { ProcurementDashboard } from './dashboards/ProcurementDashboard';
 import { PlantManagerDashboard } from './dashboards/PlantManagerDashboard';
 import { ProductionStaffDashboard } from './dashboards/ProductionStaffDashboard';
 import { StoreOutletDashboard } from './dashboards/StoreOutletDashboard';
-import { DairyBoxPos } from './DairyBoxPos';
+import { DirectorDashboard } from './dashboards/DirectorDashboard';
 import { 
   Truck, 
   Package, 
@@ -44,10 +44,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     transactions, 
     isoRatings 
   } = useDairySync();
-
-  if (currentRole === 'director') {
-    return <DairyBoxPos salesHistoryOnly />;
-  }
 
   // Role-Specific Summary Card Computations
   // 1. Procurement Metrics (Warehouse & Procurement staff)
@@ -313,6 +309,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
           onNavigateTab={onNavigateTab} 
           onOpenIsoSurvey={onOpenIsoSurvey} 
           onOpenReports={onOpenReports} 
+        />
+      )}
+
+      {currentRole === 'director' && (
+        <DirectorDashboard
+          onNavigateTab={onNavigateTab}
+          onOpenIsoSurvey={onOpenIsoSurvey}
+          onOpenReports={onOpenReports}
         />
       )}
 

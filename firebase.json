@@ -1,4 +1,19 @@
 {
+  "dataconnect": {
+    "source": "dataconnect"
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "dataconnect": {
+      "port": 9399
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000
+    }
+  },
   "hosting": {
     "public": "dist",
     "ignore": [

@@ -1,0 +1,98 @@
+mutation SeedStockTransaction(
+  $id: String!
+  $timestamp: String!
+  $itemId: String!
+  $itemName: String!
+  $itemType: String!
+  $action: String!
+  $quantity: Float!
+  $unit: String!
+  $previousStock: Float!
+  $newStock: Float!
+  $referenceId: String
+  $unitPrice: Float
+  $performedBy: String!
+  $notes: String
+) @auth(expr: "auth != null && auth.token.role == 'developer'") {
+  stockTransaction_upsert(data: {
+    id: $id
+    timestamp: $timestamp
+    itemId: $itemId
+    itemName: $itemName
+    itemType: $itemType
+    action: $action
+    quantity: $quantity
+    unit: $unit
+    previousStock: $previousStock
+    newStock: $newStock
+    referenceId: $referenceId
+    unitPrice: $unitPrice
+    performedBy: $performedBy
+    notes: $notes
+  })
+}
+
+mutation SeedIsoRating(
+  $id: String!
+  $functionalSuitability: Float!
+  $performanceEfficiency: Float!
+  $compatibility: Float!
+  $interactionCapability: Float!
+  $reliability: Float!
+  $security: Float!
+  $maintainability: Float!
+  $flexibility: Float!
+  $safety: Float!
+  $evaluatorRole: String!
+  $comments: String!
+  $date: String!
+) @auth(expr: "auth != null && auth.token.role == 'developer'") {
+  isoEvaluationRating_upsert(data: {
+    id: $id
+    functionalSuitability: $functionalSuitability
+    performanceEfficiency: $performanceEfficiency
+    compatibility: $compatibility
+    interactionCapability: $interactionCapability
+    reliability: $reliability
+    security: $security
+    maintainability: $maintainability
+    flexibility: $flexibility
+    safety: $safety
+    evaluatorRole: $evaluatorRole
+    comments: $comments
+    date: $date
+    evaluatorUid_expr: "auth.uid"
+  })
+}
+
+mutation SeedAuditLogEntry(
+  $id: String!
+  $timestamp: String!
+  $category: String!
+  $subsystem: String!
+  $action: String!
+  $description: String!
+  $details: Any
+  $userId: String!
+  $userName: String!
+  $userRole: String!
+  $userTitle: String!
+  $terminalOrStation: String
+  $severity: String!
+) @auth(expr: "auth != null && auth.token.role == 'developer'") {
+  auditLogEntry_upsert(data: {
+    id: $id
+    timestamp: $timestamp
+    category: $category
+    subsystem: $subsystem
+    action: $action
+    description: $description
+    details: $details
+    userId: $userId
+    userName: $userName
+    userRole: $userRole
+    userTitle: $userTitle
+    terminalOrStation: $terminalOrStation
+    severity: $severity
+  })
+}

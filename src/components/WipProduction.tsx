@@ -74,11 +74,23 @@ export const WipProduction: React.FC = () => {
     };
   }) : [];
 
-  const rawMilkRequirement = computedBom.find(b => b.ingredientId === 'ing-1')?.needed || (targetQty * 0.3);
+  const rawMilkRequirement = computedBom
+    .filter(requirement => {
+      const ingredient = ingredients.find(item => item.id === requirement.ingredientId);
+      return ingredient?.category === 'milk' && ingredient.unit === 'L';
+    })
+    .reduce((total, requirement) => total + requirement.needed, 0);
 
   const handleCreateBatch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
+    if (selectedProduct.recipe.length === 0) {
+      setFeedbackMessage({
+        type: 'error',
+        text: `No production recipe is configured for ${selectedProduct.name}. Add its ingredients in Finished Goods before starting a WIP batch.`
+      });
+      return;
+    }
 
     const result = createWipBatch({
       productId: selectedProduct.id,
@@ -503,6 +515,12 @@ export const WipProduction: React.FC = () => {
                   <span className="text-[10px] text-indigo-600 font-mono font-bold">Target batch: {targetQty} units</span>
                 </div>
 
+                {selectedProduct?.recipe.length === 0 && (
+                  <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                    This product has no recipe yet. Configure its ingredients in Finished Goods before starting production.
+                  </div>
+                )}
+
                 <div className="divide-y divide-slate-200 text-xs">
                   {computedBom.map((req, idx) => (
                     <div key={idx} className="py-2.5 flex items-center justify-between">
@@ -550,14 +568,18 @@ export const WipProduction: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={computedBom.some(b => !b.isSufficient)}
+                  disabled={!selectedProduct || selectedProduct.recipe.length === 0 || computedBom.some(b => !b.isSufficient)}
                   className={`px-5 py-2.5 rounded-2xl text-xs font-bold shadow-md transition-all ${
-                    computedBom.some(b => !b.isSufficient)
+                    !selectedProduct || selectedProduct.recipe.length === 0 || computedBom.some(b => !b.isSufficient)
                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
                       : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100'
                   }`}
                 >
-                  {computedBom.some(b => !b.isSufficient) ? 'Halted: Ingredient Shortage' : 'Deduct BOM & Start Batch'}
+                  {!selectedProduct || selectedProduct.recipe.length === 0
+                    ? 'Halted: Recipe Required'
+                    : computedBom.some(b => !b.isSufficient)
+                      ? 'Halted: Ingredient Shortage'
+                      : 'Deduct BOM & Start Batch'}
                 </button>
               </div>
 
