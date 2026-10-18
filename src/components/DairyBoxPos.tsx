@@ -1,15 +1,54 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
-import { ShoppingCart, Plus, Minus, Trash2, Receipt, AlertCircle, History, X, Search, Printer, Eye, DollarSign, PackageCheck, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { ProductCategory } from '../types';
+import { ShoppingCart, Plus, Minus, Trash2, Receipt, AlertCircle, History, X, Search, Printer, Eye, DollarSign, PackageCheck, TrendingUp, CheckCircle2, Filter } from 'lucide-react';
 import { ExportMenu } from './ExportMenu';
 import { downloadCsv } from '../utils/csv';
+import { usePagination } from '../hooks/usePagination';
+import { TablePagination } from './TablePagination';
+
+const productCategories: { key: ProductCategory | 'all'; label: string }[] = [
+  { key: 'all', label: 'All Products' },
+  { key: 'fresh_milk', label: 'Fresh Milk' },
+  { key: 'flavored_milk', label: 'Flavored Milk' },
+  { key: 'cultured', label: 'Cultured / Yogurt' },
+  { key: 'confectionery', label: 'Confectionery' },
+  { key: 'cheese', label: 'Cheese' }
+];
+
+const getProductSize = (name: string): { key: string; label: string } | null => {
+  const match = name.match(/(\d+(?:\.\d+)?)\s*(ml|l|g|kg)\b/i);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  const isVolume = unit === 'ml' || unit === 'l';
+  const baseAmount = unit === 'l' || unit === 'kg' ? amount * 1000 : amount;
+  const dimension = isVolume ? 'volume' : 'weight';
+  const key = `${dimension}:${baseAmount}`;
+  const displayAmount = baseAmount >= 1000 ? baseAmount / 1000 : baseAmount;
+  const displayUnit = baseAmount >= 1000
+    ? (isVolume ? 'L' : 'kg')
+    : (isVolume ? 'mL' : 'g');
+
+  return { key, label: `${displayAmount} ${displayUnit}` };
+};
 
 interface DairyBoxPosProps {
   salesHistoryOnly?: boolean;
 }
 
 export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = false }) => {
-  const { finishedGoods, transactions, processRetailSale } = useDairySync();
+  const {
+    finishedGoods,
+    transactions,
+    processRetailSale,
+    currentRole,
+    isDeveloperActive,
+    deleteSalesHistoryRecord,
+    removeIdentifiedSampleSales
+  } = useDairySync();
+  const canDeleteSalesHistory = isDeveloperActive && currentRole === 'developer';
   
   const [cart, setCart] = useState<{ productId: string; quantity: number }[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -18,6 +57,41 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
   const [salesSearch, setSalesSearch] = useState('');
   const [salesPeriod, setSalesPeriod] = useState<'all' | 'today' | '7days'>('all');
   const [selectedSaleReceipt, setSelectedSaleReceipt] = useState<string | null>(null);
+  const [selectedProductCategory, setSelectedProductCategory] = useState<ProductCategory | 'all'>('all');
+  const [selectedProductSize, setSelectedProductSize] = useState('all');
+  const [isRemovingSampleSales, setIsRemovingSampleSales] = useState(false);
+
+  const handleDeleteSale = (receiptNo: string, transactionIds: string[]) => {
+    if (!window.confirm(`Delete sales history receipt ${receiptNo}? This removes its POS history transactions only; sold stock will not be restored.`)) return;
+    if (!deleteSalesHistoryRecord(receiptNo, transactionIds)) {
+      window.alert('The sale history could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+      return;
+    }
+    setSelectedSaleReceipt(selected => selected === receiptNo ? null : selected);
+  };
+
+  const handleRemoveIdentifiedSampleSales = async () => {
+    if (!window.confirm('Remove the previously identified test sales from October 12 and 14, including the 490-unit Sample 2 sale? This only deletes those specific sales-history records and does not restore stock.')) return;
+    setIsRemovingSampleSales(true);
+    try {
+      const result = await removeIdentifiedSampleSales();
+      if (result.failedIds.length > 0) {
+        window.alert(`Removed ${result.deletedCount} sale transaction(s), queued ${result.pendingCount} for retry, but ${result.failedIds.length} could not be saved for retry. Check your connection and try again.`);
+      } else if (result.pendingCount > 0) {
+        window.alert(`${result.deletedCount} sale transaction(s) were removed. ${result.pendingCount} more were queued to delete when cloud sync is available.`);
+      } else if (result.deletedCount > 0) {
+        window.alert(`Removed ${result.deletedCount} identified test sale transaction(s) from the cloud and sales history.`);
+      } else {
+        window.alert('No matching identified test sales remain in this browser’s current data. If Chrome still shows them, reload the page and confirm it is signed into the developer account.');
+      }
+      setSelectedSaleReceipt(null);
+    } catch (error) {
+      console.error('Could not remove identified sample POS sales:', error);
+      window.alert('Could not remove the identified sales. Check the browser connection and developer sign-in, then try again.');
+    } finally {
+      setIsRemovingSampleSales(false);
+    }
+  };
 
   useEffect(() => {
     if (!coldStockNotice) return;
@@ -78,12 +152,34 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
       return Number.isFinite(saleTime) && saleTime >= rangeStart;
     });
   }, [salesHistory, salesSearch, salesPeriod]);
+  const salesPagination = usePagination(filteredSales);
 
   const selectedSale = salesHistory.find(sale => sale.receiptNo === selectedSaleReceipt) ?? null;
   const knownRevenue = filteredSales.reduce((sum, sale) => sum + (sale.totalAmount ?? 0), 0);
   const pricedSaleCount = filteredSales.filter(sale => sale.totalAmount !== null).length;
   const totalUnitsDispatched = filteredSales.reduce((sum, sale) => sum + sale.totalQuantity, 0);
   const averageTicket = pricedSaleCount ? knownRevenue / pricedSaleCount : null;
+
+  const productSizes = useMemo(() => {
+    const sizes = new Map<string, string>();
+    finishedGoods.forEach(product => {
+      const size = getProductSize(product.name);
+      if (size) sizes.set(size.key, size.label);
+    });
+    return Array.from(sizes, ([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+  }, [finishedGoods]);
+
+  const filteredProducts = useMemo(() => finishedGoods.filter(product => {
+    const matchesCategory = selectedProductCategory === 'all' || product.category === selectedProductCategory;
+    const productSize = getProductSize(product.name);
+    const matchesSize = selectedProductSize === 'all'
+      ? true
+      : selectedProductSize === 'unspecified'
+        ? productSize === null
+        : productSize?.key === selectedProductSize;
+    return matchesCategory && matchesSize;
+  }), [finishedGoods, selectedProductCategory, selectedProductSize]);
 
   const formatCurrency = (amount: number) => `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -245,10 +341,59 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
         
         {/* Left 2 Cols: Product Catalog */}
         <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Select Products for Sale</h2>
-          
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Select Products for Sale</h2>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <Filter className="h-4 w-4" aria-hidden="true" />
+                <span>Size</span>
+                <select
+                  value={selectedProductSize}
+                  onChange={event => setSelectedProductSize(event.target.value)}
+                  aria-label="Filter products by package size"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:border-emerald-400 focus:outline-none"
+                >
+                  <option value="all">All Sizes</option>
+                  {productSizes.map(size => <option key={size.key} value={size.key}>{size.label}</option>)}
+                  <option value="unspecified">Unspecified</option>
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter products by category">
+              {productCategories.map(category => (
+                <button
+                  key={category.key}
+                  type="button"
+                  onClick={() => setSelectedProductCategory(category.key)}
+                  aria-pressed={selectedProductCategory === category.key}
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors ${
+                    selectedProductCategory === category.key
+                      ? 'border-emerald-700 bg-emerald-700 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {finishedGoods.map(fg => (
+            {filteredProducts.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-10 text-center text-sm text-slate-500">
+                <p>No products match these filters.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedProductCategory('all');
+                    setSelectedProductSize('all');
+                  }}
+                  className="mt-2 font-bold text-emerald-700 hover:text-emerald-800"
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : filteredProducts.map(fg => (
               <div 
                 key={fg.id} 
                 className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between space-y-3 hover:border-slate-300 transition-all text-slate-900"
@@ -357,12 +502,14 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
         <div
           className={salesHistoryOnly ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-2 sm:p-5'}
           role={salesHistoryOnly ? undefined : 'presentation'}
+          onClick={salesHistoryOnly ? undefined : () => setShowSalesHistory(false)}
         >
           <section
             role={salesHistoryOnly ? 'region' : 'dialog'}
             aria-modal={salesHistoryOnly ? undefined : true}
             aria-labelledby="pos-sales-history-title"
             className={`flex w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm ${salesHistoryOnly ? 'max-h-[75vh] max-w-none' : 'max-h-[92vh] max-w-6xl shadow-2xl'}`}
+            onClick={salesHistoryOnly ? undefined : event => event.stopPropagation()}
           >
             <header className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div className="flex min-w-0 items-center gap-3">
@@ -380,6 +527,17 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2 self-end sm:self-auto">
+                {canDeleteSalesHistory && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRemoveIdentifiedSampleSales()}
+                    disabled={isRemovingSampleSales}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {isRemovingSampleSales ? 'Removing…' : 'Remove Test Sales'}
+                  </button>
+                )}
                 <ExportMenu
                   onPdf={printSalesHistory}
                   onCsv={exportSalesHistory}
@@ -472,13 +630,13 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
                       <th className="w-[31%] px-3 py-3">Purchased Items</th>
                       <th className="w-[8%] px-3 py-3 text-center">Units</th>
                       <th className="w-[11%] px-3 py-3 text-right">Total Amount</th>
-                      <th className="w-[4%] px-3 py-3 text-center">Receipt</th>
+                      <th className="sticky right-0 w-[11%] bg-slate-100 px-3 py-3 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white text-[11px]">
-                    {filteredSales.length === 0 ? (
+                    {salesPagination.pageItems.length === 0 ? (
                       <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">No sales match this search or time range.</td></tr>
-                    ) : filteredSales.map(sale => (
+                    ) : salesPagination.pageItems.map(sale => (
                       <tr key={sale.receiptNo} className="align-top hover:bg-slate-50/80">
                         <td className="px-3 py-3"><span className="break-all rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] font-bold text-slate-700">{sale.receiptNo}</span></td>
                         <td className="px-3 py-3 text-slate-600">{sale.timestamp}</td>
@@ -495,7 +653,8 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
                         <td className="px-3 py-3 text-right font-mono font-extrabold text-emerald-700" title={sale.totalAmount === null ? 'Prices were not saved for this older sale' : undefined}>
                           {sale.totalAmount === null ? '—' : formatCurrency(sale.totalAmount)}
                         </td>
-                        <td className="px-3 py-3 text-center">
+                        <td className="sticky right-0 bg-white px-3 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
                             onClick={() => setSelectedSaleReceipt(sale.receiptNo)}
@@ -505,12 +664,33 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
                           >
                             <Eye className="h-4 w-4" />
                           </button>
+                          {canDeleteSalesHistory && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSale(sale.receiptNo, sale.items.map(item => item.id))}
+                              aria-label={`Delete sales history receipt ${sale.receiptNo}`}
+                              title="Delete sales history receipt without restoring stock"
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-[10px] font-bold text-rose-700 hover:bg-rose-100"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              <TablePagination
+                totalItems={filteredSales.length}
+                pageIndex={salesPagination.pageIndex}
+                pageSize={salesPagination.pageSize}
+                pageCount={salesPagination.pageCount}
+                onPageChange={salesPagination.setPageIndex}
+                onPageSizeChange={salesPagination.setPageSize}
+              />
             </div>
             <footer className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <p className="text-[11px] text-slate-500">Showing {filteredSales.length} of {salesHistory.length} total registered receipts</p>
@@ -527,8 +707,8 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
       )}
 
       {selectedSale && (showSalesHistory || salesHistoryOnly) && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="sale-details-title" className="w-full max-w-lg rounded-2xl bg-white p-5 text-slate-900 shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4" role="presentation" onClick={() => setSelectedSaleReceipt(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="sale-details-title" className="w-full max-w-lg rounded-2xl bg-white p-5 text-slate-900 shadow-2xl" onClick={event => event.stopPropagation()}>
             <header className="flex items-start justify-between border-b border-slate-200 pb-3">
               <div>
                 <h2 id="sale-details-title" className="font-extrabold">Sale Receipt</h2>
@@ -549,9 +729,19 @@ export const DairyBoxPos: React.FC<DairyBoxPosProps> = ({ salesHistoryOnly = fal
                 </li>
               ))}
             </ul>
-            <div className="flex justify-between pt-3 text-sm font-extrabold">
+            <div className="flex items-center justify-between gap-3 pt-3 text-sm font-extrabold">
               <span>Total</span>
-              <span className="text-emerald-700">{selectedSale.totalAmount === null ? 'Unavailable' : formatCurrency(selectedSale.totalAmount)}</span>
+              <span className="ml-auto text-emerald-700">{selectedSale.totalAmount === null ? 'Unavailable' : formatCurrency(selectedSale.totalAmount)}</span>
+              {canDeleteSalesHistory && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSale(selectedSale.receiptNo, selectedSale.items.map(item => item.id))}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Sale
+                </button>
+              )}
             </div>
           </section>
         </div>

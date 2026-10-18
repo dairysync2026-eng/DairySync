@@ -10,6 +10,7 @@ This README will guide you through the process of using the generated JavaScript
 - [**Queries**](#queries)
   - [*ListRawIngredients*](#listrawingredients)
   - [*ListStockTransactions*](#liststocktransactions)
+  - [*ListPmoInventoryPeriods*](#listpmoinventoryperiods)
   - [*ListFinishedGoods*](#listfinishedgoods)
   - [*ListWipBatches*](#listwipbatches)
   - [*ListCommitments*](#listcommitments)
@@ -26,6 +27,7 @@ This README will guide you through the process of using the generated JavaScript
   - [*UpsertStockTransaction*](#upsertstocktransaction)
   - [*DeleteStockTransaction*](#deletestocktransaction)
   - [*UpdateFinishedGoodRecipe*](#updatefinishedgoodrecipe)
+  - [*UpsertPmoInventoryPeriod*](#upsertpmoinventoryperiod)
   - [*UpsertFinishedGood*](#upsertfinishedgood)
   - [*SetRetailFinishedGoodStock*](#setretailfinishedgoodstock)
   - [*DeleteFinishedGood*](#deletefinishedgood)
@@ -299,6 +301,107 @@ console.log(data.stockTransactions);
 executeQuery(ref).then((response) => {
   const data = response.data;
   console.log(data.stockTransactions);
+});
+```
+
+## ListPmoInventoryPeriods
+You can execute the `ListPmoInventoryPeriods` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+listPmoInventoryPeriods(options?: ExecuteQueryOptions): QueryPromise<ListPmoInventoryPeriodsData, undefined>;
+
+interface ListPmoInventoryPeriodsRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListPmoInventoryPeriodsData, undefined>;
+}
+export const listPmoInventoryPeriodsRef: ListPmoInventoryPeriodsRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+listPmoInventoryPeriods(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListPmoInventoryPeriodsData, undefined>;
+
+interface ListPmoInventoryPeriodsRef {
+  ...
+  (dc: DataConnect): QueryRef<ListPmoInventoryPeriodsData, undefined>;
+}
+export const listPmoInventoryPeriodsRef: ListPmoInventoryPeriodsRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the listPmoInventoryPeriodsRef:
+```typescript
+const name = listPmoInventoryPeriodsRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ListPmoInventoryPeriods` query has no variables.
+### Return Type
+Recall that executing the `ListPmoInventoryPeriods` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ListPmoInventoryPeriodsData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ListPmoInventoryPeriodsData {
+  pmoInventoryPeriods: ({
+    id: string;
+    title: string;
+    sourceFileName: string;
+    lines: unknown[];
+    createdAt: string;
+    createdBy: string;
+    status?: string | null;
+    postedAt?: string | null;
+    postedBy?: string | null;
+  } & PmoInventoryPeriod_Key)[];
+}
+```
+### Using `ListPmoInventoryPeriods`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, listPmoInventoryPeriods } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listPmoInventoryPeriods()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await listPmoInventoryPeriods();
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await listPmoInventoryPeriods(dataConnect);
+
+console.log(data.pmoInventoryPeriods);
+
+// Or, you can use the `Promise` API.
+listPmoInventoryPeriods().then((response) => {
+  const data = response.data;
+  console.log(data.pmoInventoryPeriods);
+});
+```
+
+### Using `ListPmoInventoryPeriods`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, listPmoInventoryPeriodsRef } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listPmoInventoryPeriodsRef()` function to get a reference to the query.
+const ref = listPmoInventoryPeriodsRef();
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = listPmoInventoryPeriodsRef(dataConnect);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.pmoInventoryPeriods);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.pmoInventoryPeriods);
 });
 ```
 
@@ -2117,6 +2220,139 @@ console.log(data.finishedGood_update);
 executeMutation(ref).then((response) => {
   const data = response.data;
   console.log(data.finishedGood_update);
+});
+```
+
+## UpsertPmoInventoryPeriod
+You can execute the `UpsertPmoInventoryPeriod` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+upsertPmoInventoryPeriod(vars: UpsertPmoInventoryPeriodVariables): MutationPromise<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+
+interface UpsertPmoInventoryPeriodRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertPmoInventoryPeriodVariables): MutationRef<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+}
+export const upsertPmoInventoryPeriodRef: UpsertPmoInventoryPeriodRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+upsertPmoInventoryPeriod(dc: DataConnect, vars: UpsertPmoInventoryPeriodVariables): MutationPromise<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+
+interface UpsertPmoInventoryPeriodRef {
+  ...
+  (dc: DataConnect, vars: UpsertPmoInventoryPeriodVariables): MutationRef<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+}
+export const upsertPmoInventoryPeriodRef: UpsertPmoInventoryPeriodRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the upsertPmoInventoryPeriodRef:
+```typescript
+const name = upsertPmoInventoryPeriodRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `UpsertPmoInventoryPeriod` mutation requires an argument of type `UpsertPmoInventoryPeriodVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface UpsertPmoInventoryPeriodVariables {
+  id: string;
+  title: string;
+  sourceFileName: string;
+  lines: unknown[];
+  createdAt: string;
+  createdBy: string;
+  status: string;
+  postedAt?: string | null;
+  postedBy?: string | null;
+}
+```
+### Return Type
+Recall that executing the `UpsertPmoInventoryPeriod` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `UpsertPmoInventoryPeriodData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface UpsertPmoInventoryPeriodData {
+  pmoInventoryPeriod_upsert: PmoInventoryPeriod_Key;
+}
+```
+### Using `UpsertPmoInventoryPeriod`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, upsertPmoInventoryPeriod, UpsertPmoInventoryPeriodVariables } from '@dataconnect/dairysync-generated';
+
+// The `UpsertPmoInventoryPeriod` mutation requires an argument of type `UpsertPmoInventoryPeriodVariables`:
+const upsertPmoInventoryPeriodVars: UpsertPmoInventoryPeriodVariables = {
+  id: ..., 
+  title: ..., 
+  sourceFileName: ..., 
+  lines: ..., 
+  createdAt: ..., 
+  createdBy: ..., 
+  status: ..., 
+  postedAt: ..., // optional
+  postedBy: ..., // optional
+};
+
+// Call the `upsertPmoInventoryPeriod()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await upsertPmoInventoryPeriod(upsertPmoInventoryPeriodVars);
+// Variables can be defined inline as well.
+const { data } = await upsertPmoInventoryPeriod({ id: ..., title: ..., sourceFileName: ..., lines: ..., createdAt: ..., createdBy: ..., status: ..., postedAt: ..., postedBy: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await upsertPmoInventoryPeriod(dataConnect, upsertPmoInventoryPeriodVars);
+
+console.log(data.pmoInventoryPeriod_upsert);
+
+// Or, you can use the `Promise` API.
+upsertPmoInventoryPeriod(upsertPmoInventoryPeriodVars).then((response) => {
+  const data = response.data;
+  console.log(data.pmoInventoryPeriod_upsert);
+});
+```
+
+### Using `UpsertPmoInventoryPeriod`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, upsertPmoInventoryPeriodRef, UpsertPmoInventoryPeriodVariables } from '@dataconnect/dairysync-generated';
+
+// The `UpsertPmoInventoryPeriod` mutation requires an argument of type `UpsertPmoInventoryPeriodVariables`:
+const upsertPmoInventoryPeriodVars: UpsertPmoInventoryPeriodVariables = {
+  id: ..., 
+  title: ..., 
+  sourceFileName: ..., 
+  lines: ..., 
+  createdAt: ..., 
+  createdBy: ..., 
+  status: ..., 
+  postedAt: ..., // optional
+  postedBy: ..., // optional
+};
+
+// Call the `upsertPmoInventoryPeriodRef()` function to get a reference to the mutation.
+const ref = upsertPmoInventoryPeriodRef(upsertPmoInventoryPeriodVars);
+// Variables can be defined inline as well.
+const ref = upsertPmoInventoryPeriodRef({ id: ..., title: ..., sourceFileName: ..., lines: ..., createdAt: ..., createdBy: ..., status: ..., postedAt: ..., postedBy: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = upsertPmoInventoryPeriodRef(dataConnect, upsertPmoInventoryPeriodVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.pmoInventoryPeriod_upsert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.pmoInventoryPeriod_upsert);
 });
 ```
 

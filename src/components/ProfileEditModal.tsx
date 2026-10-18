@@ -16,17 +16,6 @@ interface ProfileEditModalProps {
   onClose: () => void;
 }
 
-const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-  'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
-  'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=150',
-  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=150',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150',
-  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=150'
-];
-
 export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
   const { currentUser, updateUserProfile } = useDairySync();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -268,7 +257,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
                     type="url"
                     value={avatar}
                     onChange={(e) => setAvatar(e.target.value)}
-                    placeholder="Enter image URL or choose preset below..."
+                    placeholder="Enter an image URL..."
                     className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                   />
                   <input 
@@ -286,30 +275,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
                     <Upload className="w-3.5 h-3.5" />
                     <span>Upload</span>
                   </button>
-                </div>
-
-                {/* Avatar Presets Picker */}
-                <div>
-                  <span className="text-[11px] font-bold text-slate-500 block mb-1.5">Or select from curated portraits:</span>
-                  <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-                    {AVATAR_PRESETS.map((presetUrl, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        onClick={() => setAvatar(presetUrl)}
-                        className={`relative rounded-xl overflow-hidden shrink-0 border-2 transition-all ${
-                          avatar === presetUrl ? 'border-indigo-600 scale-105 shadow-md' : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <img src={presetUrl} alt={`Preset ${idx + 1}`} className="w-10 h-10 object-cover" />
-                        {avatar === presetUrl && (
-                          <div className="absolute inset-0 bg-indigo-600/30 flex items-center justify-center text-white">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </div>

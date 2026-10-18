@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { ShieldAlert, UserCheck, Factory, ShoppingCart, Truck, Terminal, ArrowRight, UserCog, ChevronDown } from 'lucide-react';
-import { UserRole } from '../types';
+import { USER_ROLES, USER_ROLE_LABELS, UserRole } from '../types';
 
 export const RoleBadge: React.FC = () => {
   const { 
@@ -10,7 +10,6 @@ export const RoleBadge: React.FC = () => {
     isDeveloperActive, 
     loginAsRoleUser, 
     returnToDeveloperAccount,
-    users 
   } = useDairySync();
 
   const [showFastSwitcher, setShowFastSwitcher] = useState(false);
@@ -103,11 +102,11 @@ export const RoleBadge: React.FC = () => {
                   Lead Dev Master Session Active
                 </span>
                 <span className="text-xs text-slate-300 font-medium hidden sm:inline truncate">
-                  Masquerading as <strong>{currentUser.name}</strong> ({roleLabels[currentRole]?.roleName})
+                  Previewing <strong>{currentUser.name}</strong> ({roleLabels[currentRole]?.roleName})
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">
-                Superuser clearance active: Switch freely into other user dashboards without re-logging in
+                Superuser clearance active: Preview any role dashboard without needing a staff profile
               </p>
             </div>
           </div>
@@ -115,18 +114,18 @@ export const RoleBadge: React.FC = () => {
           <div className="flex items-center flex-wrap gap-1.5 w-full md:w-auto justify-end shrink-0">
             {/* Direct Switcher Quick Pills */}
             <div className="hidden lg:flex items-center space-x-1 bg-slate-800/80 p-1 rounded-2xl border border-slate-700">
-              {users.map(u => (
+              {USER_ROLES.map(role => (
                 <button
-                  key={u.role}
-                  onClick={() => loginAsRoleUser(u.role)}
+                  key={role}
+                  onClick={() => loginAsRoleUser(role)}
                   className={`px-2 py-1 rounded-xl text-[10px] font-bold transition-all ${
-                    currentRole === u.role
+                    currentRole === role
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-slate-300 hover:text-white hover:bg-slate-700'
                   }`}
-                  title={`Switch directly to ${u.name} (${u.title})`}
+                  title={`Preview ${USER_ROLE_LABELS[role]} dashboard`}
                 >
-                  {roleLabels[u.role]?.short || u.role}
+                  {roleLabels[role]?.short || role}
                 </button>
               ))}
             </div>
@@ -150,29 +149,26 @@ export const RoleBadge: React.FC = () => {
                     <p className="text-[10px] text-slate-500">No logout or credentials required</p>
                   </div>
                   <div className="space-y-1">
-                    {users.map(u => (
+                    {USER_ROLES.map(role => (
                       <button
-                        key={u.role}
+                        key={role}
                         onClick={() => {
-                          loginAsRoleUser(u.role);
+                          loginAsRoleUser(role);
                           setShowFastSwitcher(false);
                         }}
                         className={`w-full text-left p-2 rounded-xl text-xs flex items-center space-x-2.5 transition-all ${
-                          currentRole === u.role 
-                            ? 'bg-indigo-600 text-white font-bold' 
+                          currentRole === role
+                            ? 'bg-indigo-600 text-white font-bold'
                             : 'hover:bg-slate-100 text-slate-700'
                         }`}
                       >
-                        <img src={u.avatar} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
                         <div className="truncate flex-1">
-                          <p className="font-bold leading-tight truncate">
-                            {u.nickname ? `${u.name} (${u.nickname})` : u.name}
-                          </p>
-                          <p className={`text-[9px] truncate ${currentRole === u.role ? 'text-indigo-100' : 'text-slate-400'}`}>
-                            {u.title}
+                          <p className="font-bold leading-tight truncate">{USER_ROLE_LABELS[role]}</p>
+                          <p className={`text-[9px] truncate ${currentRole === role ? 'text-indigo-100' : 'text-slate-400'}`}>
+                            {roleLabels[role]?.roleName}
                           </p>
                         </div>
-                        {currentRole === u.role && (
+                        {currentRole === role && (
                           <span className="text-[8px] bg-white/20 text-white px-1.5 py-0.5 rounded font-mono font-bold">
                             Active
                           </span>

@@ -14,7 +14,8 @@ import {
   Clock,
   ShieldCheck,
   TrendingUp,
-  ClipboardList
+  ClipboardList,
+  History
 } from 'lucide-react';
 
 interface SubsystemDashboardProps {
@@ -22,14 +23,22 @@ interface SubsystemDashboardProps {
 }
 
 export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNavigateTab }) => {
-  const { finishedGoods, wipBatches, ingredients, currentUser, canAccessTab } = useDairySync();
+  const { finishedGoods, wipBatches, ingredients, commitments, currentUser, canAccessTab } = useDairySync();
 
   const totalColdCapacity = finishedGoods.reduce((sum, fg) => sum + fg.coldStorageCapacity, 0);
   const currentColdStock = finishedGoods.reduce((sum, fg) => sum + fg.currentStock, 0);
   const coldOccupancyPct = Math.min(100, Math.round((currentColdStock / (totalColdCapacity || 1)) * 100));
 
   const activeWipBatches = wipBatches.filter(b => b.status !== 'completed' && b.status !== 'cancelled');
+  const activeCommitments = commitments.filter(c => c.status === 'pending' || c.status === 'in_progress');
   const rawMilk = ingredients.find(i => i.category === 'milk');
+  const productionStages = [
+    { key: 'scheduled', label: 'Scheduled Batch', description: 'Raw milk & materials allocated' },
+    { key: 'pasteurization', label: 'Pasteurization / Cooking', description: '72°C–75°C holding tank' },
+    { key: 'cooling', label: 'Cooling', description: 'Chill to 4°C before packaging' },
+    { key: 'bottling_packaging', label: 'Bottling & Packaging', description: 'Package products for cold storage' },
+    { key: 'completed', label: 'Finished Goods Release', description: 'Moved to central cold storage' }
+  ] as const;
 
   const subsystemCards = [
     {
@@ -81,6 +90,36 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
       textColor: 'text-slate-600',
       accent: 'text-slate-500',
       onClick: () => onNavigateTab('procurement')
+    },
+    {
+      id: 'sync',
+      label: 'Supply & Demand',
+      title: 'Commitment Planning',
+      meta: `${activeCommitments.length} Active Commitments`,
+      className: 'bg-white hover:bg-emerald-50/50 border-2 border-emerald-200 rounded-2xl',
+      textColor: 'text-emerald-700',
+      accent: 'text-emerald-600',
+      onClick: () => onNavigateTab('sync')
+    },
+    {
+      id: 'pos',
+      label: 'Sales History',
+      title: 'Dairy Box Sales',
+      meta: 'Review POS receipts',
+      className: 'bg-white hover:bg-emerald-50/50 border-2 border-emerald-200 rounded-2xl',
+      textColor: 'text-emerald-700',
+      accent: 'text-emerald-600',
+      onClick: () => onNavigateTab('pos')
+    },
+    {
+      id: 'audit',
+      label: 'Audit Trail',
+      title: 'Operational Records',
+      meta: 'Review system activity',
+      className: 'bg-white hover:bg-violet-50/50 border-2 border-violet-200 rounded-2xl',
+      textColor: 'text-violet-700',
+      accent: 'text-violet-600',
+      onClick: () => onNavigateTab('audit')
     }
   ].filter(card => canAccessTab(card.id));
 
@@ -105,7 +144,7 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
             </div>
           </div>
           <p className="text-xs text-teal-100/80 mt-2 font-medium max-w-2xl leading-relaxed">
-            Logged in as <strong>{currentUser.name}</strong> ({currentUser.title}). This specialized command center consolidates your facility oversight: <strong>Cold Storage (Finished Goods)</strong>, <strong>WIP Batches</strong>, <strong>Raw Ingredients</strong>, and <strong>ROP Procurement</strong>.
+            Logged in as <strong>{currentUser.name}</strong> ({currentUser.title}). This specialized command center consolidates your             facility oversight: <strong>Cold Storage (Finished Goods)</strong>, <strong>WIP Batches</strong>, <strong>Raw Ingredients</strong>, <strong>ROP Procurement</strong>, and <strong>Supply &amp; Demand commitments</strong>.
           </p>
         </div>
 
@@ -127,10 +166,10 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Your Authorized Subsystems</span>
           </span>
-          <span className="text-[11px] text-slate-500 font-medium">4 Active Subsystems</span>
+          <span className="text-[11px] text-slate-500 font-medium">{subsystemCards.length + 1} Active Subsystems</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           <div className="p-3 bg-teal-50/80 border-2 border-teal-300 rounded-2xl flex flex-col justify-between">
             <span className="text-[10px] font-bold text-teal-800 uppercase">Command Center</span>
             <span className="text-xs font-black text-teal-950 mt-1">Plant Hub (Active)</span>
@@ -149,6 +188,8 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
               </div>
               <span className="flex items-center gap-1.5 text-xs font-black text-slate-900 mt-1">
                 {card.id === 'recipes' && <ClipboardList className="h-3.5 w-3.5 text-indigo-600" />}
+                {card.id === 'pos' && <History className="h-3.5 w-3.5 text-emerald-600" />}
+                {card.id === 'audit' && <ShieldCheck className="h-3.5 w-3.5 text-violet-600" />}
                 {card.title}
               </span>
               <span className={`text-[10px] font-medium mt-1 ${card.accent}`}>{card.meta}</span>
@@ -157,6 +198,46 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
         </div>
       </div>
 
+      {/* Production process subsystem overview */}
+      <section className="bg-white border-2 border-slate-200 rounded-3xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Factory className="w-4 h-4 text-indigo-600" />
+              Production Process Subsystems
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-1">Live batch counts across the production workflow</p>
+          </div>
+          <button
+            onClick={() => onNavigateTab('wip')}
+            className="self-start sm:self-auto text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 px-3 py-2 rounded-xl transition-colors"
+          >
+            Open WIP Board →
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {productionStages.map(stage => {
+            const batchCount = wipBatches.filter(batch => batch.status === stage.key).length;
+            return (
+              <button
+                key={stage.key}
+                onClick={() => onNavigateTab('wip')}
+                className="p-3 text-left bg-slate-50 hover:bg-indigo-50 border-2 border-slate-200 hover:border-indigo-200 rounded-2xl transition-colors"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-slate-600">{stage.label}</span>
+                  <span className="shrink-0 min-w-6 h-6 px-1.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-black flex items-center justify-center">
+                    {batchCount}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2">{stage.description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+699999
       {/* Facility & Cold Chain Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
@@ -281,14 +362,20 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
                     </div>
 
                     <div className="text-right">
-                      <span className="font-mono font-black text-slate-900 text-sm">{fg.currentStock} / {fg.coldStorageCapacity} {fg.unit}</span>
-                      <p className="text-[11px] text-teal-700 font-bold">{capPct}% Allocated</p>
+                      <span className="font-mono font-black text-slate-900 text-sm">
+                        {fg.coldStorageCapacity > 0
+                          ? `${fg.currentStock} / ${fg.coldStorageCapacity} ${fg.unit}`
+                          : `${fg.currentStock} ${fg.unit} / N/A capacity`}
+                      </span>
+                      {fg.coldStorageCapacity > 0 && <p className="text-[11px] text-teal-700 font-bold">{capPct}% Allocated</p>}
                     </div>
                   </div>
 
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                    <div className="bg-teal-600 h-full rounded-full transition-all" style={{ width: `${capPct}%` }}></div>
-                  </div>
+                  {fg.coldStorageCapacity > 0 && (
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div className="bg-teal-600 h-full rounded-full transition-all" style={{ width: `${capPct}%` }}></div>
+                    </div>
+                  )}
                 </div>
               );
             })}

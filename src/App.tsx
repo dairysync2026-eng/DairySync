@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { RoleBadge } from './components/RoleBadge';
 import { Dashboard } from './components/Dashboard';
 import { RawIngredients } from './components/RawIngredients';
+import { PmoInventory } from './components/PmoInventory';
 import { WipProduction } from './components/WipProduction';
 import { FinishedGoods } from './components/FinishedGoods';
 import { ProductRecipes } from './components/ProductRecipes';
@@ -19,6 +20,7 @@ import { ScrollableTabBar } from './components/ScrollableTabBar';
 import { 
   LayoutDashboard, 
   Package, 
+  Archive,
   Layers, 
   Snowflake, 
   ClipboardList,
@@ -58,12 +60,13 @@ const MainLayout: React.FC = () => {
   const tabs = [
     { id: 'dashboard', label: 'Command Center', icon: LayoutDashboard },
     { id: 'ingredients', label: 'Raw Ingredients', icon: Package },
+    { id: 'pmo_inventory', label: 'PMO Inventory', icon: Archive },
     { id: 'wip', label: 'WIP Batches', icon: Layers },
     { id: 'finished', label: 'Cold Storage', icon: Snowflake },
     { id: 'recipes', label: 'Product Recipes', icon: ClipboardList },
     { id: 'sync', label: 'Supply & Demand', icon: TrendingUp },
     { id: 'procurement', label: 'ROP Procurement', icon: Truck },
-    { id: 'pos', label: 'Dairy Box POS', icon: ShoppingCart },
+    { id: 'pos', label: currentRole === 'plant_manager' ? 'Sales History' : 'Dairy Box POS', icon: ShoppingCart },
     { id: 'audit', label: 'Audit Trail', icon: ShieldCheck },
     { id: 'documentation', label: 'System Manual', icon: BookOpen }
   ];
@@ -113,6 +116,8 @@ const MainLayout: React.FC = () => {
 
                 {activeTab === 'ingredients' && <RawIngredients />}
 
+                {activeTab === 'pmo_inventory' && <PmoInventory />}
+
                 {activeTab === 'wip' && <WipProduction />}
 
                 {activeTab === 'finished' && <FinishedGoods onNavigateTab={setActiveTab} />}
@@ -124,7 +129,7 @@ const MainLayout: React.FC = () => {
                 {activeTab === 'procurement' && <Procurement />}
 
                 {activeTab === 'pos' && (
-                  currentRole === 'director'
+                  currentRole === 'director' || currentRole === 'plant_manager'
                     ? <DairyBoxPos salesHistoryOnly />
                     : <DairyBoxPos />
                 )}

@@ -18,16 +18,21 @@ import {
   BomIngredientRequirement,
   IsoEvaluationRating,
   WipStep,
+  normalizeWipStep,
   AuditLogEntry,
   AuditCategory,
   AuditSeverity,
   ThemeMode,
-  BatchExpiryAlert
+  BatchExpiryAlert,
+  USER_ROLE_LABELS,
+  PmoInventoryPeriod,
+  PmoInventoryLine
 } from '../types';
 import { 
   cacheInventoryToIndexedDb, 
   getPendingOfflineActions, 
   removeOfflineAction,
+  removePendingSampleWrites,
   enqueueOfflineAction,
   OfflineSyncQueueItem
 } from '../services/inventoryDb';
@@ -48,15 +53,17 @@ import {
   INITIAL_COMMITMENTS, 
   INITIAL_ALERTS, 
   INITIAL_TRANSACTIONS,
-  INITIAL_AUDIT_LOGS
+  INITIAL_AUDIT_LOGS,
+  SAMPLE_RECORD_IDS
 } from '../data/initialData';
 import { auth } from '../services/firebase';
+import { calculatePmoExpectedEnding, getPmoInventoryActivity } from '../utils/pmoInventoryLedger';
 
 export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
-  developer: ['dashboard', 'ingredients', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
-  director: ['dashboard', 'ingredients', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit'],
-  procurement: ['dashboard', 'procurement', 'ingredients'],
-  plant_manager: ['dashboard', 'finished', 'recipes', 'wip', 'ingredients', 'procurement'],
+  developer: ['dashboard', 'ingredients', 'pmo_inventory', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
+  director: ['dashboard', 'ingredients', 'pmo_inventory', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit'],
+  procurement: ['dashboard', 'procurement', 'ingredients', 'pmo_inventory'],
+  plant_manager: ['dashboard', 'finished', 'recipes', 'wip', 'ingredients', 'pmo_inventory', 'procurement', 'sync', 'pos', 'audit'],
   production_staff: ['dashboard', 'wip', 'ingredients'],
   store_outlet: ['dashboard', 'pos', 'finished']
 };
@@ -91,6 +98,22 @@ interface DairySyncContextType {
   transactions: StockTransaction[];
   isoRatings: IsoEvaluationRating[];
   auditLogs: AuditLogEntry[];
+  pmoInventoryPeriods: PmoInventoryPeriod[];
+  importPmoInventoryPeriod: (period: Omit<PmoInventoryPeriod, 'id' | 'createdAt' | 'createdBy' | 'status' | 'postedAt' | 'postedBy'>) => { success: boolean; message: string };
+  savePmoInventoryPeriod: (period: PmoInventoryPeriod) => { success: boolean; message: string };
+  postPmoInventoryPeriod: (periodId: string) => { success: boolean; message: string };
+  deletePmoInventoryPeriod: (periodId: string) => { success: boolean; message: string };
+  addPmoExternalPurchase: (
+    periodId: string,
+    ingredient: Omit<RawIngredient, 'id' | 'currentStock' | 'lastRestocked'>,
+    quantity: number
+  ) => { success: boolean; message: string };
+  recordPmoInventoryAdjustment: (
+    ingredientId: string,
+    quantity: number,
+    kind: 'expired' | 'damage' | 'waste' | 'returned',
+    notes?: string
+  ) => { success: boolean; message: string };
   
   // Actions
   addIngredient: (ingredient: Omit<RawIngredient, 'id'>) => void;
@@ -101,6 +124,9 @@ interface DairySyncContextType {
     recipe: BomIngredientRequirement[],
     batchUnitQuantity: number
   ) => boolean;
+  deleteFinishedGoodRecipe: (id: string) => boolean;
+  deleteIngredientRecord: (id: string) => boolean;
+  deleteFinishedGoodRecord: (id: string) => boolean;
   updateFinishedGoodStock: (id: string, newStock: number, notes?: string) => boolean;
   updateFinishedGoodSafetyStock: (id: string, safetyStock: number) => void;
   
@@ -116,6 +142,7 @@ interface DairySyncContextType {
   
   advanceWipBatchStep: (batchId: string, nextStep: WipStep) => void;
   cancelWipBatch: (batchId: string, reason?: string) => { success: boolean; message: string };
+  deleteWipBatchRecord: (batchId: string) => boolean;
   
   // Retail / POS Actions
   processRetailSale: (items: { productId: string; quantity: number }[]) => { success: boolean; message: string };
@@ -125,6 +152,9 @@ interface DairySyncContextType {
   updateCommitmentStatus: (id: string, status: SupplyDemandCommitment['status'], fulfilledQty?: number) => void;
   cancelCommitment: (id: string, reason: string) => void;
   updateCommitmentPriority: (id: string, priority: 'high' | 'medium' | 'low') => void;
+  deleteCommitmentRecord: (id: string) => boolean;
+  deleteSalesHistoryRecord: (receiptNo: string, transactionIds: string[]) => boolean;
+  removeIdentifiedSampleSales: () => Promise<{ deletedCount: number; pendingCount: number; failedIds: string[] }>;
   
   // Alerts Actions
   markAlertRead: (id: string) => void;
@@ -144,6 +174,7 @@ interface DairySyncContextType {
     terminalOrStation?: string;
   }) => void;
   clearAuditLogs: () => void;
+  deleteAuditLogRecord: (id: string) => boolean;
   exportAuditLogsCsv: () => void;
 
   // System Utility
@@ -182,6 +213,98 @@ const DairySyncContext = createContext<DairySyncContextType | undefined>(undefin
 const LOCAL_STORAGE_KEY = 'dairysync_pcc_mmsu_state_v1';
 const AUTH_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 const AUTH_LAST_ACTIVITY_KEY = 'dairysync_auth_last_activity';
+const IS_PAGE_RELOAD = typeof performance !== 'undefined' &&
+  performance.getEntriesByType('navigation').some(
+    entry => (entry as PerformanceNavigationTiming).type === 'reload'
+  );
+const AUDIT_HISTORY_CLEAR_BEFORE = Date.parse('2026-10-14T23:59:59+08:00');
+const SCREENSHOT_RAW_INGREDIENT_ID = 'ing-1791910661741-2wtls13';
+const SCREENSHOT_PRODUCT_IDS = new Set([
+  'fg-1791935350535-tgggf5f',
+  'fg-1791910512835-abe8kbl',
+  'fg-1791940232996-nfed1yl',
+]);
+const SCREENSHOT_BATCH_NUMBERS = new Set([
+  'BATCH-2026-984',
+  'BATCH-2026-884',
+  'BATCH-2026-734',
+]);
+const SCREENSHOT_SALE_RECEIPTS = new Set([
+  'POS-REC-7443',
+  'POS-REC-8976',
+  'POS-REC-6570',
+]);
+const SCREENSHOT_SALE_TRANSACTION_IDS = new Set([
+  'tx-fg-1791939044160-e-1stavv8',
+]);
+const SCREENSHOT_SALE_TRANSACTION_PREFIXES = ['tx-fg-1791939044160-'];
+const SCREENSHOT_COMMITMENT_ID = 'com-1791939225179-x2d9jo3';
+const SCREENSHOT_ALERT_IDS = new Set([
+  'fg-safety-fg-1791935350535-tgggf5f',
+  'overstock-fg-1791910512835-abe8kbl',
+  'overstock-fg-1791935350535-tgggf5f',
+]);
+const withoutSampleRows = <T extends { id: string }>(rows: T[], entity: keyof typeof SAMPLE_RECORD_IDS) => {
+  const sampleIds = new Set(SAMPLE_RECORD_IDS[entity] ?? []);
+  return rows.filter(row => !sampleIds.has(row.id));
+};
+const isScreenshotRawIngredient = (row: RawIngredient) =>
+  row.id === SCREENSHOT_RAW_INGREDIENT_ID ||
+  (row.sku === 'sample' && row.name === 'Sample Raw material');
+const isScreenshotFinishedGood = (row: FinishedGood) => SCREENSHOT_PRODUCT_IDS.has(row.id);
+const isScreenshotWipBatch = (row: WipBatch) => SCREENSHOT_BATCH_NUMBERS.has(row.batchNumber);
+const isScreenshotCommitment = (row: SupplyDemandCommitment) =>
+  row.id === SCREENSHOT_COMMITMENT_ID ||
+  (row.partnerName === 'DepEd Batac District' &&
+    row.scheduledDate === '2026-10-14' &&
+    row.itemOrMilk === 'Pasteurized Fresh Carabao Milk 1L' &&
+    row.targetQuantity === 300);
+const isScreenshotAlert = (row: SystemAlert) => SCREENSHOT_ALERT_IDS.has(row.id);
+const isScreenshotSaleTransaction = (row: StockTransaction) => {
+  if (row.action !== 'out_sale' || row.itemType !== 'finished_good') return false;
+  if (
+    SCREENSHOT_SALE_TRANSACTION_IDS.has(row.id) ||
+    SCREENSHOT_SALE_TRANSACTION_PREFIXES.some(prefix => row.id.startsWith(prefix)) ||
+    SCREENSHOT_SALE_RECEIPTS.has(row.referenceId ?? '')
+  ) return true;
+
+  const timestamp = row.timestamp;
+  return (
+    row.itemName === 'Sample 2' &&
+    row.quantity === 490 &&
+    row.performedBy === 'Wyn Martinez' &&
+    timestamp.includes('08:50:44') &&
+    (
+      timestamp.includes('14/10/2026') ||
+      timestamp.includes('10/14/2026') ||
+      timestamp.includes('2026-10-14')
+    )
+  ) || (
+    row.performedBy === 'Dairy Box Batac Outlet Staff' &&
+    (timestamp.includes('12/10/2026') ||
+      timestamp.includes('10/12/2026') ||
+      timestamp.includes('2026-10-12')) &&
+    timestamp.includes('10:27:54') &&
+    ['Carabao Choco Milk Drink 330ml', 'Carabao Milk Yogurt Drink 330ml (Mango)'].includes(row.itemName)
+  );
+};
+const isScreenshotTransaction = (row: StockTransaction) =>
+  isScreenshotSaleTransaction(row) ||
+  SCREENSHOT_PRODUCT_IDS.has(row.itemId) ||
+  row.itemId === SCREENSHOT_RAW_INGREDIENT_ID ||
+  (row.itemType === 'ingredient' && row.itemName === 'Sample Raw material') ||
+  (row.referenceId !== undefined &&
+    (SCREENSHOT_BATCH_NUMBERS.has(row.referenceId) || SCREENSHOT_SALE_RECEIPTS.has(row.referenceId)));
+const isScreenshotAuditLog = (row: AuditLogEntry) => {
+  const referenceId = String(row.details?.referenceId ?? '');
+  return (row.category === 'sales' &&
+    (SCREENSHOT_SALE_RECEIPTS.has(referenceId) || SCREENSHOT_SALE_TRANSACTION_IDS.has(referenceId))) ||
+  (row.category === 'commitments' &&
+    (row.details?.referenceId === SCREENSHOT_COMMITMENT_ID ||
+      (row.description.includes('DepEd Batac District') &&
+        row.description.includes('Pasteurized Fresh Carabao Milk 1L') &&
+        row.description.includes('300'))));
+};
 const DIRECTOR_READ_ONLY_ACTIONS = new Set([
   'add a raw material',
   'update raw material stock',
@@ -232,7 +355,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as Array<UserProfile & { password?: string }>;
-        const normalizedParsed = parsed.map(user => {
+        const normalizedParsed = withoutSampleRows(parsed, 'user_profile').map(user => {
           const safeUser = { ...user };
           delete safeUser.password;
           return { ...safeUser, role: normalizeRole(user.role) };
@@ -263,6 +386,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [authError, setAuthError] = useState<string | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [authenticatedRole, setAuthenticatedRole] = useState<UserRole | null>(null);
+  const didSignOutOnReload = useRef(false);
 
   const [currentRole, setCurrentRoleState] = useState<UserRole>('production_staff');
 
@@ -284,6 +408,24 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setIsAuthenticated(false);
           setDeveloperActive(false);
           setIsAuthReady(true);
+          return;
+        }
+
+        if (IS_PAGE_RELOAD && !didSignOutOnReload.current) {
+          didSignOutOnReload.current = true;
+          try {
+            await firebaseSignOut(auth);
+            setAuthError('You were signed out because the app was reloaded. Please sign in again.');
+          } catch (error) {
+            console.error('Automatic sign-out after page reload failed:', error);
+            setAuthError('Could not securely end the previous session. Please sign in again.');
+            setFirebaseUser(null);
+            setAuthenticatedRole(null);
+            setIsAuthenticated(false);
+            setDeveloperActive(false);
+          } finally {
+            setIsAuthReady(true);
+          }
           return;
         }
 
@@ -397,7 +539,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   const [ingredients, setIngredients] = useState<RawIngredient[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_ingredients`);
-    const parsed: RawIngredient[] = saved ? JSON.parse(saved) : INITIAL_INGREDIENTS;
+    const parsed = withoutSampleRows<RawIngredient>(saved ? JSON.parse(saved) : INITIAL_INGREDIENTS, 'ingredient');
     const seen = new Set<string>();
     return parsed.filter(i => {
       if (!i.id || seen.has(i.id)) return false;
@@ -417,7 +559,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [finishedGoods, setFinishedGoods] = useState<FinishedGood[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_finished_goods`);
-    const parsed: FinishedGood[] = saved ? JSON.parse(saved) : INITIAL_FINISHED_GOODS;
+    const parsed = withoutSampleRows<FinishedGood>(saved ? JSON.parse(saved) : INITIAL_FINISHED_GOODS, 'finished_good');
     const seen = new Set<string>();
     return parsed.filter(f => {
       if (!f.id || seen.has(f.id)) return false;
@@ -428,7 +570,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [wipBatches, setWipBatches] = useState<WipBatch[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_wip_batches`);
-    let parsed: WipBatch[] = saved ? JSON.parse(saved) : INITIAL_WIP_BATCHES;
+    let parsed = withoutSampleRows<WipBatch>(saved ? JSON.parse(saved) : INITIAL_WIP_BATCHES, 'wip_batch')
+      .map(batch => ({ ...batch, status: normalizeWipStep(String(batch.status)) }));
     // Ensure historical batches are populated even if an older localStorage cache exists
     const hasHistorical = parsed.some(w => w.status === 'completed' || w.status === 'cancelled');
     if (!hasHistorical) {
@@ -476,7 +619,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [commitments, setCommitments] = useState<SupplyDemandCommitment[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_commitments`);
-    const parsed: SupplyDemandCommitment[] = saved ? JSON.parse(saved) : INITIAL_COMMITMENTS;
+    const parsed = withoutSampleRows<SupplyDemandCommitment>(saved ? JSON.parse(saved) : INITIAL_COMMITMENTS, 'commitment');
     const seen = new Set<string>();
     return parsed.filter(c => {
       if (!c.id || seen.has(c.id)) return false;
@@ -487,7 +630,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [alerts, setAlerts] = useState<SystemAlert[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_alerts`);
-    const parsed: SystemAlert[] = saved ? JSON.parse(saved) : INITIAL_ALERTS;
+    const parsed = withoutSampleRows<SystemAlert>(saved ? JSON.parse(saved) : INITIAL_ALERTS, 'alert');
     const seen = new Set<string>();
     return parsed.filter(a => {
       if (seen.has(a.id)) return false;
@@ -498,13 +641,33 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [transactions, setTransactions] = useState<StockTransaction[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_transactions`);
-    const parsed: StockTransaction[] = saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
+    const parsed = withoutSampleRows<StockTransaction>(saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS, 'stock_adjustment');
     const seen = new Set<string>();
     return parsed.filter(t => {
+      if (isScreenshotTransaction(t)) return false;
       if (!t.id || seen.has(t.id)) return false;
       seen.add(t.id);
       return true;
     });
+  });
+
+  const [pmoInventoryPeriods, setPmoInventoryPeriods] = useState<PmoInventoryPeriod[]>(() => {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_pmo_inventory_periods`);
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved) as PmoInventoryPeriod[];
+      return parsed.filter(period =>
+        typeof period?.id === 'string' &&
+        typeof period.title === 'string' &&
+        Array.isArray(period.lines)
+      ).map(period => ({
+        ...period,
+        status: period.status === 'posted' ? 'posted' : 'draft'
+      }));
+    } catch (error) {
+      console.error('Could not read saved PMO inventory periods:', error);
+      return [];
+    }
   });
 
   const [isoRatings, setIsoRatings] = useState<IsoEvaluationRating[]>(() => {
@@ -518,7 +681,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_audit_logs`);
-    const parsed: AuditLogEntry[] = saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS;
+    const parsed = withoutSampleRows<AuditLogEntry>(saved ? JSON.parse(saved) : INITIAL_AUDIT_LOGS, 'audit_log');
     const seen = new Set<string>();
     return parsed.filter(a => {
       if (!a.id || seen.has(a.id)) return false;
@@ -526,7 +689,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return true;
     });
   });
-
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('offline');
   const [isOnline, setIsOnline] = useState<boolean>(() => {
     return typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -560,14 +722,29 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [cloudEnabled]);
 
   useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: users, setRows: setUsers, adapter: sqlConnectCollections.user_profile, entity: 'user_profile', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: ingredients, setRows: setIngredients, adapter: sqlConnectCollections.ingredient, entity: 'ingredient', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: finishedGoods, setRows: setFinishedGoods, adapter: sqlConnectCollections.finished_good, entity: 'finished_good', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'plant_manager', 'production_staff'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: wipBatches, setRows: setWipBatches, adapter: sqlConnectCollections.wip_batch, entity: 'wip_batch', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'procurement', 'plant_manager'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: commitments, setRows: setCommitments, adapter: sqlConnectCollections.commitment, entity: 'commitment', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: alerts, setRows: setAlerts, adapter: sqlConnectCollections.alert, entity: 'alert', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: transactions, setRows: setTransactions, adapter: sqlConnectCollections.stock_adjustment, entity: 'stock_adjustment', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: ingredients, setRows: setIngredients, adapter: sqlConnectCollections.ingredient, entity: 'ingredient', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotRawIngredient });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: finishedGoods, setRows: setFinishedGoods, adapter: sqlConnectCollections.finished_good, entity: 'finished_good', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotFinishedGood });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'plant_manager', 'production_staff'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: wipBatches, setRows: setWipBatches, adapter: sqlConnectCollections.wip_batch, entity: 'wip_batch', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotWipBatch });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'procurement', 'plant_manager'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: commitments, setRows: setCommitments, adapter: sqlConnectCollections.commitment, entity: 'commitment', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotCommitment });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: alerts, setRows: setAlerts, adapter: sqlConnectCollections.alert, entity: 'alert', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotAlert });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: transactions, setRows: setTransactions, adapter: sqlConnectCollections.stock_adjustment, entity: 'stock_adjustment', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotTransaction });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'procurement', 'plant_manager'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: pmoInventoryPeriods, setRows: setPmoInventoryPeriods, adapter: sqlConnectCollections.pmo_inventory_period, entity: 'pmo_inventory_period', userEmail, userUid, onStatus: reportSqlCollectionStatus });
   useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: isoRatings, setRows: setIsoRatings, adapter: sqlConnectCollections.iso_rating, entity: 'iso_rating', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: auditLogs, setRows: setAuditLogs, adapter: sqlConnectCollections.audit_log, entity: 'audit_log', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({
+    enabled: cloudEnabled,
+    readEnabled: ['developer', 'director'].includes(authenticatedRole || ''),
+    canSeed: canSeedCloudData,
+    online: isOnline,
+    rows: auditLogs,
+    setRows: setAuditLogs,
+    adapter: sqlConnectCollections.audit_log,
+    entity: 'audit_log',
+    userEmail,
+    userUid,
+    onStatus: reportSqlCollectionStatus,
+    clearRowsBeforeTimestamp: canSeedCloudData ? AUDIT_HISTORY_CLEAR_BEFORE : undefined,
+    removeMatchingRows: isScreenshotAuditLog,
+  });
 
   // Save changes to localStorage
   useEffect(() => {
@@ -628,6 +805,48 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [transactions]);
 
   useEffect(() => {
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_pmo_inventory_periods`, JSON.stringify(pmoInventoryPeriods));
+  }, [pmoInventoryPeriods]);
+
+  useEffect(() => {
+    if (cloudEnabled && (
+      collectionStatusesRef.current.get('ingredient') === 'syncing' ||
+      collectionStatusesRef.current.get('stock_adjustment') === 'syncing'
+    )) return;
+    setPmoInventoryPeriods(previous => {
+      let changed = false;
+      const nextPeriods = previous.map(period => {
+        if (period.status !== 'draft' || !period.lines.some(line => line.liveLedger)) return period;
+        const knownIngredientIds = new Set(period.lines.map(line => line.ingredientId).filter(Boolean));
+        const newLines: PmoInventoryLine[] = ingredients
+          .filter(ingredient => !knownIngredientIds.has(ingredient.id))
+          .map(ingredient => {
+            const line: PmoInventoryLine = {
+              id: `pmo-line-${period.id}-${ingredient.id}`,
+              itemName: ingredient.name,
+              ingredientId: ingredient.id,
+              unit: ingredient.unit,
+              beginningQuantity: 0,
+              liveLedger: true,
+            };
+            const activity = getPmoInventoryActivity(period, line, transactions);
+            line.beginningQuantity = ingredient.currentStock -
+              activity.purchases +
+              activity.issuedToProduction -
+              activity.returns +
+              activity.losses -
+              activity.adjustments;
+            return line;
+          });
+        if (newLines.length === 0) return period;
+        if (newLines.length > 0) changed = true;
+        return { ...period, lines: [...period.lines, ...newLines] };
+      });
+      return changed ? nextPeriods : previous;
+    });
+  }, [ingredients, transactions, cloudEnabled, cloudSyncStatus]);
+
+  useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_iso_ratings`, JSON.stringify(isoRatings));
   }, [isoRatings]);
 
@@ -635,7 +854,18 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_audit_logs`, JSON.stringify(auditLogs));
   }, [auditLogs]);
 
-  const selectedRoleUser = users.find(u => normalizeRole(u.role) === currentRole) || users[0];
+  const selectedRoleUser = users.find(u => normalizeRole(u.role) === currentRole) || users[0] || {
+    id: firebaseUser?.uid || '',
+    name: currentRole === 'developer'
+      ? firebaseUser?.displayName || firebaseUser?.email || USER_ROLE_LABELS.developer
+      : `${USER_ROLE_LABELS[currentRole]} Dashboard Preview`,
+    role: currentRole,
+    title: USER_ROLE_LABELS[currentRole],
+    department: '',
+    avatar: '',
+    email: firebaseUser?.email || '',
+    username: firebaseUser?.email || '',
+  };
   const directoryUser = firebaseUser?.email
     ? users.find(user => user.email.toLowerCase() === firebaseUser.email!.toLowerCase())
     : undefined;
@@ -703,23 +933,14 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.warn('RBAC Notice: Only the Lead Developer has access to switch between all account users.');
       return;
     }
-    const matched = users.find(u => normalizeRole(u.role) === targetRole);
-    if (matched) {
-      // If switching from developer or if developer session was active, maintain isDeveloperActive = true!
-      if (currentRole === 'developer' || isDeveloperActive) {
-        setDeveloperActive(true);
-      }
-      setCurrentRole(targetRole);
-    }
+    setDeveloperActive(true);
+    setCurrentRole(targetRole);
   };
 
   const returnToDeveloperAccount = () => {
     if (!isAuthenticated || !isDeveloperActive || authenticatedRole !== 'developer') return;
-    const devUser = users.find(u => normalizeRole(u.role) === 'developer');
-    if (devUser) {
-      setCurrentRole('developer');
-      setDeveloperActive(true);
-    }
+    setCurrentRole('developer');
+    setDeveloperActive(true);
   };
 
   const logout = () => {
@@ -1021,7 +1242,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       // Check finished goods for overstock
       finishedGoods.forEach(fg => {
-        if (fg.currentStock > fg.maxThreshold) {
+        if (fg.maxThreshold > 0 && fg.currentStock > fg.maxThreshold) {
           const alertId = `overstock-${fg.id}`;
           if (!seen.has(alertId)) {
             seen.add(alertId);
@@ -1069,7 +1290,25 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ...ingData,
       id: `ing-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
     };
+    const initialStockTransaction: StockTransaction | null = newIng.currentStock > 0 ? {
+      id: `tx-ing-initial-${newIng.id}`,
+      timestamp: new Date().toISOString(),
+      itemId: newIng.id,
+      itemName: newIng.name,
+      itemType: 'ingredient',
+      action: 'in_restock',
+      quantity: newIng.currentStock,
+      unit: newIng.unit,
+      previousStock: 0,
+      newStock: newIng.currentStock,
+      performedBy: currentUser.name,
+      notes: 'Initial stock recorded when raw ingredient was created',
+    } : null;
     setIngredients(prev => [newIng, ...prev]);
+    if (initialStockTransaction) {
+      setTransactions(previous => [initialStockTransaction, ...previous]);
+      void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', initialStockTransaction);
+    }
     logAuditAction({
       category: 'inventory',
       subsystem: 'Raw Ingredients',
@@ -1087,6 +1326,379 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     triggerManualCloudSync();
   };
 
+  const importPmoInventoryPeriod = (period: Omit<PmoInventoryPeriod, 'id' | 'createdAt' | 'createdBy' | 'status' | 'postedAt' | 'postedBy'>) => {
+    if (!['developer', 'procurement', 'plant_manager'].includes(currentRole) ||
+        !authorizeDirectorMutation('import a PMO inventory report')) {
+      return { success: false, message: 'Your role cannot import PMO inventory reports.' };
+    }
+    if (!period.title.trim() || !period.sourceFileName.trim() || period.lines.length === 0) {
+      return { success: false, message: 'Provide a report title, source filename, and at least one inventory line.' };
+    }
+    const newPeriod: PmoInventoryPeriod = {
+      ...period,
+      id: `pmo-period-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.name,
+      status: 'draft',
+    };
+    setPmoInventoryPeriods(previous => [newPeriod, ...previous]);
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'PMO Inventory Register',
+      action: 'PMO_INVENTORY_PERIOD_IMPORTED',
+      description: `Imported ${newPeriod.lines.length} inventory lines for ${newPeriod.title}.`,
+      details: {
+        itemOrBatch: newPeriod.title,
+        quantity: newPeriod.lines.length,
+        unit: 'inventory lines',
+        reason: `Source: ${newPeriod.sourceFileName}`,
+      },
+      severity: 'info',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `Saved ${newPeriod.lines.length} inventory lines for ${newPeriod.title}.` };
+  };
+
+  const savePmoInventoryPeriod = (period: PmoInventoryPeriod) => {
+    if (!['developer', 'procurement', 'plant_manager'].includes(currentRole)) {
+      return { success: false, message: 'Your role cannot edit PMO inventory periods.' };
+    }
+    if (!period.title.trim() || !period.sourceFileName.trim()) {
+      return { success: false, message: 'Provide an inventory period title and source.' };
+    }
+    if (period.lines.some(line =>
+      !line.itemName.trim() ||
+      !line.unit.trim() ||
+      [line.beginningQuantity, line.purchasesQuantity, line.issuedToProductionQuantity, line.lossOrReturnQuantity, line.endingQuantity]
+        .some(quantity => quantity !== undefined && (!Number.isFinite(quantity) || quantity < 0))
+    )) {
+      return { success: false, message: 'Inventory item names, units, and quantities must be valid and non-negative.' };
+    }
+    const existing = pmoInventoryPeriods.find(item => item.id === period.id);
+    if (existing?.status === 'posted') {
+      return { success: false, message: 'Posted inventory periods are locked and cannot be edited.' };
+    }
+    const updated: PmoInventoryPeriod = {
+      ...period,
+      title: period.title.trim(),
+      sourceFileName: period.sourceFileName.trim(),
+      status: 'draft',
+      createdAt: existing?.createdAt || period.createdAt || new Date().toISOString(),
+      createdBy: existing?.createdBy || period.createdBy || currentUser.name,
+      postedAt: undefined,
+      postedBy: undefined,
+    };
+    setPmoInventoryPeriods(previous => existing
+      ? previous.map(item => item.id === updated.id ? updated : item)
+      : [updated, ...previous]
+    );
+    void recordOfflineMutation('pmo_inventory_period', 'SQL_UPSERT', updated);
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'PMO Inventory Register',
+      action: existing ? 'PMO_INVENTORY_PERIOD_UPDATED' : 'PMO_INVENTORY_PERIOD_CREATED',
+      description: `${existing ? 'Updated' : 'Created'} the draft inventory period ${updated.title}.`,
+      details: { itemOrBatch: updated.title, quantity: updated.lines.length, unit: 'inventory lines' },
+      severity: 'info',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `Saved ${updated.title}.` };
+  };
+
+  const postPmoInventoryPeriod = (periodId: string) => {
+    if (!['developer', 'procurement', 'plant_manager'].includes(currentRole)) {
+      return { success: false, message: 'Your role cannot post PMO inventory periods.' };
+    }
+    const period = pmoInventoryPeriods.find(item => item.id === periodId);
+    if (!period) return { success: false, message: 'Inventory period not found.' };
+    if (period.status === 'posted') {
+      return { success: false, message: `${period.title} has already been posted.` };
+    }
+    if (period.lines.length === 0) {
+      return { success: false, message: 'Add at least one inventory item before posting.' };
+    }
+
+    const seenIngredients = new Set<string>();
+    const endingByIngredient = new Map<string, number>();
+    for (const line of period.lines) {
+      if (!line.ingredientId) {
+        return { success: false, message: `Link ${line.itemName} to Raw Ingredients before posting.` };
+      }
+      if (seenIngredients.has(line.ingredientId)) {
+        return { success: false, message: `${line.itemName} appears more than once in this period.` };
+      }
+      seenIngredients.add(line.ingredientId);
+      const ingredient = ingredients.find(item => item.id === line.ingredientId);
+      if (!ingredient) return { success: false, message: `Raw ingredient ${line.itemName} no longer exists.` };
+      if (ingredient.unit.trim().toLowerCase() !== line.unit.trim().toLowerCase()) {
+        return { success: false, message: `${line.itemName} uses ${ingredient.unit} in Raw Ingredients but ${line.unit} in this report.` };
+      }
+      const activity = getPmoInventoryActivity(period, line, transactions);
+      const expectedEnding = calculatePmoExpectedEnding(line, activity);
+      if (line.beginningQuantity === undefined ||
+          !Number.isFinite(line.beginningQuantity) ||
+          line.beginningQuantity < 0 ||
+          line.endingQuantity === undefined ||
+          !Number.isFinite(line.endingQuantity) ||
+          line.endingQuantity < 0 ||
+          expectedEnding === null ||
+          !Number.isFinite(expectedEnding)) {
+        return { success: false, message: `Complete valid beginning and physical ending counts for ${line.itemName}.` };
+      }
+      const variance = line.endingQuantity - expectedEnding;
+      if (ingredient.currentStock + variance < 0) {
+        return { success: false, message: `Recorded movements would make ${line.itemName} inventory negative.` };
+      }
+      endingByIngredient.set(line.ingredientId, variance);
+    }
+
+    const postedAt = new Date().toISOString();
+    const updatedIngredients = ingredients.map(ingredient => {
+      const variance = endingByIngredient.get(ingredient.id);
+      return variance === undefined
+        ? ingredient
+        : { ...ingredient, currentStock: ingredient.currentStock + variance };
+    });
+    const reconciliationTransactions: StockTransaction[] = [];
+    for (const ingredient of ingredients) {
+      const variance = endingByIngredient.get(ingredient.id);
+      if (variance === undefined || variance === 0) continue;
+      reconciliationTransactions.push({
+        id: `tx-pmo-${period.id}-${ingredient.id}`,
+        timestamp: postedAt,
+        itemId: ingredient.id,
+        itemName: ingredient.name,
+        itemType: 'ingredient',
+        action: 'inventory_reconciliation',
+        quantity: Math.abs(variance),
+        unit: ingredient.unit,
+        previousStock: ingredient.currentStock,
+        newStock: ingredient.currentStock + variance,
+        referenceId: period.id,
+        performedBy: currentUser.name,
+        notes: `Physical count reconciliation for ${period.title}`,
+      });
+    }
+    const postedPeriod: PmoInventoryPeriod = {
+      ...period,
+      status: 'posted',
+      postedAt,
+      postedBy: currentUser.name,
+    };
+
+    setIngredients(updatedIngredients);
+    setTransactions(previous => [...reconciliationTransactions, ...previous]);
+    setPmoInventoryPeriods(previous => previous.map(item => item.id === period.id ? postedPeriod : item));
+    for (const ingredient of updatedIngredients) {
+      if (!endingByIngredient.has(ingredient.id)) continue;
+      void recordOfflineMutation('ingredient', 'UPSERT_RAW_INGREDIENT', ingredient);
+    }
+    reconciliationTransactions.forEach(transaction => {
+      void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', transaction);
+    });
+    void recordOfflineMutation('pmo_inventory_period', 'SQL_UPSERT', postedPeriod);
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'PMO Inventory Register',
+      action: 'PMO_INVENTORY_PERIOD_POSTED',
+      description: `Posted ${postedPeriod.title} and reconciled ${endingByIngredient.size} raw ingredient balances to physical counts.`,
+      details: {
+        itemOrBatch: postedPeriod.title,
+        quantity: endingByIngredient.size,
+        unit: 'ingredients reconciled',
+        reason: `${reconciliationTransactions.length} stock balance adjustments recorded`,
+        referenceId: postedPeriod.id,
+      },
+      severity: reconciliationTransactions.length > 0 ? 'warning' : 'success',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `Posted ${postedPeriod.title}; ${reconciliationTransactions.length} physical-count variances were applied to shared stock.` };
+  };
+
+  const deletePmoInventoryPeriod = (periodId: string) => {
+    if (currentRole !== 'developer') {
+      return { success: false, message: 'Only a Developer can delete PMO inventory periods.' };
+    }
+    const period = pmoInventoryPeriods.find(item => item.id === periodId);
+    if (!period) return { success: false, message: 'Inventory period not found.' };
+
+    setPmoInventoryPeriods(previous => previous.filter(item => item.id !== period.id));
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'PMO Inventory Register',
+      action: 'PMO_INVENTORY_PERIOD_DELETED',
+      description: `Deleted the ${period.status} inventory period ${period.title}. Stock movements and reconciliations recorded from this period were not reversed.`,
+      details: {
+        itemOrBatch: period.title,
+        quantity: period.lines.length,
+        unit: 'inventory lines',
+        reason: 'Developer deleted the PMO inventory period; shared stock transaction history was preserved',
+        referenceId: period.id,
+      },
+      severity: 'warning',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `${period.title} was deleted. Shared stock movements and transaction history were preserved.` };
+  };
+
+  const recordPmoInventoryAdjustment = (
+    ingredientId: string,
+    quantity: number,
+    kind: 'expired' | 'damage' | 'waste' | 'returned',
+    notes?: string
+  ) => {
+    if (!['developer', 'procurement', 'plant_manager'].includes(currentRole)) {
+      return { success: false, message: 'Your role cannot record PMO inventory adjustments.' };
+    }
+    const ingredient = ingredients.find(item => item.id === ingredientId);
+    if (!ingredient) return { success: false, message: 'Raw ingredient not found.' };
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return { success: false, message: 'Enter an adjustment quantity greater than zero.' };
+    }
+    const isReturn = kind === 'returned';
+    const newStock = ingredient.currentStock + (isReturn ? quantity : -quantity);
+    if (newStock < 0) {
+      return { success: false, message: `The adjustment exceeds available ${ingredient.name} stock.` };
+    }
+    const timestamp = new Date().toISOString();
+    const transaction: StockTransaction = {
+      id: `tx-pmo-adjustment-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      timestamp,
+      itemId: ingredient.id,
+      itemName: ingredient.name,
+      itemType: 'ingredient',
+      action: isReturn ? 'inventory_return' : 'inventory_loss',
+      quantity,
+      unit: ingredient.unit,
+      previousStock: ingredient.currentStock,
+      newStock,
+      performedBy: currentUser.name,
+      notes: `${kind}${notes ? `: ${notes}` : ''}`,
+    };
+    const updatedIngredient = { ...ingredient, currentStock: newStock };
+
+    setIngredients(previous => previous.map(item =>
+      item.id === ingredient.id ? updatedIngredient : item
+    ));
+    setTransactions(previous => [transaction, ...previous]);
+    void recordOfflineMutation('ingredient', 'UPSERT_RAW_INGREDIENT', updatedIngredient);
+    void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', transaction);
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'PMO Inventory Register',
+      action: isReturn ? 'PMO_INVENTORY_RETURN_RECORDED' : 'PMO_INVENTORY_LOSS_RECORDED',
+      description: `${kind} ${quantity} ${ingredient.unit} of ${ingredient.name}; shared stock changed from ${ingredient.currentStock} to ${newStock}.`,
+      details: {
+        itemOrBatch: ingredient.name,
+        previousValue: ingredient.currentStock,
+        newValue: newStock,
+        quantity,
+        unit: ingredient.unit,
+        reason: notes || kind,
+        referenceId: transaction.id,
+      },
+      severity: isReturn ? 'info' : 'warning',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `Recorded ${kind} for ${ingredient.name}; the shared stock balance is now ${newStock} ${ingredient.unit}.` };
+  };
+
+  const addPmoExternalPurchase = (
+    periodId: string,
+    ingredientData: Omit<RawIngredient, 'id' | 'currentStock' | 'lastRestocked'>,
+    quantity: number
+  ) => {
+    if (!['developer', 'procurement', 'plant_manager'].includes(currentRole)) {
+      return { success: false, message: 'Your role cannot record PMO outside purchases.' };
+    }
+    const period = pmoInventoryPeriods.find(item => item.id === periodId);
+    if (!period || period.status !== 'draft') {
+      return { success: false, message: 'Select an existing draft period before recording an outside purchase.' };
+    }
+    const name = ingredientData.name.trim();
+    const sku = ingredientData.sku.trim();
+    if (!name || !sku || !ingredientData.unit.trim() || !ingredientData.supplier.trim()) {
+      return { success: false, message: 'Provide an item name, SKU, unit, and supplier.' };
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(ingredientData.costPerUnit) || ingredientData.costPerUnit < 0) {
+      return { success: false, message: 'Purchase quantity must be greater than zero and unit cost must be non-negative.' };
+    }
+    if ([ingredientData.safetyStock, ingredientData.reorderPoint, ingredientData.maxStock, ingredientData.avgDailyConsumption, ingredientData.leadTimeDays]
+      .some(value => !Number.isFinite(value) || value < 0) ||
+      (ingredientData.maxStock > 0 && ingredientData.maxStock < ingredientData.safetyStock)) {
+      return { success: false, message: 'Enter valid non-negative stock thresholds and lead-time values; maximum stock must cover safety stock.' };
+    }
+    const duplicate = ingredients.find(item =>
+      item.sku.trim().toLowerCase() === sku.toLowerCase() ||
+      item.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      return { success: false, message: `${duplicate.name} already exists in Raw Ingredients. Add the purchase to that existing item instead.` };
+    }
+    const now = new Date();
+    const newIngredient: RawIngredient = {
+      ...ingredientData,
+      id: `ing-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      sku,
+      name,
+      category: ingredientData.category.trim().toLowerCase(),
+      unit: ingredientData.unit.trim(),
+      supplier: ingredientData.supplier.trim(),
+      currentStock: quantity,
+      lastRestocked: now.toLocaleString() + ' PST',
+    };
+    const newLine: PmoInventoryLine = {
+      id: `pmo-line-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      itemName: newIngredient.name,
+      ingredientId: newIngredient.id,
+      unit: newIngredient.unit,
+      beginningQuantity: 0,
+      liveLedger: true,
+      notes: 'Outside purchase recorded with new Raw Ingredients catalog entry',
+    };
+    const newTransaction: StockTransaction = {
+      id: `tx-pmo-purchase-${period.id}-${newIngredient.id}`,
+      timestamp: now.toISOString(),
+      itemId: newIngredient.id,
+      itemName: newIngredient.name,
+      itemType: 'ingredient',
+      action: 'in_restock',
+      quantity,
+      unit: newIngredient.unit,
+      previousStock: 0,
+      newStock: quantity,
+      referenceId: period.id,
+      unitPrice: newIngredient.costPerUnit,
+      performedBy: currentUser.name,
+      notes: `Outside purchase recorded for PMO inventory period ${period.title}`,
+    };
+    const updatedPeriod = { ...period, lines: [...period.lines, newLine] };
+
+    setIngredients(previous => [newIngredient, ...previous]);
+    setTransactions(previous => [newTransaction, ...previous]);
+    setPmoInventoryPeriods(previous => previous.map(item => item.id === period.id ? updatedPeriod : item));
+    void recordOfflineMutation('ingredient', 'CREATE_INGREDIENT', newIngredient);
+    void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', newTransaction);
+    void recordOfflineMutation('pmo_inventory_period', 'SQL_UPSERT', updatedPeriod);
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'PMO Inventory Register',
+      action: 'PMO_OUTSIDE_PURCHASE_ADDED',
+      description: `Created ${newIngredient.name} in Raw Ingredients and recorded a purchase of ${quantity} ${newIngredient.unit}.`,
+      details: {
+        itemOrBatch: newIngredient.name,
+        quantity,
+        unit: newIngredient.unit,
+        costOrTotal: quantity * newIngredient.costPerUnit,
+        reason: 'Outside purchase created as a shared Raw Ingredients record',
+        referenceId: period.id,
+      },
+      severity: 'success',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `${newIngredient.name} was added to Raw Ingredients and the purchase was recorded.` };
+  };
+
   const updateIngredientStock = (id: string, newStock: number, notes?: string, expiryDate?: string) => {
     if (!authorizeDirectorMutation('update raw material stock')) return false;
     let newTx: StockTransaction | null = null;
@@ -1100,11 +1712,11 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const diff = newStock - ing.currentStock;
         newTx = {
           id: `tx-ing-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          timestamp: new Date().toLocaleString() + ' PST',
+          timestamp: new Date().toISOString(),
           itemId: ing.id,
           itemName: ing.name,
           itemType: 'ingredient',
-          action: diff >= 0 ? 'in_restock' : 'wip_deduct',
+          action: diff >= 0 ? 'in_restock' : 'inventory_adjustment',
           quantity: Math.abs(diff),
           unit: ing.unit,
           previousStock: ing.currentStock,
@@ -1234,7 +1846,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const diff = newStock - fg.currentStock;
         newTx = {
           id: `tx-fg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          timestamp: new Date().toLocaleString() + ' PST',
+          timestamp: new Date().toISOString(),
           itemId: fg.id,
           itemName: fg.name,
           itemType: 'finished_good',
@@ -1319,11 +1931,11 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         
         newTransactions.push({
           id: `tx-bulk-ing-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          timestamp: new Date().toLocaleString() + ' PST',
+          timestamp: new Date().toISOString(),
           itemId: ing.id,
           itemName: ing.name,
           itemType: 'ingredient',
-          action: diff >= 0 ? 'in_restock' : 'wip_deduct',
+          action: diff >= 0 ? 'in_restock' : 'inventory_adjustment',
           quantity: Math.abs(diff),
           unit: ing.unit,
           previousStock: ing.currentStock,
@@ -1406,7 +2018,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
         newTransactions.push({
           id: `tx-bulk-fg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          timestamp: new Date().toLocaleString() + ' PST',
+          timestamp: new Date().toISOString(),
           itemId: fg.id,
           itemName: fg.name,
           itemType: 'finished_good',
@@ -1641,7 +2253,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         
         newTxs.push({
           id: `tx-wip-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${ing.id}`,
-          timestamp: new Date().toLocaleString() + ' PST',
+          timestamp: new Date().toISOString(),
           itemId: ing.id,
           itemName: ing.name,
           itemType: 'ingredient',
@@ -1801,18 +2413,18 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const restoredStock = ing.currentStock + usedItem.quantity;
         newTxs.push({
           id: `tx-cancel-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${ing.id}`,
-          timestamp: new Date().toLocaleString() + ' PST',
+          timestamp: new Date().toISOString(),
           itemId: ing.id,
           itemName: ing.name,
           itemType: 'ingredient',
-          action: 'in_restock',
+          action: 'wip_restore',
           quantity: usedItem.quantity,
           unit: ing.unit,
           previousStock: ing.currentStock,
           newStock: restoredStock,
           referenceId: targetBatch.batchNumber,
           performedBy: currentUser.name,
-          notes: `Batch Cancellation Inventory Rollback: Restored raw material for scheduled ${targetBatch.batchNumber} (${reason || 'Cancelled prior to pasteurization'})`
+          notes: `Batch Cancellation Inventory Rollback: Restored raw material for scheduled ${targetBatch.batchNumber} (${reason || 'Cancelled before pasteurization'})`
         });
 
         return {
@@ -2140,20 +2752,37 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     }
 
-    setUsers(prev => prev.map(u => {
-      if (u.id === userId) {
-        return {
-          ...u,
-          ...updates,
-          name: updates.name ? updates.name.trim() : u.name,
-          username: updates.username ? updates.username.trim() : u.username,
-          title: updates.title !== undefined ? updates.title.trim() : u.title,
-          avatar: updates.avatar !== undefined ? updates.avatar.trim() : u.avatar,
-          nickname: updates.nickname !== undefined ? updates.nickname.trim() : u.nickname
-        };
-      }
-      return u;
-    }));
+    const existingProfile = users.find(user => user.id === userId);
+    if (!existingProfile && (!firebaseUser || firebaseUser.uid !== userId)) {
+      return { success: false, message: 'The profile could not be found. Reload and try again.' };
+    }
+
+    const baseProfile: UserProfile = existingProfile || {
+      id: firebaseUser?.uid || userId,
+      name: firebaseUser?.displayName || firebaseUser?.email || 'DairySync User',
+      role: authenticatedRole || currentRole,
+      title: '',
+      department: '',
+      avatar: '',
+      email: firebaseUser?.email || '',
+      username: firebaseUser?.email || '',
+    };
+    const updatedProfile: UserProfile = {
+      ...baseProfile,
+      ...updates,
+      id: baseProfile.id,
+      role: baseProfile.role,
+      email: baseProfile.email,
+      name: updates.name ? updates.name.trim() : baseProfile.name,
+      username: updates.username ? updates.username.trim() : baseProfile.username,
+      title: updates.title !== undefined ? updates.title.trim() : baseProfile.title,
+      avatar: updates.avatar !== undefined ? updates.avatar.trim() : baseProfile.avatar,
+      nickname: updates.nickname !== undefined ? updates.nickname.trim() : baseProfile.nickname,
+    };
+    setUsers(prev => existingProfile
+      ? prev.map(user => user.id === userId ? updatedProfile : user)
+      : [...prev, updatedProfile]
+    );
 
     logAuditAction({
       category: 'security',
@@ -2169,6 +2798,182 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     triggerManualCloudSync();
     return { success: true, message: 'Profile updated successfully.' };
+  };
+
+  const canDeleteDataAsDeveloper = () =>
+    isAuthenticated &&
+    authenticatedRole === 'developer' &&
+    isDeveloperActive &&
+    currentRole === 'developer';
+
+  const deleteIngredientRecord = (id: string) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    const target = ingredients.find(item => item.id === id);
+    if (!target) return false;
+
+    setIngredients(prev => prev.filter(item => item.id !== id));
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'Raw Ingredients',
+      action: 'INGREDIENT_RECORD_DELETED',
+      description: `Deleted raw ingredient record ${target.name} (${target.sku})`,
+      details: { itemOrBatch: target.name, reason: 'Developer per-record deletion' },
+      severity: 'critical'
+    });
+    triggerManualCloudSync();
+    return true;
+  };
+
+  const deleteFinishedGoodRecord = (id: string) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    const target = finishedGoods.find(item => item.id === id);
+    if (!target) return false;
+
+    setFinishedGoods(prev => prev.filter(item => item.id !== id));
+    logAuditAction({
+      category: 'cold_storage',
+      subsystem: 'Cold Storage',
+      action: 'FINISHED_GOOD_RECORD_DELETED',
+      description: `Deleted finished good record ${target.name} (${target.sku})`,
+      details: { itemOrBatch: target.name, reason: 'Developer per-record deletion' },
+      severity: 'critical'
+    });
+    triggerManualCloudSync();
+    return true;
+  };
+
+  const deleteFinishedGoodRecipe = (id: string) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    const target = finishedGoods.find(item => item.id === id);
+    if (!target || !target.recipe?.length) return false;
+    return updateFinishedGoodRecipe(id, [], target.batchUnitQuantity || 100);
+  };
+
+  const deleteWipBatchRecord = (batchId: string) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    const target = wipBatches.find(batch => batch.id === batchId);
+    if (!target) return false;
+
+    setWipBatches(prev => prev.filter(batch => batch.id !== batchId));
+    logAuditAction({
+      category: 'production',
+      subsystem: 'WIP Batches',
+      action: 'WIP_BATCH_RECORD_DELETED',
+      description: `Deleted WIP batch record ${target.batchNumber}`,
+      details: { itemOrBatch: target.batchNumber, reason: 'Developer per-record deletion; inventory was not adjusted' },
+      severity: 'critical'
+    });
+    triggerManualCloudSync();
+    return true;
+  };
+
+  const deleteCommitmentRecord = (id: string) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    const target = commitments.find(commitment => commitment.id === id);
+    if (!target) return false;
+
+    setCommitments(prev => prev.filter(commitment => commitment.id !== id));
+    logAuditAction({
+      category: 'commitments',
+      subsystem: 'Supply & Demand',
+      action: 'COMMITMENT_RECORD_DELETED',
+      description: `Deleted ${target.type} commitment for ${target.partnerName}`,
+      details: { itemOrBatch: target.itemOrMilk, reason: 'Developer per-record deletion' },
+      severity: 'critical'
+    });
+    triggerManualCloudSync();
+    return true;
+  };
+
+  const deleteSalesHistoryRecord = (receiptNo: string, transactionIds: string[]) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    if (transactionIds.length === 0) return false;
+    const requestedIds = new Set(transactionIds);
+    const matchingTransactions = transactions.filter(transaction =>
+      requestedIds.has(transaction.id) &&
+      transaction.action === 'out_sale' &&
+      transaction.itemType === 'finished_good'
+    );
+    if (matchingTransactions.length !== requestedIds.size) return false;
+
+    const deletedIds = new Set(matchingTransactions.map(transaction => transaction.id));
+    setTransactions(prev => prev.filter(transaction => !deletedIds.has(transaction.id)));
+    logAuditAction({
+      category: 'sales',
+      subsystem: 'Dairy Box POS',
+      action: 'POS_SALES_HISTORY_RECORD_DELETED',
+      description: `Deleted POS sales history receipt ${receiptNo}`,
+      details: {
+        referenceId: receiptNo,
+        count: matchingTransactions.length,
+        reason: 'Developer per-record deletion; finished goods stock was not restored'
+      },
+      severity: 'critical'
+    });
+    triggerManualCloudSync();
+    return true;
+  };
+
+  const removeIdentifiedSampleSales = async () => {
+    if (!canDeleteDataAsDeveloper()) {
+      return { deletedCount: 0, pendingCount: 0, failedIds: ['Developer authorization required'] };
+    }
+
+    const targets = transactions.filter(isScreenshotSaleTransaction);
+    if (targets.length === 0) {
+      return { deletedCount: 0, pendingCount: 0, failedIds: [] };
+    }
+
+    const targetIds = targets.map(transaction => transaction.id);
+    await removePendingSampleWrites('stock_adjustment', targetIds);
+
+    const deletedIds: string[] = [];
+    const pendingIds: string[] = [];
+    const failedIds: string[] = [];
+    for (const transaction of targets) {
+      try {
+        await sqlConnectCollections.stock_adjustment.remove(transaction.id);
+        deletedIds.push(transaction.id);
+      } catch (error) {
+        console.error(`Could not delete identified sample POS transaction ${transaction.id}:`, error);
+        const queueId = await enqueueOfflineAction({
+          entity: 'stock_adjustment',
+          action: 'SQL_DELETE',
+          payload: { id: transaction.id },
+          userEmail: firebaseUser?.email || undefined,
+          userUid: firebaseUser?.uid,
+        });
+        if (queueId >= 0) pendingIds.push(transaction.id);
+        else failedIds.push(transaction.id);
+      }
+    }
+
+    const removedIds = new Set([...deletedIds, ...pendingIds]);
+    if (removedIds.size > 0) {
+      setTransactions(previous => previous.filter(transaction => !removedIds.has(transaction.id)));
+      logAuditAction({
+        category: 'sales',
+        subsystem: 'Dairy Box POS',
+        action: 'IDENTIFIED_SAMPLE_SALES_REMOVED',
+        description: `Removed ${deletedIds.length} identified sample POS sale transaction(s)${pendingIds.length > 0 ? `; queued ${pendingIds.length} for cloud deletion retry` : ''}`,
+        details: {
+          count: removedIds.size,
+          itemsDeleted: targets.filter(transaction => removedIds.has(transaction.id)).map(transaction => transaction.itemName).join(', '),
+          reason: 'Developer cleanup of specifically identified sample sales; sold inventory was not restored'
+        },
+        severity: 'critical'
+      });
+      triggerManualCloudSync();
+    }
+
+    return { deletedCount: deletedIds.length, pendingCount: pendingIds.length, failedIds };
+  };
+
+  const deleteAuditLogRecord = (id: string) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    if (!auditLogs.some(log => log.id === id)) return false;
+    setAuditLogs(prev => prev.filter(log => log.id !== id));
+    return true;
   };
 
   const resetToDefaultData = () => {
@@ -2207,27 +3012,42 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       commitments,
       alerts,
       transactions,
+      pmoInventoryPeriods,
+      importPmoInventoryPeriod,
+      savePmoInventoryPeriod,
+      postPmoInventoryPeriod,
+      deletePmoInventoryPeriod,
+      addPmoExternalPurchase,
+      recordPmoInventoryAdjustment,
       isoRatings,
       auditLogs,
       addIngredient,
       updateIngredientStock,
       addFinishedGood,
       updateFinishedGoodRecipe,
+      deleteFinishedGoodRecipe,
+      deleteIngredientRecord,
+      deleteFinishedGoodRecord,
       updateFinishedGoodStock,
       updateFinishedGoodSafetyStock,
       createWipBatch,
       advanceWipBatchStep,
       cancelWipBatch,
+      deleteWipBatchRecord,
       processRetailSale,
       addCommitment,
       updateCommitmentStatus,
       cancelCommitment,
       updateCommitmentPriority,
+      deleteCommitmentRecord,
+      deleteSalesHistoryRecord,
+      removeIdentifiedSampleSales,
       markAlertRead,
       clearAllAlerts,
       submitIsoEvaluation,
       logAuditAction,
       clearAuditLogs,
+      deleteAuditLogRecord,
       exportAuditLogsCsv,
       resetToDefaultData,
       addUserProfile,

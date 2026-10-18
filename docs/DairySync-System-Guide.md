@@ -35,10 +35,10 @@ Authentication uses Firebase Authentication Email/Password with a trusted Fireba
 
 | Role | Authorized areas |
 |---|---|
-| Developer / Super Administrator | All dashboards, inventory, WIP, product recipes, cold storage, supply-demand, procurement, POS, audit, user administration, reset, and system tools |
-| Director / PMO Supervisor | Oversight and reporting; Raw Ingredients, WIP, and Cold Storage are read-only; Product Recipes can be managed; POS shows Sales History only |
-| Administrative Assistant IV / Procurement | Dashboard, ROP Procurement, Raw Ingredients |
-| Internal Custodian / Plant Manager | Dashboard, Cold Storage, WIP, Raw Ingredients, Procurement |
+| Developer / Super Administrator | All dashboards, inventory, PMO Inventory, WIP, product recipes, cold storage, supply-demand, procurement, POS, audit, user administration, reset, and system tools |
+| Director / PMO Supervisor | Oversight and reporting; Raw Ingredients, PMO Inventory, WIP, and Cold Storage are read-only; Product Recipes can be managed; POS shows Sales History only |
+| Administrative Assistant IV / Procurement | Dashboard, ROP Procurement, Raw Ingredients, PMO Inventory |
+| Internal Custodian / Plant Manager | Dashboard, Cold Storage, WIP, Raw Ingredients, PMO Inventory, Procurement |
 | Production Staff | Dashboard, WIP, Raw Ingredients |
 | Store Outlet / Dairy Box | Dashboard, Dairy Box POS, Cold Storage |
 
@@ -88,13 +88,15 @@ The main layout provides:
 
 1. Command Center
 2. Raw Ingredients
-3. WIP Batches
-4. Cold Storage
-5. Supply and Demand
-6. ROP Procurement
-7. Dairy Box POS
-8. Audit Trail
-9. System Manual (Developer only)
+3. PMO Inventory
+4. WIP Batches
+5. Cold Storage
+6. Product Recipes
+7. Supply and Demand
+8. ROP Procurement
+9. Dairy Box POS
+10. Audit Trail
+11. System Manual (Developer only)
 
 ---
 
@@ -214,6 +216,18 @@ The Raw Ingredients module manages materials needed for dairy production.
 
 When stock reaches or falls below the reorder point, the system creates a reorder-point alert. When stock reaches safety stock, the alert severity can become critical. Inventory adjustments create stock transactions and audit records.
 
+## 5.1 PMO Inventory and Stock Reconciliation
+
+The PMO Inventory register records period-based physical counts against the shared Raw Ingredients ledger. For linked items in a new live-ledger period, purchases, WIP production issues/restores, losses, returns, and stock adjustments are derived from shared stock transactions rather than entered a second time. Opening balances are calculated from current shared stock and period movements, and update as cloud transactions arrive while the period remains a draft. Imported legacy reports retain their entered movement quantities.
+
+- Create a draft period and add existing Raw Ingredients items.
+- Record losses or returns with their type; each movement updates shared stock and creates a transaction used by the expected balance.
+- Record an outside purchase for an item not yet in Raw Ingredients. The workflow creates the shared ingredient entry, records the purchase stock transaction, and adds the item to the period.
+- Review each expected closing balance against its physical ending count.
+- Post a period once. Posting applies the difference between expected close and physical count to the current shared Raw Ingredients balance, records that reconciliation as a stock transaction, and adds an audit entry. Posted periods are locked to prevent duplicate posting.
+- Developers can delete a period; this removes only the period report. Shared stock movements and posted reconciliations remain in the inventory ledger and are not reversed. Deletions are recorded in the audit trail.
+- WIP, Procurement, Raw Ingredients, and reports continue to use the shared ingredient records. The Director can view PMO periods but cannot edit or post them; Developers, Plant Managers, and Procurement users can manage periods.
+
 ---
 
 ## 6. Finished Goods and Cold Storage Subsystem
@@ -268,11 +282,11 @@ The WIP module manages the production lifecycle from scheduling to completion or
 
 ### Production steps
 
-1. Scheduled
-2. Pasteurization
-3. Homogenization
-4. Cooling and bottling
-5. Completed
+1. Scheduled Batch
+2. Pasteurization / Cooking
+3. Cooling
+4. Bottling & Packaging
+5. Finished Goods Release
 6. Cancelled
 
 ### Functions
@@ -660,8 +674,9 @@ Ratings are stored with the evaluator role, comments, and date. The Reports moda
 2. Open ROP Procurement or Raw Ingredients.
 3. Review low-stock and safety-stock alerts.
 4. Register arrivals and receipts.
-5. Confirm updated stock and transaction records.
-6. Export or print an inventory report.
+5. Use PMO Inventory to reconcile a period or register an outside purchase not already in Raw Ingredients.
+6. Confirm updated shared stock and transaction records.
+7. Export or print an inventory report.
 
 ### Production staff
 

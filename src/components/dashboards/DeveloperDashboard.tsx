@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDairySync } from '../../context/DairySyncContext';
 import { InventoryTrendGraph } from '../InventoryTrendGraph';
-import { UserProfile, UserRole } from '../../types';
+import { USER_ROLES, USER_ROLE_LABELS, UserProfile, UserRole } from '../../types';
 import { 
   Terminal, 
   Cpu, 
@@ -48,8 +48,8 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     users, 
     transactions,
     auditLogs,
-    resetToDefaultData,
     currentUser,
+    currentRole,
     loginAsRoleUser,
     addUserProfile,
     updateUserProfile
@@ -147,7 +147,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     {
       id: 'wip',
       name: 'WIP Production Batches',
-      desc: 'Pasteurization, Incubation & Bottling processing runs',
+      desc: 'Pasteurization / Cooking, Cooling & Bottling / Packaging processing runs',
       count: `${wipBatches.filter(b => b.status !== 'completed' && b.status !== 'cancelled').length} active batches`,
       icon: Factory,
       color: 'indigo'
@@ -237,16 +237,29 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
             <FileText className="w-3.5 h-3.5 text-indigo-400" />
             <span>Reports</span>
           </button>
-          <button
-            onClick={() => {
-              if (window.confirm('Reset local state to default PCC-MMSU baseline dataset?')) {
-                resetToDefaultData();
-              }
-            }}
-            className="flex items-center space-x-1.5 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold px-3.5 py-2.5 rounded-2xl transition-all"
-          >
-            <span>Reset Demo DB</span>
-          </button>
+        </div>
+      </div>
+
+      <div className="bg-white border-2 border-indigo-100 rounded-3xl p-5 shadow-sm space-y-3">
+        <div>
+          <h3 className="text-sm font-black text-slate-900">Preview Role Dashboards</h3>
+          <p className="text-xs text-slate-500 mt-1">Switch the current view without creating or signing into a staff account.</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {USER_ROLES.map(role => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => loginAsRoleUser(role)}
+              className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition-colors ${
+                currentRole === role
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'
+              }`}
+            >
+              {USER_ROLE_LABELS[role]}
+            </button>
+          ))}
         </div>
       </div>
 

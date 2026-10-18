@@ -2,16 +2,25 @@ import React, { useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { BomIngredientRequirement, FinishedGood } from '../types';
 import { ClipboardList, Plus, Save, Trash2, X } from 'lucide-react';
+import { usePagination } from '../hooks/usePagination';
+import { TablePagination } from './TablePagination';
+
+const getRecipeOutputUnitLabel = (unit: FinishedGood['unit']) =>
+  unit === 'bottles' || unit === 'packs' ? 'bottles / packs' : unit;
 
 export const ProductRecipes: React.FC = () => {
   const {
     finishedGoods,
     ingredients,
     currentRole,
+    isDeveloperActive,
     updateFinishedGoodRecipe,
+    deleteFinishedGoodRecipe,
   } = useDairySync();
   const canEditRecipes = ['developer', 'director', 'plant_manager'].includes(currentRole);
+  const canDeleteRecipes = isDeveloperActive && currentRole === 'developer';
   const productsNeedingRecipes = finishedGoods.filter(product => !product.recipe?.length);
+  const pagination = usePagination(finishedGoods);
   const [selectedProduct, setSelectedProduct] = useState<FinishedGood | null>(null);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [pickerProductId, setPickerProductId] = useState('');
@@ -24,6 +33,13 @@ export const ProductRecipes: React.FC = () => {
     setRecipe((product.recipe || []).map(item => ({ ...item })));
     setBaseBatch(String(product.batchUnitQuantity || 100));
     setError('');
+  };
+
+  const handleDeleteRecipe = (product: FinishedGood) => {
+    if (!window.confirm(`Delete the recipe for ${product.name}? The finished product remains in Cold Storage, but WIP production will require a new recipe.`)) return;
+    if (!deleteFinishedGoodRecipe(product.id)) {
+      window.alert('The recipe could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    }
   };
 
   const openProductPicker = () => {
@@ -138,7 +154,7 @@ export const ProductRecipes: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {finishedGoods.map(product => {
+              {pagination.pageItems.map(product => {
                 const ingredientCount = product.recipe?.length || 0;
                 const hasRecipe = ingredientCount > 0;
                 return (
@@ -148,7 +164,7 @@ export const ProductRecipes: React.FC = () => {
                       <div className="mt-0.5 font-mono text-xs text-slate-500">{product.sku}</div>
                     </td>
                     <td className="px-4 py-4 font-mono text-xs font-semibold text-slate-700">
-                      {product.batchUnitQuantity || 100} {product.unit}
+                      {product.batchUnitQuantity || 100} {getRecipeOutputUnitLabel(product.unit)}
                     </td>
                     <td className="px-4 py-4 text-xs text-slate-700">
                       {hasRecipe
@@ -166,6 +182,7 @@ export const ProductRecipes: React.FC = () => {
                     </td>
                     {canEditRecipes && (
                       <td className="px-5 py-4 text-right">
+                        <div className="flex justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => openEditor(product)}
@@ -174,6 +191,18 @@ export const ProductRecipes: React.FC = () => {
                           <ClipboardList className="h-3.5 w-3.5" />
                           {hasRecipe ? 'Edit recipe' : 'Add recipe'}
                         </button>
+                        {canDeleteRecipes && hasRecipe && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecipe(product)}
+                            aria-label={`Delete recipe for ${product.name}`}
+                            title="Delete product recipe"
+                            className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -181,6 +210,14 @@ export const ProductRecipes: React.FC = () => {
               })}
             </tbody>
           </table>
+          <TablePagination
+            totalItems={finishedGoods.length}
+            pageIndex={pagination.pageIndex}
+            pageSize={pagination.pageSize}
+            pageCount={pagination.pageCount}
+            onPageChange={pagination.setPageIndex}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </div>
       )}
 
@@ -285,7 +322,7 @@ export const ProductRecipes: React.FC = () => {
                     onChange={event => setBaseBatch(event.target.value)}
                     className="w-28 rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-sm font-mono font-bold focus:border-indigo-500 focus:outline-none"
                   />
-                  <span className="text-xs font-semibold text-slate-700">{selectedProduct.unit}</span>
+                  <span className="text-xs font-semibold text-slate-700">{getRecipeOutputUnitLabel(selectedProduct.unit)}</span>
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500">
                   Enter ingredient quantities for this output amount. WIP production scales them automatically.

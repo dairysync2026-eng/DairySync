@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { 
   Bell, 
@@ -9,7 +9,6 @@ import {
   User, 
   UserCog,
   ChevronDown,
-  RefreshCw,
   X,
   AlertTriangle,
   Info,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import { ProfileEditModal } from './ProfileEditModal';
 import { PWAInstallButton } from './pwa/PWAInstallButton';
+import { USER_ROLES, USER_ROLE_LABELS } from '../types';
 
 interface HeaderProps {
   onOpenReports: () => void;
@@ -33,11 +33,9 @@ export const Header: React.FC<HeaderProps> = ({
     currentRole, 
     setCurrentRole, 
     currentUser, 
-    users, 
     alerts, 
     markAlertRead, 
     clearAllAlerts,
-    resetToDefaultData,
     logout,
     loginAsRoleUser,
     isDeveloperActive,
@@ -48,8 +46,38 @@ export const Header: React.FC<HeaderProps> = ({
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const desktopAlertsRef = useRef<HTMLDivElement>(null);
+  const mobileAlertsRef = useRef<HTMLDivElement>(null);
+  const roleDropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const unreadAlerts = alerts.filter(a => !a.read);
+
+  useEffect(() => {
+    if (!showAlertsDrawer && !showRoleDropdown && !showMobileMenu) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      if (
+        showAlertsDrawer &&
+        !desktopAlertsRef.current?.contains(target) &&
+        !mobileAlertsRef.current?.contains(target)
+      ) {
+        setShowAlertsDrawer(false);
+      }
+      if (showRoleDropdown && !roleDropdownRef.current?.contains(target)) {
+        setShowRoleDropdown(false);
+      }
+      if (showMobileMenu && !mobileMenuRef.current?.contains(target)) {
+        setShowMobileMenu(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown);
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown);
+  }, [showAlertsDrawer, showRoleDropdown, showMobileMenu]);
 
   return (
     <header className="bg-white text-slate-900 border-b-2 border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -58,9 +86,11 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Logo & Institution Branding */}
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-2xl bg-indigo-600 flex items-center justify-center font-extrabold text-white text-base sm:text-lg shadow-md shadow-indigo-200">
-              DS
-            </div>
+            <img
+              src="/dairysync-app-icon.png"
+              alt="DairySync"
+              className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-2xl object-cover shadow-md shadow-indigo-200"
+            />
             <div className="min-w-0">
               <div className="flex items-center space-x-2">
                 <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900">
@@ -91,7 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* Notifications Bell */}
-            <div className="relative">
+            <div className="relative" ref={desktopAlertsRef}>
               <button
                 onClick={() => setShowAlertsDrawer(!showAlertsDrawer)}
                 className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl border border-slate-200 transition-colors relative"
@@ -174,7 +204,7 @@ export const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Profile & Role Switcher Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={roleDropdownRef}>
               <button
                 onClick={() => setShowRoleDropdown(!showRoleDropdown)}
                 className="flex items-center space-x-2 bg-slate-900 hover:bg-slate-800 text-white pl-2 pr-3 py-1.5 rounded-xl text-xs font-bold shadow-sm transition-all border border-slate-700"
@@ -238,7 +268,7 @@ export const Header: React.FC<HeaderProps> = ({
                             <ShieldAlert className="w-3 h-3 text-indigo-600 inline mr-1" />
                             <span>Lead Dev Master Clearance</span>
                           </p>
-                          <p className="text-[10px] text-indigo-600/90 font-medium">Switch to any user without re-login</p>
+                          <p className="text-[10px] text-indigo-600/90 font-medium">Preview any role dashboard without a staff profile</p>
                         </div>
                         <span className="text-[9px] bg-indigo-600 text-white font-extrabold px-1.5 py-0.5 rounded shadow-xs">
                           ACTIVE
@@ -262,27 +292,24 @@ export const Header: React.FC<HeaderProps> = ({
                       )}
 
                       <div className="space-y-1">
-                        {users.map(u => (
+                        {USER_ROLES.map(role => (
                           <button
-                            key={u.role}
+                            key={role}
                             onClick={() => {
-                              loginAsRoleUser(u.role);
+                              loginAsRoleUser(role);
                               setShowRoleDropdown(false);
                             }}
                             className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center space-x-3 transition-all ${
-                              currentRole === u.role 
+                              currentRole === role
                                 ? 'bg-indigo-600 text-white font-bold shadow-sm' 
                                 : 'text-slate-700 hover:bg-slate-100'
                             }`}
                           >
-                            <img src={u.avatar} alt="" className="w-6 h-6 rounded-full object-cover border border-slate-200 shrink-0" />
                             <div className="truncate flex-1">
-                              <p className="font-bold leading-tight truncate">
-                                {u.nickname ? `${u.name} (${u.nickname})` : u.name}
-                              </p>
-                              <p className={`text-[10px] truncate ${currentRole === u.role ? 'text-indigo-100' : 'text-slate-500'}`}>{u.title}</p>
+                              <p className="font-bold leading-tight truncate">{USER_ROLE_LABELS[role]}</p>
+                              <p className={`text-[10px] truncate ${currentRole === role ? 'text-indigo-100' : 'text-slate-500'}`}>Dashboard preview</p>
                             </div>
-                            {currentRole === u.role && (
+                            {currentRole === role && (
                               <span className="text-[9px] bg-white/20 text-white px-1.5 py-0.5 rounded text-xs font-mono font-bold">
                                 Active
                               </span>
@@ -305,18 +332,6 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>Sign Out / Lock System</span>
                     </button>
 
-                    {currentRole === 'developer' && (
-                      <button
-                        onClick={() => {
-                          resetToDefaultData();
-                          setShowRoleDropdown(false);
-                        }}
-                        className="w-full text-left px-3 py-1.5 text-[11px] text-slate-500 font-medium hover:bg-slate-100 rounded-xl flex items-center space-x-2 transition-colors"
-                      >
-                        <RefreshCw className="w-3 h-3 text-slate-400" />
-                        <span>Reset Demo Database State</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -327,7 +342,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Mobile Screen Actions & Drop Down Trigger Button (Visible Only on Mobile) */}
           <div className="flex sm:hidden items-center space-x-1.5">
             {/* Quick Alerts Bell on Mobile */}
-            <div className="relative">
+            <div className="relative" ref={mobileAlertsRef}>
               <button
                 onClick={() => {
                   setShowAlertsDrawer(!showAlertsDrawer);
@@ -429,7 +444,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Mobile Screen Drop Down Menu */}
       {showMobileMenu && (
-        <div className="sm:hidden border-t-2 border-slate-200 bg-white shadow-2xl animate-in slide-in-from-top-2 duration-150">
+        <div ref={mobileMenuRef} className="sm:hidden border-t-2 border-slate-200 bg-white shadow-2xl animate-in slide-in-from-top-2 duration-150">
           <div className="px-4 py-4 space-y-3.5 max-h-[calc(100vh-4.5rem)] overflow-y-auto">
             
             {/* Active User Account Summary Card */}
@@ -544,27 +559,24 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
 
                 <div className="space-y-1">
-                  {users.map(u => (
+                  {USER_ROLES.map(role => (
                     <button
-                      key={u.role}
+                      key={role}
                       onClick={() => {
-                        loginAsRoleUser(u.role);
+                        loginAsRoleUser(role);
                         setShowMobileMenu(false);
                       }}
                       className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center space-x-2.5 transition-all ${
-                        currentRole === u.role 
+                        currentRole === role
                           ? 'bg-indigo-600 text-white font-bold shadow-xs' 
                           : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
                       }`}
                     >
-                      <img src={u.avatar} alt="" className="w-6 h-6 rounded-full object-cover border border-slate-300 shrink-0" />
                       <div className="truncate flex-1">
-                        <p className="font-bold leading-tight truncate">
-                          {u.nickname ? `${u.name} (${u.nickname})` : u.name}
-                        </p>
-                        <p className={`text-[10px] truncate ${currentRole === u.role ? 'text-indigo-100' : 'text-slate-500'}`}>{u.title}</p>
+                        <p className="font-bold leading-tight truncate">{USER_ROLE_LABELS[role]}</p>
+                        <p className={`text-[10px] truncate ${currentRole === role ? 'text-indigo-100' : 'text-slate-500'}`}>Dashboard preview</p>
                       </div>
-                      {currentRole === u.role && (
+                      {currentRole === role && (
                         <span className="text-[9px] bg-white/20 text-white px-1.5 py-0.5 rounded font-mono font-bold">
                           Active
                         </span>
@@ -577,19 +589,6 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Footer Session Controls */}
             <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
-              {currentRole === 'developer' && (
-                <button
-                  onClick={() => {
-                    resetToDefaultData();
-                    setShowMobileMenu(false);
-                  }}
-                  className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold flex items-center space-x-1.5 py-1.5"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Reset Demo State</span>
-                </button>
-              )}
-
               <button
                 onClick={() => {
                   logout();

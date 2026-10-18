@@ -107,6 +107,20 @@ type StockTransaction @table(key: "id") {
   notes: String
 }
 
+type PmoInventoryPeriod @table(key: "id") {
+  id: String!
+  title: String!
+  sourceFileName: String!
+  lines: [Any!]!
+  createdAt: String!
+  createdBy: String!
+  status: String
+  postedAt: String
+  postedBy: String
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
 type IsoEvaluationRating @table(key: "id") {
   id: String!
   functionalSuitability: Float!

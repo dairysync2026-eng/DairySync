@@ -17,7 +17,8 @@ import {
   RotateCcw,
   Archive,
   History,
-  AlertTriangle
+  AlertTriangle,
+  Trash2
 } from 'lucide-react';
 
 export const WipProduction: React.FC = () => {
@@ -29,9 +30,12 @@ export const WipProduction: React.FC = () => {
     advanceWipBatchStep,
     cancelWipBatch,
     currentUser,
-    currentRole
+    currentRole,
+    isDeveloperActive,
+    deleteWipBatchRecord
   } = useDairySync();
   const isDirectorReadOnly = currentRole === 'director';
+  const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string>(finishedGoods[0]?.id || '');
@@ -112,7 +116,7 @@ export const WipProduction: React.FC = () => {
 
   const handleConfirmCancelBatch = () => {
     if (!batchToCancel) return;
-    const res = cancelWipBatch(batchToCancel.id, cancelReasonInput.trim() || 'Operator cancelled prior to pasteurization');
+    const res = cancelWipBatch(batchToCancel.id, cancelReasonInput.trim() || 'Operator cancelled before pasteurization');
     setFeedbackMessage({
       type: res.success ? 'success' : 'error',
       text: res.message
@@ -121,11 +125,18 @@ export const WipProduction: React.FC = () => {
     setCancelReasonInput('');
   };
 
+  const handleDeleteBatch = (batch: WipBatch) => {
+    if (!window.confirm(`Delete WIP batch ${batch.batchNumber}? This removes its record only and will not restore or adjust inventory.`)) return;
+    if (!deleteWipBatchRecord(batch.id)) {
+      window.alert('The batch could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    }
+  };
+
   const steps: { key: WipStep; label: string; desc: string }[] = [
     { key: 'scheduled', label: '1. Scheduled Batch', desc: 'Raw milk & materials allocated' },
-    { key: 'pasteurization', label: '2. Pasteurization', desc: '72°C - 75°C holding tank' },
-    { key: 'homogenization', label: '3. Homogenization', desc: 'Flavoring & consistency mix' },
-    { key: 'cooling_bottling', label: '4. Bottling & Cooling', desc: 'Cold storage chill to 4°C' },
+    { key: 'pasteurization', label: '2. Pasteurization / Cooking', desc: '72°C - 75°C holding tank' },
+    { key: 'cooling', label: '3. Cooling', desc: 'Chill to 4°C before packaging' },
+    { key: 'bottling_packaging', label: '4. Bottling & Packaging', desc: 'Package finished products for cold storage' },
     { key: 'completed', label: '5. Finished Goods Release', desc: 'Moved to central cold storage' }
   ];
 
@@ -258,30 +269,30 @@ export const WipProduction: React.FC = () => {
                                 onClick={() => advanceWipBatchStep(batch.id, 'pasteurization')}
                                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] py-2 rounded-xl flex items-center justify-center space-x-1 shadow-sm transition-colors"
                               >
-                                <span>Start Pasteurization</span>
+                                <span>Start Pasteurization / Cooking</span>
                                 <ArrowRight className="w-3 h-3" />
                               </button>
                             </div>
                           )}
                           {batch.status === 'pasteurization' && (
                             <button
-                              onClick={() => advanceWipBatchStep(batch.id, 'homogenization')}
+                              onClick={() => advanceWipBatchStep(batch.id, 'cooling')}
                               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] py-2 rounded-xl flex items-center justify-center space-x-1 shadow-sm"
                             >
-                              <span>Move to Homogenizer</span>
+                              <span>Move to Cooling</span>
                               <ArrowRight className="w-3 h-3" />
                             </button>
                           )}
-                          {batch.status === 'homogenization' && (
+                          {batch.status === 'cooling' && (
                             <button
-                              onClick={() => advanceWipBatchStep(batch.id, 'cooling_bottling')}
+                              onClick={() => advanceWipBatchStep(batch.id, 'bottling_packaging')}
                               className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] py-2 rounded-xl flex items-center justify-center space-x-1 shadow-sm"
                             >
-                              <span>Move to Bottling Line</span>
+                              <span>Move to Bottling & Packaging</span>
                               <ArrowRight className="w-3 h-3" />
                             </button>
                           )}
-                          {batch.status === 'cooling_bottling' && (
+                          {batch.status === 'bottling_packaging' && (
                             <button
                               onClick={() => advanceWipBatchStep(batch.id, 'completed')}
                               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] py-2 rounded-xl flex items-center justify-center space-x-1 shadow-sm"
@@ -290,6 +301,20 @@ export const WipProduction: React.FC = () => {
                               <span>Release to Finished Goods</span>
                             </button>
                           )}
+                        </div>
+                      )}
+                      {canDeleteRecords && (
+                        <div className="pt-2 border-t border-slate-100 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBatch(batch)}
+                            aria-label={`Delete WIP batch ${batch.batchNumber}`}
+                            title="Delete WIP batch record without adjusting inventory"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete Record
+                          </button>
                         </div>
                       )}
 

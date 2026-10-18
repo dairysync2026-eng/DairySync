@@ -29,20 +29,26 @@ import {
 import { AuditPdfReportModal } from './AuditPdfReportModal';
 import { AccessRestricted } from './AccessRestricted';
 import { ExportMenu } from './ExportMenu';
+import { usePagination } from '../hooks/usePagination';
+import { TablePagination } from './TablePagination';
 
 export const AuditTrail: React.FC = () => {
   const { 
     auditLogs, 
     currentUser, 
     currentRole,
+    isDeveloperActive,
     users, 
     logAuditAction, 
     clearAuditLogs, 
+    deleteAuditLogRecord,
     exportAuditLogsCsv 
   } = useDairySync();
+  const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
+  const canManageAuditTrail = currentRole === 'developer' || currentRole === 'director';
 
-  // Enforce access control: only Lead Developer and Director can access Audit Trail
-  const isAuthorized = currentRole === 'developer' || currentRole === 'director';
+  // Plant Managers may review the audit trail but cannot change or clear audit records.
+  const isAuthorized = canManageAuditTrail || currentRole === 'plant_manager';
 
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,6 +76,15 @@ export const AuditTrail: React.FC = () => {
   const [manualNewValue, setManualNewValue] = useState('');
   const [manualNotes, setManualNotes] = useState('');
   const [manualSeverity, setManualSeverity] = useState<AuditSeverity>('info');
+
+  const handleDeleteAuditLog = (log: AuditLogEntry) => {
+    if (!window.confirm(`Permanently delete this audit record?\n\n${log.timestamp}\n${log.action}: ${log.description}`)) return;
+    if (!deleteAuditLogRecord(log.id)) {
+      window.alert('The audit record could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    } else if (activeDetailLog?.id === log.id) {
+      setActiveDetailLog(null);
+    }
+  };
 
   // Distinct Action Types for filter dropdown
   const uniqueActionTypes = useMemo(() => {
@@ -146,6 +161,7 @@ export const AuditTrail: React.FC = () => {
       return true;
     });
   }, [auditLogs, searchTerm, selectedCategory, selectedUser, selectedSeverity, selectedActionType, dateFilter, fromTimestamp, toTimestamp]);
+  const pagination = usePagination(filteredLogs);
 
   // Statistics
   const stats = useMemo(() => {
@@ -280,7 +296,7 @@ export const AuditTrail: React.FC = () => {
             menuClassName="bg-white border-slate-200 text-slate-700"
           />
 
-          <button
+          {canManageAuditTrail && <button
             id="btn-manual-audit-record"
             onClick={() => setShowManualAuditModal(true)}
             className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-3.5 py-2 rounded-2xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 shadow-xs transition-all cursor-pointer"
@@ -288,16 +304,16 @@ export const AuditTrail: React.FC = () => {
           >
             <PlusCircle className="w-4 h-4 text-indigo-600" />
             <span>Record Verification</span>
-          </button>
+          </button>}
 
-          <button
+          {canManageAuditTrail && <button
             id="btn-clear-audit-logs"
             onClick={() => setShowClearConfirm(true)}
             className="flex items-center justify-center p-2 rounded-2xl text-xs font-bold bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 transition-all cursor-pointer"
             title="Clear or archive audit log"
           >
             <Trash2 className="w-4 h-4" />
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -577,7 +593,7 @@ export const AuditTrail: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredLogs.map(log => (
+                  {pagination.pageItems.map(log => (
                     <tr 
                       key={log.id}
                       onClick={() => setActiveDetailLog(log)}
@@ -629,16 +645,32 @@ export const AuditTrail: React.FC = () => {
                       </td>
 
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveDetailLog(log);
-                          }}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 transition-colors"
-                          title="View Full Provenance"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDetailLog(log);
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 transition-colors"
+                            title="View Full Provenance"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          {canDeleteRecords && (
+                            <button
+                              type="button"
+                              onClick={event => {
+                                event.stopPropagation();
+                                handleDeleteAuditLog(log);
+                              }}
+                              aria-label={`Delete audit record ${log.id}`}
+                              title="Delete audit record"
+                              className="p-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -648,7 +680,7 @@ export const AuditTrail: React.FC = () => {
 
             {/* Mobile Cards View (displayed below md breakpoint) */}
             <div className="md:hidden divide-y divide-slate-100">
-              {filteredLogs.map(log => (
+              {pagination.pageItems.map(log => (
                 <div 
                   key={log.id} 
                   onClick={() => setActiveDetailLog(log)}
@@ -678,9 +710,25 @@ export const AuditTrail: React.FC = () => {
                       <User className="w-3.5 h-3.5 text-slate-400" />
                       <span className="font-bold text-slate-700 truncate">{log.userName}</span>
                     </div>
-                    <span className="text-[10px] text-indigo-600 font-bold flex items-center">
-                      Details &rarr;
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-indigo-600 font-bold flex items-center">
+                        Details &rarr;
+                      </span>
+                      {canDeleteRecords && (
+                        <button
+                          type="button"
+                          onClick={event => {
+                            event.stopPropagation();
+                            handleDeleteAuditLog(log);
+                          }}
+                          aria-label={`Delete audit record ${log.id}`}
+                          title="Delete audit record"
+                          className="rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -689,6 +737,14 @@ export const AuditTrail: React.FC = () => {
           </div>
         )}
 
+        <TablePagination
+          totalItems={filteredLogs.length}
+          pageIndex={pagination.pageIndex}
+          pageSize={pagination.pageSize}
+          pageCount={pagination.pageCount}
+          onPageChange={pagination.setPageIndex}
+          onPageSizeChange={pagination.setPageSize}
+        />
       </div>
 
       {/* Detail Inspection Modal */}

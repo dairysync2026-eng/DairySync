@@ -110,9 +110,11 @@ export const LoginPage: React.FC = () => {
       <header className="p-6 border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md sticky top-0 z-20">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-2xl bg-indigo-600 flex items-center justify-center font-extrabold text-white text-lg shadow-lg shadow-indigo-500/20">
-              DS
-            </div>
+            <img
+              src="/dairysync-app-icon.png"
+              alt="DairySync"
+              className="h-10 w-10 rounded-2xl object-cover shadow-lg shadow-indigo-500/20"
+            />
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-extrabold text-lg tracking-tight text-white">

@@ -52,9 +52,9 @@ export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ on
   const getNextStep = (status: WipBatch['status']): WipStep | null => {
     switch (status) {
       case 'scheduled': return 'pasteurization';
-      case 'pasteurization': return 'homogenization';
-      case 'homogenization': return 'cooling_bottling';
-      case 'cooling_bottling': return 'completed';
+      case 'pasteurization': return 'cooling';
+      case 'cooling': return 'bottling_packaging';
+      case 'bottling_packaging': return 'completed';
       default: return null;
     }
   };
@@ -62,9 +62,9 @@ export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ on
   const getStepProgress = (status: WipBatch['status']) => {
     switch (status) {
       case 'scheduled': return { pct: 20, label: 'Batch Scheduled' };
-      case 'pasteurization': return { pct: 45, label: 'Pasteurization (72°C)' };
-      case 'homogenization': return { pct: 70, label: 'Homogenization / Incubation' };
-      case 'cooling_bottling': return { pct: 90, label: 'Cooling & Bottling Line' };
+      case 'pasteurization': return { pct: 40, label: 'Pasteurization / Cooking (72°C)' };
+      case 'cooling': return { pct: 60, label: 'Cooling' };
+      case 'bottling_packaging': return { pct: 80, label: 'Bottling & Packaging' };
       case 'completed': return { pct: 100, label: 'Completed & Transferred' };
       case 'cancelled': return { pct: 0, label: 'Batch Cancelled' };
       default: return { pct: 0, label: 'Batch Scheduled' };
@@ -155,7 +155,7 @@ export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ on
               <span className="text-xs text-indigo-500 font-bold">Batches on Floor</span>
             </div>
             <p className="text-xs text-slate-500 mt-2 font-medium">
-              In pasteurization, homogenization, or bottling
+              Scheduled, pasteurization / cooking, cooling, or bottling & packaging
             </p>
           </div>
         </div>
@@ -231,7 +231,7 @@ export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ on
                 <span>Active Floor Batch Queue & Step Advancement</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                Real-time tracking of batches undergoing pasteurization, homogenization, incubation, and packaging
+                Real-time tracking of scheduled batches through pasteurization / cooking, cooling, bottling & packaging, and release
               </p>
             </div>
             <button

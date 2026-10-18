@@ -243,7 +243,7 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
                       </div>
                       <h4 className="font-extrabold text-slate-900 text-sm mt-1">{item.name}</h4>
                       <p className="text-xs text-slate-500 font-medium">
-                        Supplier: <strong>{item.supplier}</strong> • Lead Time: {item.leadTimeDays} days • Unit Cost: ₱{item.costPerUnit}
+                        Supplier: <strong>{item.supplier}</strong> • Lead Time: {item.leadTimeDays} days • Unit Cost: {item.costPerUnit > 0 ? `₱${item.costPerUnit}` : 'N/A'}
                       </p>
                     </div>
 

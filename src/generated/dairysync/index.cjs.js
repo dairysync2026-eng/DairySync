@@ -156,6 +156,35 @@ exports.updateFinishedGoodRecipe = function updateFinishedGoodRecipe(dcOrVars, v
 }
 ;
 
+const listPmoInventoryPeriodsRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'ListPmoInventoryPeriods');
+}
+listPmoInventoryPeriodsRef.operationName = 'ListPmoInventoryPeriods';
+exports.listPmoInventoryPeriodsRef = listPmoInventoryPeriodsRef;
+
+exports.listPmoInventoryPeriods = function listPmoInventoryPeriods(dcOrOptions, options) {
+  
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(listPmoInventoryPeriodsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+;
+
+const upsertPmoInventoryPeriodRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'UpsertPmoInventoryPeriod', inputVars);
+}
+upsertPmoInventoryPeriodRef.operationName = 'UpsertPmoInventoryPeriod';
+exports.upsertPmoInventoryPeriodRef = upsertPmoInventoryPeriodRef;
+
+exports.upsertPmoInventoryPeriod = function upsertPmoInventoryPeriod(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(upsertPmoInventoryPeriodRef(dcInstance, inputVars));
+}
+;
+
 const listFinishedGoodsRef = (dc) => {
   const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
   dcInstance._useGeneratedSdk();

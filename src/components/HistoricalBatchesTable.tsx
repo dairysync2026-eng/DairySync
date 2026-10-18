@@ -16,15 +16,26 @@ import {
   ArrowUpRight,
   ShieldCheck,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { ExportMenu } from './ExportMenu';
+import { usePagination } from '../hooks/usePagination';
+import { TablePagination } from './TablePagination';
 
 export const HistoricalBatchesTable: React.FC = () => {
-  const { wipBatches, finishedGoods } = useDairySync();
+  const { wipBatches, finishedGoods, currentRole, isDeveloperActive, deleteWipBatchRecord } = useDairySync();
+  const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
   const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'cancelled'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBatchForDetails, setSelectedBatchForDetails] = useState<WipBatch | null>(null);
+
+  const handleDeleteBatch = (batch: WipBatch) => {
+    if (!window.confirm(`Delete historical WIP batch ${batch.batchNumber}? This removes its record only and does not adjust inventory.`)) return;
+    if (!deleteWipBatchRecord(batch.id)) {
+      window.alert('The batch could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    }
+  };
 
   // All historical batches (completed or cancelled)
   const historicalBatches = useMemo(() => {
@@ -49,6 +60,7 @@ export const HistoricalBatchesTable: React.FC = () => {
       return true;
     });
   }, [historicalBatches, filterStatus, searchQuery]);
+  const pagination = usePagination(filteredBatches);
 
   // Performance Analysis KPIs
   const completedBatches = historicalBatches.filter(b => b.status === 'completed');
@@ -236,14 +248,14 @@ export const HistoricalBatchesTable: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredBatches.length === 0 ? (
+            {pagination.pageItems.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
                   No historical batches match the active filter criteria.
                 </td>
               </tr>
             ) : (
-              filteredBatches.map(batch => {
+              pagination.pageItems.map(batch => {
                 const isCompleted = batch.status === 'completed';
                 const yieldEfficiency = batch.rawMilkVolumeUsed > 0 
                   ? (batch.targetQuantity / batch.rawMilkVolumeUsed).toFixed(2) 
@@ -327,6 +339,7 @@ export const HistoricalBatchesTable: React.FC = () => {
 
                     {/* View Details Button */}
                     <td className="py-3 px-4 text-right">
+                      <div className="flex justify-end gap-2">
                       <button
                         type="button"
                         onClick={() => setSelectedBatchForDetails(batch)}
@@ -334,6 +347,18 @@ export const HistoricalBatchesTable: React.FC = () => {
                       >
                         Inspect
                       </button>
+                      {canDeleteRecords && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBatch(batch)}
+                          aria-label={`Delete historical batch ${batch.batchNumber}`}
+                          title="Delete historical batch record"
+                          className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -342,6 +367,14 @@ export const HistoricalBatchesTable: React.FC = () => {
           </tbody>
         </table>
       </div>
+      <TablePagination
+        totalItems={filteredBatches.length}
+        pageIndex={pagination.pageIndex}
+        pageSize={pagination.pageSize}
+        pageCount={pagination.pageCount}
+        onPageChange={pagination.setPageIndex}
+        onPageSizeChange={pagination.setPageSize}
+      />
 
       {/* Inspect Batch Details Modal */}
       {selectedBatchForDetails && (

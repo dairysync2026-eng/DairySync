@@ -289,7 +289,7 @@ export const PrintStockReportModal: React.FC<PrintStockReportModalProps> = ({
                           {ing.reorderPoint} / {ing.safetyStock} {ing.unit}
                         </td>
                         <td className="py-2 px-2 border border-slate-300 text-right font-mono text-slate-700 whitespace-nowrap">
-                          ₱{ing.costPerUnit.toFixed(2)}
+                          {ing.costPerUnit > 0 ? `₱${ing.costPerUnit.toFixed(2)}` : 'N/A'}
                         </td>
                         <td className="py-2 px-2 border border-slate-300 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                           ₱{itemValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -376,7 +376,9 @@ export const PrintStockReportModal: React.FC<PrintStockReportModalProps> = ({
                           {fg.location}
                         </td>
                         <td className="py-2 px-2 border border-slate-300 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                          {fg.currentStock.toLocaleString()} / {fg.coldStorageCapacity} {fg.unit}
+                          {fg.coldStorageCapacity > 0
+                            ? `${fg.currentStock.toLocaleString()} / ${fg.coldStorageCapacity} ${fg.unit}`
+                            : `${fg.currentStock.toLocaleString()} ${fg.unit} / N/A capacity`}
                           {isLowStock && (
                             <span className="text-[9px] font-bold text-rose-600 block print:text-black">
                               *Below Buffer

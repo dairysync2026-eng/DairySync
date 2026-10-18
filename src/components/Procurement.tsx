@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
-import { Truck, AlertTriangle, CheckCircle2, ShoppingBag, Send, FileText } from 'lucide-react';
+import { Truck, AlertTriangle, CheckCircle2, ShoppingBag, Send, FileText, Trash2 } from 'lucide-react';
+import { usePagination } from '../hooks/usePagination';
+import { TablePagination } from './TablePagination';
 
 export const Procurement: React.FC = () => {
-  const { ingredients, updateIngredientStock, currentRole } = useDairySync();
+  const { ingredients, updateIngredientStock, currentRole, isDeveloperActive, deleteIngredientRecord } = useDairySync();
   const isDirectorReadOnly = currentRole === 'director';
+  const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const pagination = usePagination(ingredients);
 
   const ropTriggered = ingredients.filter(i => i.currentStock <= i.reorderPoint);
 
@@ -16,6 +20,13 @@ export const Procurement: React.FC = () => {
     const updated = updateIngredientStock(id, item.currentStock + ropQty, `Procurement Order Restock (+${ropQty} ${item.unit})`);
     if (!updated) return;
     setOrderedIds(prev => [...prev, id]);
+  };
+
+  const handleDeleteIngredient = (id: string, name: string) => {
+    if (!window.confirm(`Delete ${name} from Raw Ingredients? This removes the ingredient record only; related history will remain.`)) return;
+    if (!deleteIngredientRecord(id)) {
+      window.alert('The ingredient could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    }
   };
 
   return (
@@ -56,7 +67,10 @@ export const Procurement: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {ropTriggered.map(item => {
-              const recommendedOrder = Math.max(item.maxStock - item.currentStock, item.reorderPoint * 2);
+              const recommendedOrder = Math.max(
+                item.maxStock > 0 ? item.maxStock - item.currentStock : 0,
+                item.reorderPoint * 2,
+              );
               const totalEstCost = recommendedOrder * item.costPerUnit;
 
               return (
@@ -82,7 +96,7 @@ export const Procurement: React.FC = () => {
                     <div className="text-right">
                       <p className="text-xs text-slate-500 font-medium">Recommended Order Quantity:</p>
                       <p className="text-sm font-extrabold text-amber-700 font-mono">
-                        +{recommendedOrder} {item.unit} (Est. ₱{totalEstCost.toLocaleString()}.00)
+                        +{recommendedOrder} {item.unit} (Est. {item.costPerUnit > 0 ? `₱${totalEstCost.toLocaleString()}.00` : 'N/A'})
                       </p>
                     </div>
 
@@ -117,22 +131,50 @@ export const Procurement: React.FC = () => {
                 <th className="p-3">Daily Usage</th>
                 <th className="p-3">ROP Formula</th>
                 <th className="p-3 text-right">Unit Price</th>
+                {canDeleteRecords && <th className="p-3 text-right">Action</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
-              {ingredients.map(ing => (
+              {pagination.pageItems.length === 0 ? (
+                <tr>
+                  <td colSpan={canDeleteRecords ? 7 : 6} className="p-8 text-center text-slate-500">
+                    No raw materials are available for reorder parameters.
+                  </td>
+                </tr>
+              ) : pagination.pageItems.map(ing => (
                 <tr key={ing.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="p-3 font-bold text-slate-900">{ing.name}</td>
                   <td className="p-3 text-slate-500">{ing.supplier}</td>
                   <td className="p-3 font-mono">{ing.leadTimeDays} days</td>
                   <td className="p-3 font-mono">{ing.avgDailyConsumption} {ing.unit}/day</td>
                   <td className="p-3 font-mono text-amber-600 font-extrabold">{ing.reorderPoint} {ing.unit}</td>
-                  <td className="p-3 text-right font-mono font-bold text-slate-900">₱{ing.costPerUnit}.00</td>
+                  <td className="p-3 text-right font-mono font-bold text-slate-900">{ing.costPerUnit > 0 ? `₱${ing.costPerUnit}.00` : 'N/A'}</td>
+                  {canDeleteRecords && (
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteIngredient(ing.id, ing.name)}
+                        aria-label={`Delete ${ing.name}`}
+                        title="Delete ingredient record"
+                        className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <TablePagination
+          totalItems={ingredients.length}
+          pageIndex={pagination.pageIndex}
+          pageSize={pagination.pageSize}
+          pageCount={pagination.pageCount}
+          onPageChange={pagination.setPageIndex}
+          onPageSizeChange={pagination.setPageSize}
+        />
       </div>
 
     </div>

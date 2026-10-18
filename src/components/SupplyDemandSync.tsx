@@ -16,7 +16,8 @@ import {
   Flag,
   RotateCcw,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 
 export const SupplyDemandSync: React.FC = () => {
@@ -25,8 +26,12 @@ export const SupplyDemandSync: React.FC = () => {
     addCommitment, 
     updateCommitmentStatus, 
     cancelCommitment,
-    updateCommitmentPriority 
+    updateCommitmentPriority,
+    currentRole,
+    isDeveloperActive,
+    deleteCommitmentRecord
   } = useDairySync();
+  const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'fulfilled' | 'cancelled'>('all');
@@ -34,6 +39,13 @@ export const SupplyDemandSync: React.FC = () => {
   // Cancellation Modal state
   const [commitmentToCancel, setCommitmentToCancel] = useState<SupplyDemandCommitment | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  const handleDeleteCommitment = (commitment: SupplyDemandCommitment) => {
+    if (!window.confirm(`Delete the ${commitment.status} commitment for ${commitment.partnerName}? This removes the commitment record only; inventory and fulfillment are not changed.`)) return;
+    if (!deleteCommitmentRecord(commitment.id)) {
+      window.alert('The commitment could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    }
+  };
   
   const [newCom, setNewCom] = useState<Omit<SupplyDemandCommitment, 'id'>>({
     type: 'National School Feeding Program (DepEd)',
@@ -299,8 +311,9 @@ export const SupplyDemandSync: React.FC = () => {
                   {com.status.replace('_', ' ')}
                 </span>
 
-                {!isCancelled && !isFulfilled && (
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
+                  {!isCancelled && !isFulfilled && (
+                    <>
                     {/* Cancellation button close to Mark Fulfilled button */}
                     <button
                       onClick={() => {
@@ -321,8 +334,20 @@ export const SupplyDemandSync: React.FC = () => {
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Mark Fulfilled</span>
                     </button>
-                  </div>
-                )}
+                    </>
+                  )}
+                  {canDeleteRecords && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCommitment(com)}
+                      aria-label={`Delete commitment for ${com.partnerName}`}
+                      title="Delete commitment record"
+                      className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
             </div>

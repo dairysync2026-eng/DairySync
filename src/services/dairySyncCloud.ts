@@ -22,6 +22,7 @@ import {
   listCommitmentsRef,
   listFinishedGoodsRef,
   listIsoRatingsRef,
+  listPmoInventoryPeriodsRef,
   listRawIngredientsRef,
   listStockTransactionsRef,
   listSystemAlertsRef,
@@ -42,18 +43,21 @@ import {
   upsertUserProfile,
   upsertWipBatch,
   updateFinishedGoodRecipe as updateFinishedGoodRecipeOperation,
+  upsertPmoInventoryPeriod,
 } from '@dataconnect/dairysync-generated';
 import {
   AuditLogEntry,
   FinishedGood,
   IsoEvaluationRating,
   RawIngredient,
+  PmoInventoryPeriod,
   StockTransaction,
   SupplyDemandCommitment,
   SystemAlert,
   UserProfile,
   UserRole,
   WipBatch,
+  normalizeWipStep,
 } from '../types';
 import { app, auth } from './firebase';
 
@@ -251,6 +255,10 @@ async function saveIsoRating(rating: IsoEvaluationRating): Promise<void> {
   await upsertIsoRating(dataConnect, rating);
 }
 
+async function savePmoInventoryPeriod(period: PmoInventoryPeriod): Promise<void> {
+  await upsertPmoInventoryPeriod(dataConnect, period);
+}
+
 async function seedHistoricalIsoRating(rating: IsoEvaluationRating): Promise<void> {
   await seedIsoRatingOperation(dataConnect, rating);
 }
@@ -305,6 +313,7 @@ function mapFinishedGood(row: FinishedGood): FinishedGood {
 function mapWipBatch(row: WipBatch): WipBatch {
   return {
     ...row,
+    status: normalizeWipStep(String(row.status)),
     ingredientsUsed: row.ingredientsUsed as WipBatch['ingredientsUsed'],
     completedAt: row.completedAt ?? undefined,
     cancellationReason: row.cancellationReason ?? undefined,
@@ -361,6 +370,16 @@ function mapStockTransaction(row: StockTransaction): StockTransaction {
   };
 }
 
+function mapPmoInventoryPeriod(row: PmoInventoryPeriod): PmoInventoryPeriod {
+  return {
+    ...row,
+    lines: row.lines as PmoInventoryPeriod['lines'],
+    status: row.status === 'posted' ? 'posted' : 'draft',
+    postedAt: row.postedAt ?? undefined,
+    postedBy: row.postedBy ?? undefined,
+  };
+}
+
 export const sqlConnectCollections = {
   ingredient: createCollectionAdapter(listRawIngredientsRef(dataConnect), 'rawIngredients', mapRawIngredient, saveRawIngredient, removeRawIngredient),
   finished_good: createCollectionAdapter(listFinishedGoodsRef(dataConnect), 'finishedGoods', mapFinishedGood, saveFinishedGood, async id => { await deleteFinishedGood(dataConnect, { id }); }),
@@ -368,6 +387,9 @@ export const sqlConnectCollections = {
   commitment: createCollectionAdapter(listCommitmentsRef(dataConnect), 'supplyDemandCommitments', mapCommitment, saveCommitment, async id => { await deleteCommitment(dataConnect, { id }); }),
   alert: createCollectionAdapter(listSystemAlertsRef(dataConnect), 'systemAlerts', mapSystemAlert, saveSystemAlert, async id => { await deleteSystemAlert(dataConnect, { id }); }),
   stock_adjustment: createCollectionAdapter(listStockTransactionsRef(dataConnect), 'stockTransactions', mapStockTransaction, saveStockTransaction, removeStockTransaction, seedHistoricalStockTransaction),
+  pmo_inventory_period: createCollectionAdapter(listPmoInventoryPeriodsRef(dataConnect), 'pmoInventoryPeriods', mapPmoInventoryPeriod, savePmoInventoryPeriod, async () => {
+    throw new Error('PMO inventory periods are retained as inventory history and cannot be deleted here.');
+  }),
   iso_rating: createCollectionAdapter(listIsoRatingsRef(dataConnect), 'isoEvaluationRatings', mapIsoRating, saveIsoRating, async id => { await deleteIsoRating(dataConnect, { id }); }, seedHistoricalIsoRating),
   audit_log: createCollectionAdapter(listAuditLogEntriesRef(dataConnect), 'auditLogEntries', mapAuditLog, saveAuditLog, async id => { await deleteAuditLogEntry(dataConnect, { id }); }, seedHistoricalAuditLog),
   user_profile: createCollectionAdapter(listUserProfilesRef(dataConnect), 'userProfiles', mapUserProfile, saveUserProfile, async id => { await deleteUserProfile(dataConnect, { id }); }),
@@ -387,6 +409,7 @@ export async function saveSqlConnectEntity(entity: SqlConnectEntity, payload: un
     case 'commitment': return sqlConnectCollections.commitment.save(payload as SupplyDemandCommitment);
     case 'alert': return sqlConnectCollections.alert.save(payload as SystemAlert);
     case 'stock_adjustment': return sqlConnectCollections.stock_adjustment.save(payload as StockTransaction);
+    case 'pmo_inventory_period': return sqlConnectCollections.pmo_inventory_period.save(payload as PmoInventoryPeriod);
     case 'iso_rating': return sqlConnectCollections.iso_rating.save(payload as IsoEvaluationRating);
     case 'audit_log': return sqlConnectCollections.audit_log.save(payload as AuditLogEntry);
     case 'user_profile': return sqlConnectCollections.user_profile.save(payload as UserProfile);
@@ -410,6 +433,7 @@ export async function deleteSqlConnectEntity(entity: SqlConnectEntity, id: strin
     case 'commitment': return sqlConnectCollections.commitment.remove(id);
     case 'alert': return sqlConnectCollections.alert.remove(id);
     case 'stock_adjustment': return sqlConnectCollections.stock_adjustment.remove(id);
+    case 'pmo_inventory_period': return sqlConnectCollections.pmo_inventory_period.remove(id);
     case 'iso_rating': return sqlConnectCollections.iso_rating.remove(id);
     case 'audit_log': return sqlConnectCollections.audit_log.remove(id);
     case 'user_profile': return sqlConnectCollections.user_profile.remove(id);

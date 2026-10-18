@@ -133,6 +133,31 @@ export function updateFinishedGoodRecipe(dcOrVars, vars) {
   return executeMutation(updateFinishedGoodRecipeRef(dcInstance, inputVars));
 }
 
+export const listPmoInventoryPeriodsRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'ListPmoInventoryPeriods');
+}
+listPmoInventoryPeriodsRef.operationName = 'ListPmoInventoryPeriods';
+
+export function listPmoInventoryPeriods(dcOrOptions, options) {
+  
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(listPmoInventoryPeriodsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+
+export const upsertPmoInventoryPeriodRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'UpsertPmoInventoryPeriod', inputVars);
+}
+upsertPmoInventoryPeriodRef.operationName = 'UpsertPmoInventoryPeriod';
+
+export function upsertPmoInventoryPeriod(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(upsertPmoInventoryPeriodRef(dcInstance, inputVars));
+}
+
 export const listFinishedGoodsRef = (dc) => {
   const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
   dcInstance._useGeneratedSdk();

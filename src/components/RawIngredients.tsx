@@ -16,11 +16,17 @@ import {
   LayoutList,
   LayoutGrid,
   DollarSign,
-  Printer
+  Printer,
+  MapPin,
+  Filter,
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 import { PrintStockReportModal } from './PrintStockReportModal';
 import { ExportMenu } from './ExportMenu';
 import { downloadCsv } from '../utils/csv';
+import { usePagination } from '../hooks/usePagination';
+import { TablePagination } from './TablePagination';
 
 export interface ExpiryInfo {
   dateStr?: string;
@@ -103,12 +109,24 @@ export const RawIngredients: React.FC = () => {
     ingredients, 
     addIngredient, 
     updateIngredientStock,
-    currentRole
+    currentRole,
+    isDeveloperActive,
+    deleteIngredientRecord
   } = useDairySync();
   const isDirectorReadOnly = currentRole === 'director';
+  const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
+
+  const handleDeleteIngredient = (ingredient: RawIngredient) => {
+    if (!window.confirm(`Delete ${ingredient.name} (${ingredient.sku}) from Raw Ingredients? This removes the ingredient record only; related history will remain.`)) return;
+    if (!deleteIngredientRecord(ingredient.id)) {
+      window.alert('The ingredient could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    }
+  };
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [stockFilter, setStockFilter] = useState<'all' | 'low_stock' | 'overstock' | 'optimal'>('all');
   const [filterExpiringSoonOnly, setFilterExpiringSoonOnly] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
@@ -131,9 +149,11 @@ export const RawIngredients: React.FC = () => {
   const [customUnit, setCustomUnit] = useState('');
   const [addInitialStock, setAddInitialStock] = useState('100');
   const [addUnitCost, setAddUnitCost] = useState('50');
+  const [unitCostNotApplicable, setUnitCostNotApplicable] = useState(false);
   const [addSafetyStock, setAddSafetyStock] = useState('15');
   const [addReorderPoint, setAddReorderPoint] = useState('30');
   const [addMaxStock, setAddMaxStock] = useState('500');
+  const [maxStockNotApplicable, setMaxStockNotApplicable] = useState(false);
   const [isNonPerishable, setIsNonPerishable] = useState(false);
   const [addExpiryDate, setAddExpiryDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
   const [addSupplier, setAddSupplier] = useState('PCC Local Cooperatives');
@@ -173,6 +193,16 @@ export const RawIngredients: React.FC = () => {
     return list;
   }, [availableCategories]);
 
+  const uniqueLocations = useMemo(
+    () => Array.from(new Set(ingredients.map(ingredient => ingredient.location).filter(Boolean))).sort(),
+    [ingredients]
+  );
+
+  const stockMetrics = useMemo(() => ({
+    lowStockCount: ingredients.filter(ingredient => ingredient.currentStock <= ingredient.safetyStock).length,
+    overstockCount: ingredients.filter(ingredient => ingredient.maxStock > 0 && ingredient.currentStock >= ingredient.maxStock).length,
+  }), [ingredients]);
+
   // Expiry stats calculation
   const expiryMetrics = useMemo(() => {
     let expiringCount = 0;
@@ -209,13 +239,21 @@ export const RawIngredients: React.FC = () => {
         i.supplier.toLowerCase().includes(query) ||
         i.location.toLowerCase().includes(query);
       const matchCategory = selectedCategory === 'all' || i.category === selectedCategory;
+      const matchLocation = selectedLocation === 'all' || i.location === selectedLocation;
+      const isLowStock = i.currentStock <= i.safetyStock;
+      const isOverstock = i.maxStock > 0 && i.currentStock >= i.maxStock;
+      const matchStock = stockFilter === 'all' ||
+        (stockFilter === 'low_stock' && isLowStock) ||
+        (stockFilter === 'overstock' && isOverstock) ||
+        (stockFilter === 'optimal' && !isLowStock && !isOverstock);
       
       const expInfo = getIngredientExpiryInfo(i.expiryDate);
       const matchExpiring = !filterExpiringSoonOnly || expInfo.isFlagged;
 
-      return matchSearch && matchCategory && matchExpiring;
+      return matchSearch && matchCategory && matchLocation && matchStock && matchExpiring;
     });
-  }, [ingredients, search, selectedCategory, filterExpiringSoonOnly]);
+  }, [ingredients, search, selectedCategory, selectedLocation, stockFilter, filterExpiringSoonOnly]);
+  const pagination = usePagination(filtered);
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -227,10 +265,10 @@ export const RawIngredients: React.FC = () => {
       category: (addCategory.trim().toLowerCase() || 'milk') as IngredientCategory,
       unit: (addUnit.trim() || 'kg') as RawIngredient['unit'],
       currentStock: parseFloat(addInitialStock) || 0,
-      costPerUnit: parseFloat(addUnitCost) || 0,
+      costPerUnit: unitCostNotApplicable ? 0 : (parseFloat(addUnitCost) || 0),
       safetyStock: parseFloat(addSafetyStock) || 0,
       reorderPoint: parseFloat(addReorderPoint) || 0,
-      maxStock: parseFloat(addMaxStock) || 500,
+      maxStock: maxStockNotApplicable ? 0 : (parseFloat(addMaxStock) || 500),
       avgDailyConsumption: 5,
       leadTimeDays: 3,
       supplier: addSupplier.trim() || 'PCC Local Cooperatives',
@@ -253,9 +291,11 @@ export const RawIngredients: React.FC = () => {
     setCustomUnit('');
     setAddInitialStock('100');
     setAddUnitCost('50');
+    setUnitCostNotApplicable(false);
     setAddSafetyStock('15');
     setAddReorderPoint('30');
     setAddMaxStock('500');
+    setMaxStockNotApplicable(false);
     setIsNonPerishable(false);
     setAddExpiryDate(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
   };
@@ -311,10 +351,10 @@ export const RawIngredients: React.FC = () => {
         i.unit,
         i.reorderPoint,
         i.safetyStock,
-        i.maxStock,
+        i.maxStock > 0 ? i.maxStock : 'N/A',
         i.expiryDate || 'N/A',
         exp.label,
-        i.costPerUnit,
+        i.costPerUnit > 0 ? i.costPerUnit : 'N/A',
         (i.currentStock * i.costPerUnit).toFixed(2),
         i.supplier,
         i.location,
@@ -327,6 +367,8 @@ export const RawIngredients: React.FC = () => {
   const clearFilters = () => {
     setSearch('');
     setSelectedCategory('all');
+    setSelectedLocation('all');
+    setStockFilter('all');
     setFilterExpiringSoonOnly(false);
   };
 
@@ -536,31 +578,63 @@ export const RawIngredients: React.FC = () => {
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="flex flex-col md:flex-row gap-3">
-        {/* Search Input */}
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
-          <input 
-            id="input-search-raw-ingredients"
-            type="text" 
-            placeholder="Search raw ingredients, packaging, SKU, supplier, location..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-11 pr-10 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-sm"
-          />
-          {search && (
-            <button 
-              onClick={() => setSearch('')}
-              className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 p-0.5 rounded-lg"
-              title="Clear search"
+      <div className="space-y-2.5">
+        <div className="flex flex-col lg:flex-row gap-2.5">
+          <div className="relative flex-1 min-w-0">
+            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+            <input
+              id="input-search-raw-ingredients"
+              type="text"
+              placeholder="Search raw materials, SKU, supplier, location..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-11 pr-10 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-sm"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 p-0.5 rounded-lg"
+                title="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="relative w-full lg:w-64 shrink-0">
+            <MapPin className="w-4 h-4 text-indigo-500 absolute left-3.5 top-3.5 pointer-events-none" />
+            <select
+              id="select-raw-storage-location"
+              value={selectedLocation}
+              onChange={e => setSelectedLocation(e.target.value)}
+              className="w-full appearance-none pl-10 pr-9 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
             >
-              <X className="w-4 h-4" />
-            </button>
-          )}
+              <option value="all">All Storage Locations</option>
+              {uniqueLocations.map(location => <option key={location} value={location}>{location}</option>)}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+          </div>
+
+          <div className="relative w-full lg:w-64 shrink-0">
+            <Filter className="w-4 h-4 text-indigo-500 absolute left-3.5 top-3.5 pointer-events-none" />
+            <select
+              id="select-raw-stock-status"
+              value={stockFilter}
+              onChange={e => setStockFilter(e.target.value as typeof stockFilter)}
+              className="w-full appearance-none pl-10 pr-9 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
+            >
+              <option value="all">All Stock Statuses</option>
+              <option value="low_stock">Below Safety Stock ({stockMetrics.lowStockCount})</option>
+              <option value="overstock">At or Above Max Stock ({stockMetrics.overstockCount})</option>
+              <option value="optimal">Optimal Stock Range</option>
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+          </div>
         </div>
 
-        {/* Category Filter Pills & Expiring Flag Pill */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Expiry and category filters remain available below the search row. */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {/* Quick Flag: Expiring within 7 Days */}
           <button
             type="button"
@@ -611,11 +685,13 @@ export const RawIngredients: React.FC = () => {
       </div>
 
       {/* Active Filter Indicators */}
-      {(search || selectedCategory !== 'all' || filterExpiringSoonOnly) && (
+      {(search || selectedCategory !== 'all' || selectedLocation !== 'all' || stockFilter !== 'all' || filterExpiringSoonOnly) && (
         <div className="flex items-center justify-between text-xs text-slate-500 px-1">
           <span>
             Showing <strong className="text-slate-800 font-bold">{filtered.length}</strong> of {ingredients.length} raw materials
             {selectedCategory !== 'all' && <> in <span className="font-semibold text-indigo-600 capitalize">{selectedCategory}</span></>}
+            {selectedLocation !== 'all' && <> at <span className="font-semibold text-indigo-600">{selectedLocation}</span></>}
+            {stockFilter !== 'all' && <> &bull; <span className="font-semibold text-indigo-600">{stockFilter === 'low_stock' ? 'Below Safety Stock' : stockFilter === 'overstock' ? 'At or Above Max Stock' : 'Optimal Stock Range'}</span></>}
             {filterExpiringSoonOnly && <> &bull; <span className="font-semibold text-amber-700">Flagged Expiring Within 7 Days</span></>}
             {search && <> matching "<span className="font-semibold text-slate-800">{search}</span>"</>}
           </span>
@@ -688,7 +764,7 @@ export const RawIngredients: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filtered.map(ing => {
+              {pagination.pageItems.map(ing => {
                 const exp = getIngredientExpiryInfo(ing.expiryDate);
                 const isBelowRop = ing.currentStock <= ing.reorderPoint;
                 const isBelowSafety = ing.currentStock <= ing.safetyStock;
@@ -737,7 +813,7 @@ export const RawIngredients: React.FC = () => {
                         </span>
                       ) : (
                         <span className="text-[10px] text-slate-400 font-medium block">
-                          Max: {ing.maxStock} {ing.unit}
+                          Max: {ing.maxStock > 0 ? `${ing.maxStock} ${ing.unit}` : 'N/A'}
                         </span>
                       )}
                     </td>
@@ -766,12 +842,13 @@ export const RawIngredients: React.FC = () => {
 
                     {/* Unit Cost */}
                     <td className="py-3.5 px-3">
-                      <span className="font-mono font-bold text-slate-900">₱{ing.costPerUnit}.00</span>
+                      <span className="font-mono font-bold text-slate-900">{ing.costPerUnit > 0 ? `₱${ing.costPerUnit}.00` : 'N/A'}</span>
                       <span className="text-slate-400 text-[10px] block">/ {ing.unit}</span>
                     </td>
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
+                      <div className="flex justify-end gap-2">
                       {!isDirectorReadOnly && (
                         <button
                           onClick={() => openAdjustModal(ing)}
@@ -781,6 +858,18 @@ export const RawIngredients: React.FC = () => {
                           <span>Update</span>
                         </button>
                       )}
+                      {canDeleteRecords && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteIngredient(ing)}
+                          aria-label={`Delete ${ing.name}`}
+                          title="Delete ingredient record"
+                          className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -796,7 +885,7 @@ export const RawIngredients: React.FC = () => {
       {/* ========================================================= */}
       {viewMode === 'grid' && filtered.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map(ing => {
+          {pagination.pageItems.map(ing => {
             const exp = getIngredientExpiryInfo(ing.expiryDate);
 
             return (
@@ -844,7 +933,7 @@ export const RawIngredients: React.FC = () => {
                   <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                     <span className="text-[11px] text-slate-500 block font-medium">Max Capacity</span>
                     <span className="font-extrabold font-mono text-sm text-slate-900">
-                      {ing.maxStock} {ing.unit}
+                      {ing.maxStock > 0 ? `${ing.maxStock} ${ing.unit}` : 'N/A'}
                     </span>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -865,8 +954,9 @@ export const RawIngredients: React.FC = () => {
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
                   <div className="text-[11px] text-slate-500 font-medium">
                     <span>Unit Cost: </span>
-                    <strong className="text-slate-900 font-mono font-bold">₱{ing.costPerUnit}.00</strong>
+                    <strong className="text-slate-900 font-mono font-bold">{ing.costPerUnit > 0 ? `₱${ing.costPerUnit}.00` : 'N/A'}</strong>
                   </div>
+                  <div className="flex items-center gap-2">
                   {!isDirectorReadOnly && (
                     <button
                       onClick={() => openAdjustModal(ing)}
@@ -876,12 +966,35 @@ export const RawIngredients: React.FC = () => {
                       <span>Update Stock</span>
                     </button>
                   )}
+                  {canDeleteRecords && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteIngredient(ing)}
+                      aria-label={`Delete ${ing.name}`}
+                      title="Delete ingredient record"
+                      className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white">
+        <TablePagination
+          totalItems={filtered.length}
+          pageIndex={pagination.pageIndex}
+          pageSize={pagination.pageSize}
+          pageCount={pagination.pageCount}
+          onPageChange={pagination.setPageIndex}
+          onPageSizeChange={pagination.setPageSize}
+        />
+      </div>
 
       {/* Update Stock & Expiry Modal */}
       {stockModalItem && !isDirectorReadOnly && (
@@ -998,7 +1111,7 @@ export const RawIngredients: React.FC = () => {
                     value={addSku} 
                     onChange={e => setAddSku(e.target.value)} 
                     placeholder="e.g. ING-842"
-                    className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                    className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1110,17 +1223,31 @@ export const RawIngredients: React.FC = () => {
                   )}
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Unit Cost (₱)</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    min="0"
-                    required 
-                    value={addUnitCost} 
-                    onChange={e => setAddUnitCost(e.target.value)} 
-                    placeholder="50"
-                    className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
-                  />
+                  <div className="mb-1 flex items-center justify-between gap-1">
+                    <label className="block font-bold text-slate-600">Unit Cost (₱)</label>
+                    <button
+                      type="button"
+                      aria-pressed={unitCostNotApplicable}
+                      onClick={() => setUnitCostNotApplicable(value => !value)}
+                      className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {unitCostNotApplicable ? 'Set value' : 'N/A'}
+                    </button>
+                  </div>
+                  {unitCostNotApplicable ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 font-semibold text-slate-500">N/A</div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      value={addUnitCost}
+                      onChange={e => setAddUnitCost(e.target.value)}
+                      placeholder="50"
+                      className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -1128,8 +1255,8 @@ export const RawIngredients: React.FC = () => {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-600 mb-1">Safety Stock</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="any"
                     min="0"
                     required 
@@ -1153,17 +1280,31 @@ export const RawIngredients: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Max Capacity</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    min="0"
-                    required 
-                    value={addMaxStock} 
-                    onChange={e => setAddMaxStock(e.target.value)} 
-                    placeholder="500"
-                    className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
-                  />
+                    <div className="mb-1 flex items-center justify-between gap-1">
+                    <label className="block font-bold text-slate-600">Max Capacity</label>
+                    <button
+                      type="button"
+                      aria-pressed={maxStockNotApplicable}
+                      onClick={() => setMaxStockNotApplicable(value => !value)}
+                      className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {maxStockNotApplicable ? 'Set value' : 'N/A'}
+                    </button>
+                  </div>
+                  {maxStockNotApplicable ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 font-semibold text-slate-500">N/A</div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      value={addMaxStock}
+                      onChange={e => setAddMaxStock(e.target.value)}
+                      placeholder="500"
+                      className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -1179,20 +1320,21 @@ export const RawIngredients: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsNonPerishable(!isNonPerishable)}
+                    aria-pressed={isNonPerishable}
                     className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition-all flex items-center space-x-1.5 border shadow-2xs ${
                       isNonPerishable 
                         ? 'bg-emerald-600 text-white border-emerald-700' 
                         : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-300'
                     }`}
                   >
-                    <span>{isNonPerishable ? '✓ Non-Perishable Item' : 'Mark as Non-Perishable'}</span>
+                    <span>{isNonPerishable ? '✓ Expiry: N/A · Non-perishable' : 'Mark expiry as N/A'}</span>
                   </button>
                 </div>
 
                 {isNonPerishable ? (
                   <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 text-[11px] flex items-center space-x-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Item marked as non-perishable (e.g. bottles, caps, dry cartons). Expiration alerts will be skipped.</span>
+                    <span>Expiry is not applicable for this item (e.g. bottles, caps, dry cartons). Expiration alerts will be skipped.</span>
                   </div>
                 ) : (
                   <div>
@@ -1241,12 +1383,24 @@ export const RawIngredients: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Storage Location / Bay</label>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label htmlFor="raw-material-storage-location" className="block font-bold text-slate-600">Storage Location / Bay</label>
+                    <button
+                      type="button"
+                      aria-pressed={addLocation.trim().toLowerCase() === 'n/a'}
+                      onClick={() => setAddLocation(addLocation.trim().toLowerCase() === 'n/a' ? 'Dry Storage Bay 1' : 'N/A')}
+                      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {addLocation.trim().toLowerCase() === 'n/a' ? 'Set location' : 'Location N/A'}
+                    </button>
+                  </div>
                   <input 
+                    id="raw-material-storage-location"
                     type="text" 
                     value={addLocation} 
                     onChange={e => setAddLocation(e.target.value)} 
                     placeholder="e.g., Dry Bay 1, Cold Vault A"
+                    disabled={addLocation.trim().toLowerCase() === 'n/a'}
                     className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" 
                   />
                 </div>

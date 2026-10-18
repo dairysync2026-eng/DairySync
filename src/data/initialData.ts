@@ -9,6 +9,8 @@ import {
   AuditLogEntry
 } from '../types';
 
+/*
+ * Sample data kept for reference only. Active defaults are empty below.
 export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'usr-dev',
@@ -717,3 +719,27 @@ export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [
     severity: 'info'
   }
 ];
+*/
+
+export const INITIAL_USERS: UserProfile[] = [];
+export const INITIAL_INGREDIENTS: RawIngredient[] = [];
+export const INITIAL_FINISHED_GOODS: FinishedGood[] = [];
+export const INITIAL_WIP_BATCHES: WipBatch[] = [];
+export const INITIAL_COMMITMENTS: SupplyDemandCommitment[] = [];
+export const INITIAL_ALERTS: SystemAlert[] = [];
+export const INITIAL_TRANSACTIONS: StockTransaction[] = [];
+export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
+
+export const SAMPLE_RECORD_IDS: Partial<Record<
+  'user_profile' | 'ingredient' | 'finished_good' | 'wip_batch' | 'commitment' | 'alert' | 'stock_adjustment' | 'audit_log',
+  readonly string[]
+>> = {
+  user_profile: ['usr-dev', 'usr-1', 'usr-2', 'usr-3', 'usr-4', 'usr-5'],
+  ingredient: ['ing-1', 'ing-2', 'ing-3', 'ing-4', 'ing-5', 'ing-6', 'ing-7', 'ing-8'],
+  finished_good: ['fg-1', 'fg-2', 'fg-3', 'fg-4', 'fg-5'],
+  wip_batch: ['wip-101', 'wip-102', 'wip-100', 'wip-099', 'wip-098'],
+  commitment: ['com-1', 'com-2', 'com-3'],
+  alert: ['overstock-fg-1', 'rop-ing-3', 'rop-ing-7', 'alt-4', 'fg-safety-fg-2', 'rop-ing-5'],
+  stock_adjustment: ['tx-101', 'tx-100'],
+  audit_log: ['audit-001', 'audit-002', 'audit-003', 'audit-004', 'audit-005', 'audit-006', 'audit-007'],
+};

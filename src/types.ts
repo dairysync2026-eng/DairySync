@@ -6,6 +6,24 @@ export type UserRole =
   | 'production_staff'     // Production Staff
   | 'store_outlet';       // Store Outlet (Dairy Box)
 
+export const USER_ROLES: readonly UserRole[] = [
+  'developer',
+  'director',
+  'procurement',
+  'plant_manager',
+  'production_staff',
+  'store_outlet',
+];
+
+export const USER_ROLE_LABELS: Record<UserRole, string> = {
+  developer: 'Lead Developer',
+  director: 'Director / PMO Supervisor',
+  procurement: 'Procurement',
+  plant_manager: 'Plant Manager',
+  production_staff: 'Production Staff',
+  store_outlet: 'Store Outlet',
+};
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -39,6 +57,37 @@ export interface RawIngredient {
   expiryDate?: string; // ISO date format YYYY-MM-DD
 }
 
+export interface PmoInventoryLine {
+  id: string;
+  itemName: string;
+  ingredientId?: string;
+  unit: string;
+  beginningQuantity?: number;
+  purchasesQuantity?: number;
+  issuedToProductionQuantity?: number;
+  lossOrReturnQuantity?: number;
+  lossOrReturnDirection?: 'decrease' | 'increase';
+  lossOrReturnType?: 'expired' | 'damage' | 'waste' | 'returned';
+  endingQuantity?: number;
+  liveLedger?: boolean;
+  notes?: string;
+  sourceRow?: string;
+}
+
+export type PmoInventoryPeriodStatus = 'draft' | 'posted';
+
+export interface PmoInventoryPeriod {
+  id: string;
+  title: string;
+  sourceFileName: string;
+  lines: PmoInventoryLine[];
+  createdAt: string;
+  createdBy: string;
+  status: PmoInventoryPeriodStatus;
+  postedAt?: string;
+  postedBy?: string;
+}
+
 export interface BomIngredientRequirement {
   ingredientId: string;
   ingredientName: string;
@@ -67,7 +116,17 @@ export interface FinishedGood {
   location: string;
 }
 
-export type WipStep = 'scheduled' | 'pasteurization' | 'homogenization' | 'cooling_bottling' | 'completed' | 'cancelled';
+export type WipStep = 'scheduled' | 'pasteurization' | 'cooling' | 'bottling_packaging' | 'completed' | 'cancelled';
+
+export function normalizeWipStep(status: string): WipStep {
+  if (status === 'homogenization') return 'cooling';
+  if (status === 'cooling_bottling') return 'bottling_packaging';
+  if (status === 'scheduled' || status === 'pasteurization' || status === 'cooling' ||
+      status === 'bottling_packaging' || status === 'completed' || status === 'cancelled') {
+    return status;
+  }
+  throw new Error(`Unsupported WIP batch status: ${status}`);
+}
 
 export interface WipBatch {
   id: string;
@@ -130,7 +189,17 @@ export interface StockTransaction {
   itemId: string;
   itemName: string;
   itemType: 'ingredient' | 'finished_good';
-  action: 'in_restock' | 'out_sale' | 'out_feeding' | 'wip_deduct' | 'wip_complete';
+  action:
+    | 'in_restock'
+    | 'out_sale'
+    | 'out_feeding'
+    | 'wip_deduct'
+    | 'wip_restore'
+    | 'wip_complete'
+    | 'inventory_loss'
+    | 'inventory_return'
+    | 'inventory_adjustment'
+    | 'inventory_reconciliation';
   quantity: number;
   unit: string;
   previousStock: number;

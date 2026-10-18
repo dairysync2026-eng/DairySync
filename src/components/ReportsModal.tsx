@@ -16,7 +16,7 @@ export const ReportsModal: React.FC<ReportsModalProps> = ({ onClose }) => {
   const grandTotalValue = totalIngredientValue + totalFinishedValue;
 
   const lowStockCount = ingredients.filter(i => i.currentStock <= i.reorderPoint).length;
-  const overstockCount = finishedGoods.filter(f => f.currentStock > f.maxThreshold).length;
+  const overstockCount = finishedGoods.filter(f => f.maxThreshold > 0 && f.currentStock > f.maxThreshold).length;
 
   const handlePrint = () => {
     window.print();
@@ -45,7 +45,7 @@ export const ReportsModal: React.FC<ReportsModalProps> = ({ onClose }) => {
     csv += "SKU,Name,Category,Current Stock,Unit,ROP,Safety Stock,Cost/Unit (PHP),Valuation (PHP),Supplier,Status\n";
     ingredients.forEach(i => {
       const status = i.currentStock <= i.safetyStock ? 'CRITICAL DEFICIT' : i.currentStock <= i.reorderPoint ? 'REORDER NEEDED' : 'OPTIMAL';
-      csv += `"${i.sku}","${i.name}","${i.category}",${i.currentStock},"${i.unit}",${i.reorderPoint},${i.safetyStock},${i.costPerUnit},${(i.currentStock * i.costPerUnit).toFixed(2)},"${i.supplier}","${status}"\n`;
+      csv += `"${i.sku}","${i.name}","${i.category}",${i.currentStock},"${i.unit}",${i.reorderPoint},${i.safetyStock},${i.costPerUnit > 0 ? i.costPerUnit : 'N/A'},${(i.currentStock * i.costPerUnit).toFixed(2)},"${i.supplier}","${status}"\n`;
     });
 
     csv += "\nCOLD STORAGE FINISHED GOODS\n";
@@ -70,8 +70,14 @@ export const ReportsModal: React.FC<ReportsModalProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto"
+        onClick={event => event.stopPropagation()}
+      >
         
         {/* Printable Header Controls */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 print:hidden">

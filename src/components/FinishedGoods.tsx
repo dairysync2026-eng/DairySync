@@ -20,12 +20,15 @@ import {
   TrendingDown,
   Layers,
   ChevronDown,
-  Printer
+  Printer,
+  Trash2
 } from 'lucide-react';
 import { BatchExpirationWidget } from './BatchExpirationWidget';
 import { PrintStockReportModal } from './PrintStockReportModal';
 import { ExportMenu } from './ExportMenu';
 import { downloadCsv } from '../utils/csv';
+import { usePagination } from '../hooks/usePagination';
+import { TablePagination } from './TablePagination';
 
 interface FinishedGoodsProps {
   onNavigateTab?: (tab: string) => void;
@@ -37,9 +40,19 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     updateFinishedGoodStock, 
     updateFinishedGoodSafetyStock,
     addFinishedGood,
-    currentRole
+    currentRole,
+    isDeveloperActive,
+    deleteFinishedGoodRecord
   } = useDairySync();
   const isDirectorReadOnly = currentRole === 'director';
+  const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
+
+  const handleDeleteFinishedGood = (product: FinishedGood) => {
+    if (!window.confirm(`Delete ${product.name} (${product.sku}) from Cold Storage? This removes the product record only; related sales and commitments will remain.`)) return;
+    if (!deleteFinishedGoodRecord(product.id)) {
+      window.alert('The finished good could not be deleted. Confirm you are signed in as the Lead Developer and try again.');
+    }
+  };
   
   // Search & Filter state
   const [search, setSearch] = useState('');
@@ -101,6 +114,8 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
   const [newColdStorageLimitStr, setNewColdStorageLimitStr] = useState<string>('500');
   const [newInitialStockStr, setNewInitialStockStr] = useState<string>('200');
   const [newSafetyStockStr, setNewSafetyStockStr] = useState<string>('50');
+  const [coldStorageLimitNotApplicable, setColdStorageLimitNotApplicable] = useState(false);
+  const [storageLocationNotApplicable, setStorageLocationNotApplicable] = useState(false);
 
   // Category definitions
   const categories: { key: string; label: string }[] = [
@@ -123,7 +138,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     const totalUnits = finishedGoods.reduce((sum, fg) => sum + fg.currentStock, 0);
     const totalValuation = finishedGoods.reduce((sum, fg) => sum + (fg.currentStock * fg.unitPrice), 0);
     const lowStockCount = finishedGoods.filter(fg => fg.currentStock <= (fg.safetyStock ?? 50)).length;
-    const overstockCount = finishedGoods.filter(fg => fg.currentStock >= fg.maxThreshold).length;
+    const overstockCount = finishedGoods.filter(fg => fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold).length;
 
     return {
       totalUnits,
@@ -156,14 +171,16 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       if (stockFilter === 'low_stock') {
         matchStock = fg.currentStock <= safetyStockVal;
       } else if (stockFilter === 'overstock') {
-        matchStock = fg.currentStock >= fg.maxThreshold;
+        matchStock = fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold;
       } else if (stockFilter === 'optimal') {
-        matchStock = fg.currentStock > safetyStockVal && fg.currentStock < fg.maxThreshold;
+        matchStock = fg.currentStock > safetyStockVal &&
+          (fg.maxThreshold <= 0 || fg.currentStock < fg.maxThreshold);
       }
 
       return matchSearch && matchCategory && matchLocation && matchStock;
     });
   }, [finishedGoods, search, selectedCategory, selectedLocation, stockFilter]);
+  const pagination = usePagination(filteredGoods);
 
   const hasActiveFilters = search !== '' || selectedCategory !== 'all' || selectedLocation !== 'all' || stockFilter !== 'all';
 
@@ -192,12 +209,15 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     if (!newFg.name) return;
 
     const parsedUnitPrice = Math.max(0, parseFloat(newUnitPriceStr) || 0);
-    const parsedColdStorageCapacity = Math.max(1, parseFloat(newColdStorageLimitStr) || 100);
+    const parsedColdStorageCapacity = coldStorageLimitNotApplicable
+      ? 0
+      : Math.max(1, parseFloat(newColdStorageLimitStr) || 100);
     const parsedCurrentStock = Math.max(0, parseFloat(newInitialStockStr) || 0);
     const parsedSafetyStock = Math.max(0, parseFloat(newSafetyStockStr) || 0);
 
     addFinishedGood({
       ...newFg,
+      location: storageLocationNotApplicable ? 'N/A' : newFg.location,
       unitPrice: parsedUnitPrice,
       coldStorageCapacity: parsedColdStorageCapacity,
       maxThreshold: Math.round(parsedColdStorageCapacity * 0.9),
@@ -227,6 +247,8 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     });
     setNewUnitPriceStr('50');
     setNewColdStorageLimitStr('500');
+    setColdStorageLimitNotApplicable(false);
+    setStorageLocationNotApplicable(false);
     setNewInitialStockStr('200');
     setNewSafetyStockStr('50');
   };
@@ -604,11 +626,13 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       {/* ========================================================= */}
       {viewMode === 'grid' && filteredGoods.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredGoods.map(fg => {
+          {pagination.pageItems.map(fg => {
             const safetyStockVal = fg.safetyStock ?? 50;
             const isLowStock = fg.currentStock <= safetyStockVal;
-            const isOverstock = fg.currentStock >= fg.maxThreshold;
-            const capacityPercent = Math.min(100, Math.round((fg.currentStock / fg.coldStorageCapacity) * 100));
+            const isOverstock = fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold;
+            const capacityPercent = fg.coldStorageCapacity > 0
+              ? Math.min(100, Math.round((fg.currentStock / fg.coldStorageCapacity) * 100))
+              : 0;
 
             return (
               <div 
@@ -662,16 +686,20 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600">
                     <span>Vault Utilization</span>
-                    <span className="font-mono font-bold text-slate-900">{capacityPercent}% ({fg.currentStock}/{fg.coldStorageCapacity} {fg.unit})</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {fg.coldStorageCapacity > 0
+                        ? `${capacityPercent}% (${fg.currentStock}/${fg.coldStorageCapacity} ${fg.unit})`
+                        : `${fg.currentStock} ${fg.unit} · Capacity N/A`}
+                    </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                  {fg.coldStorageCapacity > 0 && <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                     <div 
                       className={`h-full transition-all duration-300 ${
                         isLowStock ? 'bg-rose-500' : isOverstock ? 'bg-amber-500' : 'bg-teal-500'
                       }`}
                       style={{ width: `${capacityPercent}%` }}
                     />
-                  </div>
+                  </div>}
                 </div>
 
                 {/* Stock Details Matrix */}
@@ -685,7 +713,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                   <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                     <span className="text-[11px] text-slate-500 block font-medium">Vault Capacity</span>
                     <span className="font-extrabold font-mono text-sm text-slate-900">
-                      {fg.coldStorageCapacity} {fg.unit}
+                      {fg.coldStorageCapacity > 0 ? `${fg.coldStorageCapacity} ${fg.unit}` : 'N/A'}
                     </span>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
@@ -729,6 +757,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                     <span className="text-slate-400 ml-1.5 font-mono text-[10px]">({fg.shelfLifeDays}d FEFO)</span>
                   </div>
 
+                  <div className="flex items-center gap-2">
                   {!isDirectorReadOnly && (
                     <button
                       onClick={() => openAdjustModal(fg)}
@@ -738,6 +767,18 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                       <span>Adjust Stock</span>
                     </button>
                   )}
+                  {canDeleteRecords && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteFinishedGood(fg)}
+                      aria-label={`Delete ${fg.name}`}
+                      title="Delete finished good record"
+                      className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  </div>
                 </div>
 
               </div>
@@ -782,11 +823,13 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredGoods.map(fg => {
+              {pagination.pageItems.map(fg => {
                 const safetyStockVal = fg.safetyStock ?? 50;
                 const isLowStock = fg.currentStock <= safetyStockVal;
-                const isOverstock = fg.currentStock >= fg.maxThreshold;
-                const capacityPercent = Math.min(100, Math.round((fg.currentStock / fg.coldStorageCapacity) * 100));
+                const isOverstock = fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold;
+                const capacityPercent = fg.coldStorageCapacity > 0
+                  ? Math.min(100, Math.round((fg.currentStock / fg.coldStorageCapacity) * 100))
+                  : 0;
 
                 return (
                   <tr 
@@ -832,7 +875,9 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                     {/* Cold Stock / Capacity */}
                     <td className="py-3.5 px-3">
                       <div className="font-mono text-xs font-bold text-slate-900">
-                        {fg.currentStock} / {fg.coldStorageCapacity} {fg.unit}
+                        {fg.coldStorageCapacity > 0
+                          ? `${fg.currentStock} / ${fg.coldStorageCapacity} ${fg.unit}`
+                          : `${fg.currentStock} ${fg.unit} / N/A capacity`}
                       </div>
                       <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200 mt-1">
                         <div 
@@ -870,6 +915,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
 
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
+                      <div className="flex justify-end gap-2">
                       {!isDirectorReadOnly && (
                         <button
                           onClick={() => openAdjustModal(fg)}
@@ -879,6 +925,18 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                           <span>Adjust</span>
                         </button>
                       )}
+                      {canDeleteRecords && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteFinishedGood(fg)}
+                          aria-label={`Delete ${fg.name}`}
+                          title="Delete finished good record"
+                          className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -886,6 +944,19 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
             </tbody>
           </table>
           </div>
+        </div>
+      )}
+
+      {filteredGoods.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white">
+          <TablePagination
+            totalItems={filteredGoods.length}
+            pageIndex={pagination.pageIndex}
+            pageSize={pagination.pageSize}
+            pageCount={pagination.pageCount}
+            onPageChange={pagination.setPageIndex}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </div>
       )}
 
@@ -922,8 +993,8 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                 {/* Current Stock Count */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Current Stock Count</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="any"
                     min="0"
                     required
@@ -984,8 +1055,8 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Ledger / Cold Storage Audit Note</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="e.g. Audit reconciliation, physical count or buffer update"
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
@@ -1052,17 +1123,31 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Cold Storage Limit</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    min="1"
-                    required
-                    value={newColdStorageLimitStr}
-                    onChange={e => setNewColdStorageLimitStr(e.target.value)}
-                    placeholder="e.g. 500"
-                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
-                  />
+                  <div className="mb-1 flex items-center justify-between gap-1">
+                    <label className="block text-xs font-bold text-slate-700">Cold Storage Limit</label>
+                    <button
+                      type="button"
+                      aria-pressed={coldStorageLimitNotApplicable}
+                      onClick={() => setColdStorageLimitNotApplicable(value => !value)}
+                      className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {coldStorageLimitNotApplicable ? 'Set value' : 'N/A'}
+                    </button>
+                  </div>
+                  {coldStorageLimitNotApplicable ? (
+                    <div className="rounded-2xl border-2 border-slate-200 bg-slate-100 px-3.5 py-2.5 text-xs font-semibold text-slate-500">N/A</div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="any"
+                      min="1"
+                      required
+                      value={newColdStorageLimitStr}
+                      onChange={e => setNewColdStorageLimitStr(e.target.value)}
+                      placeholder="e.g. 500"
+                      className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -1096,14 +1181,28 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Storage Location Vault</label>
-                <input 
-                  type="text" 
-                  value={newFg.location}
-                  onChange={e => setNewFg({ ...newFg, location: e.target.value })}
-                  placeholder="e.g. Cold Storage Room 1 - Rack A"
-                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm"
-                />
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="block text-xs font-bold text-slate-500">Storage Location Vault</label>
+                  <button
+                    type="button"
+                    aria-pressed={storageLocationNotApplicable}
+                    onClick={() => setStorageLocationNotApplicable(value => !value)}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100"
+                  >
+                    {storageLocationNotApplicable ? 'Set location' : 'N/A'}
+                  </button>
+                </div>
+                {storageLocationNotApplicable ? (
+                  <div className="rounded-2xl border-2 border-slate-200 bg-slate-100 px-3.5 py-2.5 text-xs font-semibold text-slate-500">N/A</div>
+                ) : (
+                  <input
+                    type="text"
+                    value={newFg.location}
+                    onChange={e => setNewFg({ ...newFg, location: e.target.value })}
+                    placeholder="e.g. Cold Storage Room 1 - Rack A"
+                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                )}
               </div>
 
               <div className="pt-2 flex justify-end space-x-3">

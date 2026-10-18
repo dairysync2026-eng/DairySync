@@ -139,3 +139,45 @@ mutation UpdateFinishedGoodRecipe(
     updatedBy_expr: "auth.uid"
   })
 }
+
+query ListPmoInventoryPeriods
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff']")
+  @refresh(onMutationExecuted: { operation: "UpsertPmoInventoryPeriod" }) {
+  pmoInventoryPeriods(orderBy: [{ createdAt: DESC }]) {
+    id
+    title
+    sourceFileName
+    lines
+    createdAt
+    createdBy
+    status
+    postedAt
+    postedBy
+  }
+}
+
+mutation UpsertPmoInventoryPeriod(
+  $id: String!
+  $title: String!
+  $sourceFileName: String!
+  $lines: [Any!]!
+  $createdAt: String!
+  $createdBy: String!
+  $status: String!
+  $postedAt: String
+  $postedBy: String
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'procurement', 'plant_manager']") {
+  pmoInventoryPeriod_upsert(data: {
+    id: $id
+    title: $title
+    sourceFileName: $sourceFileName
+    lines: $lines
+    createdAt: $createdAt
+    createdBy: $createdBy
+    status: $status
+    postedAt: $postedAt
+    postedBy: $postedBy
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}

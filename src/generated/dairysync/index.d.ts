@@ -174,6 +174,20 @@ export interface ListIsoRatingsData {
   } & IsoEvaluationRating_Key)[];
 }
 
+export interface ListPmoInventoryPeriodsData {
+  pmoInventoryPeriods: ({
+    id: string;
+    title: string;
+    sourceFileName: string;
+    lines: unknown[];
+    createdAt: string;
+    createdBy: string;
+    status?: string | null;
+    postedAt?: string | null;
+    postedBy?: string | null;
+  } & PmoInventoryPeriod_Key)[];
+}
+
 export interface ListRawIngredientsData {
   rawIngredients: ({
     id: string;
@@ -260,6 +274,11 @@ export interface ListWipBatchesData {
     notes?: string | null;
     coldStorageTemp: string;
   } & WipBatch_Key)[];
+}
+
+export interface PmoInventoryPeriod_Key {
+  id: string;
+  __typename?: 'PmoInventoryPeriod_Key';
 }
 
 export interface RawIngredient_Key {
@@ -455,6 +474,22 @@ export interface UpsertIsoRatingVariables {
   safety: number;
   comments: string;
   date: string;
+}
+
+export interface UpsertPmoInventoryPeriodData {
+  pmoInventoryPeriod_upsert: PmoInventoryPeriod_Key;
+}
+
+export interface UpsertPmoInventoryPeriodVariables {
+  id: string;
+  title: string;
+  sourceFileName: string;
+  lines: unknown[];
+  createdAt: string;
+  createdBy: string;
+  status: string;
+  postedAt?: string | null;
+  postedBy?: string | null;
 }
 
 export interface UpsertRawIngredientData {
@@ -683,6 +718,30 @@ export const updateFinishedGoodRecipeRef: UpdateFinishedGoodRecipeRef;
 
 export function updateFinishedGoodRecipe(vars: UpdateFinishedGoodRecipeVariables): MutationPromise<UpdateFinishedGoodRecipeData, UpdateFinishedGoodRecipeVariables>;
 export function updateFinishedGoodRecipe(dc: DataConnect, vars: UpdateFinishedGoodRecipeVariables): MutationPromise<UpdateFinishedGoodRecipeData, UpdateFinishedGoodRecipeVariables>;
+
+interface ListPmoInventoryPeriodsRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListPmoInventoryPeriodsData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): QueryRef<ListPmoInventoryPeriodsData, undefined>;
+  operationName: string;
+}
+export const listPmoInventoryPeriodsRef: ListPmoInventoryPeriodsRef;
+
+export function listPmoInventoryPeriods(options?: ExecuteQueryOptions): QueryPromise<ListPmoInventoryPeriodsData, undefined>;
+export function listPmoInventoryPeriods(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListPmoInventoryPeriodsData, undefined>;
+
+interface UpsertPmoInventoryPeriodRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertPmoInventoryPeriodVariables): MutationRef<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpsertPmoInventoryPeriodVariables): MutationRef<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+  operationName: string;
+}
+export const upsertPmoInventoryPeriodRef: UpsertPmoInventoryPeriodRef;
+
+export function upsertPmoInventoryPeriod(vars: UpsertPmoInventoryPeriodVariables): MutationPromise<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+export function upsertPmoInventoryPeriod(dc: DataConnect, vars: UpsertPmoInventoryPeriodVariables): MutationPromise<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
 
 interface ListFinishedGoodsRef {
   /* Allow users to create refs without passing in DataConnect */

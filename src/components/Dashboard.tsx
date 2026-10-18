@@ -166,7 +166,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <div className="mt-3">
                 <span className="text-3xl font-black text-indigo-600 font-mono">{activeWip.length}</span>
                 <span className="text-xs text-indigo-500 font-bold ml-1.5">Batches Running</span>
-                <p className="text-[11px] text-slate-500 mt-1 font-medium">Undergoing pasteurization / bottling</p>
+                <p className="text-[11px] text-slate-500 mt-1 font-medium">Scheduled, pasteurization, cooling, or bottling</p>
               </div>
             </div>
 

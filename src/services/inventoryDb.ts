@@ -17,7 +17,8 @@ export interface OfflineSyncQueueItem {
     | 'alert'
     | 'iso_rating'
     | 'audit_log'
-    | 'user_profile';
+    | 'user_profile'
+    | 'pmo_inventory_period';
   payload: any;
   userEmail?: string;
   userUid?: string;
@@ -276,6 +277,26 @@ export async function getPendingOfflineActions(): Promise<OfflineSyncQueueItem[]
   } catch {
     return [];
   }
+}
+
+export async function removePendingSampleWrites(
+  entity: OfflineSyncQueueItem['entity'],
+  sampleIds: readonly string[]
+): Promise<void> {
+  if (sampleIds.length === 0) return;
+  const sampleIdSet = new Set(sampleIds);
+  const pending = await getPendingOfflineActions();
+  const queuedWrites = pending.filter(item =>
+    item.entity === entity &&
+    item.action !== 'SQL_DELETE' &&
+    item.action !== 'DELETE_RAW_INGREDIENT' &&
+    typeof item.payload?.id === 'string' &&
+    sampleIdSet.has(item.payload.id)
+  );
+  await Promise.all(queuedWrites.map(item => item.id === undefined
+    ? Promise.resolve()
+    : removeOfflineAction(item.id)
+  ));
 }
 
 export async function removeOfflineAction(id: number): Promise<void> {
