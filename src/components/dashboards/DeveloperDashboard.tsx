@@ -28,6 +28,7 @@ import {
   Plus
 } from 'lucide-react';
 import { ScrambleText } from '../decryption/ScrambleText';
+import { isAtOrBelowBuffer } from '../../utils/inventoryThresholds';
 
 interface SubsystemDashboardProps {
   onNavigateTab: (tab: string) => void;
@@ -180,7 +181,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
       id: 'procurement',
       name: 'ROP Procurement Desk',
       desc: 'Reorder Point calculations, automated POs & lead times',
-      count: `${ingredients.filter(i => i.currentStock <= i.reorderPoint).length} low stock alerts`,
+      count: `${ingredients.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint)).length} low stock alerts`,
       icon: Truck,
       color: 'emerald'
     },

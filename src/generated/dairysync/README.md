@@ -28,6 +28,7 @@ This README will guide you through the process of using the generated JavaScript
   - [*DeleteStockTransaction*](#deletestocktransaction)
   - [*UpdateFinishedGoodRecipe*](#updatefinishedgoodrecipe)
   - [*UpsertPmoInventoryPeriod*](#upsertpmoinventoryperiod)
+  - [*DeletePmoInventoryPeriod*](#deletepmoinventoryperiod)
   - [*UpsertFinishedGood*](#upsertfinishedgood)
   - [*SetRetailFinishedGoodStock*](#setretailfinishedgoodstock)
   - [*DeleteFinishedGood*](#deletefinishedgood)
@@ -2356,6 +2357,115 @@ executeMutation(ref).then((response) => {
 });
 ```
 
+## DeletePmoInventoryPeriod
+You can execute the `DeletePmoInventoryPeriod` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+deletePmoInventoryPeriod(vars: DeletePmoInventoryPeriodVariables): MutationPromise<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+
+interface DeletePmoInventoryPeriodRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeletePmoInventoryPeriodVariables): MutationRef<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+}
+export const deletePmoInventoryPeriodRef: DeletePmoInventoryPeriodRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+deletePmoInventoryPeriod(dc: DataConnect, vars: DeletePmoInventoryPeriodVariables): MutationPromise<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+
+interface DeletePmoInventoryPeriodRef {
+  ...
+  (dc: DataConnect, vars: DeletePmoInventoryPeriodVariables): MutationRef<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+}
+export const deletePmoInventoryPeriodRef: DeletePmoInventoryPeriodRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the deletePmoInventoryPeriodRef:
+```typescript
+const name = deletePmoInventoryPeriodRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `DeletePmoInventoryPeriod` mutation requires an argument of type `DeletePmoInventoryPeriodVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface DeletePmoInventoryPeriodVariables {
+  id: string;
+}
+```
+### Return Type
+Recall that executing the `DeletePmoInventoryPeriod` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `DeletePmoInventoryPeriodData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface DeletePmoInventoryPeriodData {
+  pmoInventoryPeriod_delete?: PmoInventoryPeriod_Key | null;
+}
+```
+### Using `DeletePmoInventoryPeriod`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, deletePmoInventoryPeriod, DeletePmoInventoryPeriodVariables } from '@dataconnect/dairysync-generated';
+
+// The `DeletePmoInventoryPeriod` mutation requires an argument of type `DeletePmoInventoryPeriodVariables`:
+const deletePmoInventoryPeriodVars: DeletePmoInventoryPeriodVariables = {
+  id: ...,
+};
+
+// Call the `deletePmoInventoryPeriod()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await deletePmoInventoryPeriod(deletePmoInventoryPeriodVars);
+// Variables can be defined inline as well.
+const { data } = await deletePmoInventoryPeriod({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await deletePmoInventoryPeriod(dataConnect, deletePmoInventoryPeriodVars);
+
+console.log(data.pmoInventoryPeriod_delete);
+
+// Or, you can use the `Promise` API.
+deletePmoInventoryPeriod(deletePmoInventoryPeriodVars).then((response) => {
+  const data = response.data;
+  console.log(data.pmoInventoryPeriod_delete);
+});
+```
+
+### Using `DeletePmoInventoryPeriod`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, deletePmoInventoryPeriodRef, DeletePmoInventoryPeriodVariables } from '@dataconnect/dairysync-generated';
+
+// The `DeletePmoInventoryPeriod` mutation requires an argument of type `DeletePmoInventoryPeriodVariables`:
+const deletePmoInventoryPeriodVars: DeletePmoInventoryPeriodVariables = {
+  id: ...,
+};
+
+// Call the `deletePmoInventoryPeriodRef()` function to get a reference to the mutation.
+const ref = deletePmoInventoryPeriodRef(deletePmoInventoryPeriodVars);
+// Variables can be defined inline as well.
+const ref = deletePmoInventoryPeriodRef({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = deletePmoInventoryPeriodRef(dataConnect, deletePmoInventoryPeriodVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.pmoInventoryPeriod_delete);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.pmoInventoryPeriod_delete);
+});
+```
+
 ## UpsertFinishedGood
 You can execute the `UpsertFinishedGood` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
 ```typescript
@@ -4357,4 +4467,3 @@ executeMutation(ref).then((response) => {
   console.log(data.userProfile_delete);
 });
 ```
-

@@ -282,7 +282,7 @@ export const AuditTrail: React.FC = () => {
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                Local browser audit records for user actions, BOM deductions, WIP step advances & cold storage changes
+                Auditable user actions, BOM deductions, WIP step advances & cold-storage changes
               </p>
             </div>
           </div>
@@ -323,9 +323,9 @@ export const AuditTrail: React.FC = () => {
           <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Audit Logs</p>
           <div className="flex items-baseline justify-between mt-1">
             <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">{stats.total}</span>
-            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Browser Local</span>
+            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">Live records</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1 truncate">Cloud SQL audit API is not configured</p>
+          <p className="text-[11px] text-slate-500 mt-1 truncate">Synced through Firebase Data Connect</p>
         </div>
 
         <div className="bg-white border-2 border-slate-200 rounded-3xl p-4 sm:p-5 shadow-sm">

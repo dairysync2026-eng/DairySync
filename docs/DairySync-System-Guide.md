@@ -27,7 +27,7 @@ The application is designed around the PCC-MMSU workflow:
 
 ### Source-verified storage note
 
-Authentication uses Firebase Authentication Email/Password with a trusted Firebase custom `role` claim. Operational collections are connected to Firebase SQL Connect operations, which enforce role checks server-side; localStorage and IndexedDB remain caches and offline storage. The SQL Connect service and Cloud SQL instance must still be provisioned and deployed before the hosted app uses this backend.
+Authentication uses Firebase Authentication Email/Password with a trusted Firebase custom `role` claim. Each browser tab has an independent session, so different accounts and role-specific dashboards can be used in separate tabs at the same time. Operational collections are connected to Firebase SQL Connect operations, which enforce role checks server-side; localStorage and IndexedDB remain caches and offline storage. The SQL Connect service and Cloud SQL instance must still be provisioned and deployed before the hosted app uses this backend.
 
 ---
 

@@ -48,6 +48,14 @@ export interface DeleteIsoRatingVariables {
   id: string;
 }
 
+export interface DeletePmoInventoryPeriodData {
+  pmoInventoryPeriod_delete?: PmoInventoryPeriod_Key | null;
+}
+
+export interface DeletePmoInventoryPeriodVariables {
+  id: string;
+}
+
 export interface DeleteRawIngredientData {
   rawIngredient_delete?: RawIngredient_Key | null;
 }
@@ -742,6 +750,18 @@ export const upsertPmoInventoryPeriodRef: UpsertPmoInventoryPeriodRef;
 
 export function upsertPmoInventoryPeriod(vars: UpsertPmoInventoryPeriodVariables): MutationPromise<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
 export function upsertPmoInventoryPeriod(dc: DataConnect, vars: UpsertPmoInventoryPeriodVariables): MutationPromise<UpsertPmoInventoryPeriodData, UpsertPmoInventoryPeriodVariables>;
+
+interface DeletePmoInventoryPeriodRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeletePmoInventoryPeriodVariables): MutationRef<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: DeletePmoInventoryPeriodVariables): MutationRef<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+  operationName: string;
+}
+export const deletePmoInventoryPeriodRef: DeletePmoInventoryPeriodRef;
+
+export function deletePmoInventoryPeriod(vars: DeletePmoInventoryPeriodVariables): MutationPromise<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+export function deletePmoInventoryPeriod(dc: DataConnect, vars: DeletePmoInventoryPeriodVariables): MutationPromise<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
 
 interface ListFinishedGoodsRef {
   /* Allow users to create refs without passing in DataConnect */

@@ -3,6 +3,7 @@ import { useDairySync } from '../context/DairySyncContext';
 import { FileText, X, Printer, Download, CheckCircle2, AlertTriangle, Layers, Award, ShieldCheck } from 'lucide-react';
 import { downloadAuditTrailPdf } from '../utils/auditPdfGenerator';
 import { ExportMenu } from './ExportMenu';
+import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 interface ReportsModalProps {
   onClose: () => void;
@@ -15,7 +16,7 @@ export const ReportsModal: React.FC<ReportsModalProps> = ({ onClose }) => {
   const totalFinishedValue = finishedGoods.reduce((sum, f) => sum + (f.currentStock * f.unitPrice), 0);
   const grandTotalValue = totalIngredientValue + totalFinishedValue;
 
-  const lowStockCount = ingredients.filter(i => i.currentStock <= i.reorderPoint).length;
+  const lowStockCount = ingredients.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint)).length;
   const overstockCount = finishedGoods.filter(f => f.maxThreshold > 0 && f.currentStock > f.maxThreshold).length;
 
   const handlePrint = () => {
@@ -44,7 +45,11 @@ export const ReportsModal: React.FC<ReportsModalProps> = ({ onClose }) => {
     csv += "RAW INGREDIENTS AUDIT\n";
     csv += "SKU,Name,Category,Current Stock,Unit,ROP,Safety Stock,Cost/Unit (PHP),Valuation (PHP),Supplier,Status\n";
     ingredients.forEach(i => {
-      const status = i.currentStock <= i.safetyStock ? 'CRITICAL DEFICIT' : i.currentStock <= i.reorderPoint ? 'REORDER NEEDED' : 'OPTIMAL';
+      const status = isAtOrBelowBuffer(i.currentStock, i.safetyStock)
+        ? 'CRITICAL DEFICIT'
+        : isAtOrBelowBuffer(i.currentStock, i.reorderPoint)
+          ? 'REORDER NEEDED'
+          : 'OPTIMAL';
       csv += `"${i.sku}","${i.name}","${i.category}",${i.currentStock},"${i.unit}",${i.reorderPoint},${i.safetyStock},${i.costPerUnit > 0 ? i.costPerUnit : 'N/A'},${(i.currentStock * i.costPerUnit).toFixed(2)},"${i.supplier}","${status}"\n`;
     });
 

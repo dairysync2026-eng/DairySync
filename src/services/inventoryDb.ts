@@ -299,6 +299,23 @@ export async function removePendingSampleWrites(
   ));
 }
 
+export async function removePendingWritesForRecord(
+  entity: OfflineSyncQueueItem['entity'],
+  recordId: string
+): Promise<void> {
+  const pending = await getPendingOfflineActions();
+  const queuedWrites = pending.filter(item =>
+    item.entity === entity &&
+    item.action !== 'SQL_DELETE' &&
+    item.action !== 'DELETE_RAW_INGREDIENT' &&
+    item.payload?.id === recordId
+  );
+  await Promise.all(queuedWrites.map(item => item.id === undefined
+    ? Promise.resolve()
+    : removeOfflineAction(item.id)
+  ));
+}
+
 export async function removeOfflineAction(id: number): Promise<void> {
   const db = await openInventoryDb();
   await new Promise<void>((resolve, reject) => {

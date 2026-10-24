@@ -14,6 +14,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { WipBatch, WipStep } from '../../types';
+import { isAtOrBelowBuffer } from '../../utils/inventoryThresholds';
 
 interface SubsystemDashboardProps {
   onNavigateTab: (tab: string) => void;
@@ -308,8 +309,8 @@ export const ProductionStaffDashboard: React.FC<SubsystemDashboardProps> = ({ on
                 </div>
                 <div className="text-right">
                   <p className="font-mono font-bold text-slate-900">{ing.currentStock} {ing.unit}</p>
-                  <span className={`text-[10px] font-bold ${ing.currentStock > ing.reorderPoint ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {ing.currentStock > ing.reorderPoint ? 'Ready' : 'Low Buffer'}
+                  <span className={`text-[10px] font-bold ${!isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint) ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint) ? 'Low Buffer' : 'Ready'}
                   </span>
                 </div>
               </div>

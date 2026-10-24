@@ -35,7 +35,7 @@ The script obtains the short-lived OAuth access token through `gcloud auth appli
 
 After creating the Firebase account and assigning its role claim, sign into DairySync as a developer and open **Command Center > Manage All Account Users > Add Staff Profile**. Enter the account's Firebase email, a unique username, the same role, and the staff member's profile details. This adds the shared directory profile; it does not create a Firebase login or change Firebase credentials. Each person must sign in with their own Firebase email and password.
 
-Authenticated sessions are automatically signed out after 10 minutes without user activity. Pointer, keyboard, scroll, and focus activity resets the timer, and activity is shared between open DairySync tabs.
+Each browser tab keeps its own Firebase sign-in session. Open DairySync in a separate tab and sign in with the other account to use different roles and dashboards at the same time; signing out or reaching the inactivity limit in one tab does not sign out another. A tab's sign-in survives refreshes in that tab, and new tabs require their own sign-in. Authenticated sessions are automatically signed out after 10 minutes without activity in that tab. Pointer, keyboard, scroll, and focus activity resets that tab's timer.
 
 ### PCC-MMSU Staff Role Mapping
 

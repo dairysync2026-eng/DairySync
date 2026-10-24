@@ -16,6 +16,17 @@ interface ProfileEditModalProps {
   onClose: () => void;
 }
 
+const isValidProfilePicture = (value: string) => {
+  if (/^data:image\/[^;,]+;base64,[A-Za-z0-9+/]*={0,2}$/i.test(value)) return true;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
   const { currentUser, updateUserProfile } = useDairySync();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,20 +46,32 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
   // Handle local file upload for profile picture
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setErrorMsg('Image size exceeds 2MB limit. Please choose a smaller photo.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          setAvatar(reader.result);
-          setErrorMsg(null);
-        }
-      };
-      reader.readAsDataURL(file);
+    e.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Please choose a valid image file.');
+      return;
     }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg('Image size exceeds 2MB limit. Please choose a smaller photo.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAvatar(reader.result);
+        setErrorMsg(null);
+      }
+    };
+    reader.onerror = () => {
+      setErrorMsg('Could not read this image. Please choose another file.');
+    };
+    reader.onabort = () => {
+      setErrorMsg('Image upload was interrupted. Please try again.');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -72,13 +95,19 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
       return;
     }
 
+    const profilePicture = avatar.trim();
+    if (profilePicture && !isValidProfilePicture(profilePicture)) {
+      setErrorMsg('Enter a valid HTTP(S) image URL or upload an image file.');
+      return;
+    }
+
     setIsSubmitting(true);
     const updates = {
         name: name.trim(),
         title: title.trim(),
         username: username.trim(),
         nickname: nickname.trim(),
-        avatar: avatar.trim() || currentUser.avatar
+        avatar: profilePicture || currentUser.avatar
       };
     const result = updateUserProfile(currentUser.id, updates);
     setIsSubmitting(false);
@@ -254,10 +283,11 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) =
                 {/* Direct URL input and File upload */}
                 <div className="flex items-center space-x-2">
                   <input
-                    type="url"
+                    type="text"
                     value={avatar}
                     onChange={(e) => setAvatar(e.target.value)}
-                    placeholder="Enter an image URL..."
+                    placeholder="Enter an HTTP(S) image URL or upload a photo..."
+                    autoComplete="off"
                     className="flex-1 text-xs px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                   />
                   <input 

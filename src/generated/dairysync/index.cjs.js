@@ -185,6 +185,20 @@ exports.upsertPmoInventoryPeriod = function upsertPmoInventoryPeriod(dcOrVars, v
 }
 ;
 
+const deletePmoInventoryPeriodRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'DeletePmoInventoryPeriod', inputVars);
+}
+deletePmoInventoryPeriodRef.operationName = 'DeletePmoInventoryPeriod';
+exports.deletePmoInventoryPeriodRef = deletePmoInventoryPeriodRef;
+
+exports.deletePmoInventoryPeriod = function deletePmoInventoryPeriod(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(deletePmoInventoryPeriodRef(dcInstance, inputVars));
+}
+;
+
 const listFinishedGoodsRef = (dc) => {
   const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
   dcInstance._useGeneratedSdk();

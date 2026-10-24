@@ -2,6 +2,7 @@ import { Dispatch, SetStateAction, useEffect, useRef } from 'react';
 import {
   enqueueOfflineAction,
   getPendingOfflineActions,
+  removePendingWritesForRecord,
   removeOfflineAction,
   removePendingSampleWrites,
   OfflineSyncQueueItem,
@@ -343,6 +344,7 @@ export function useSqlConnectCollection<T extends { id: string }>({
         }
       }
       for (const id of removed) {
+        await removePendingWritesForRecord(entity, id);
         try {
           await adapter.remove(id);
         } catch (error) {

@@ -80,9 +80,17 @@ export const calculatePmoExpectedEnding = (
       signedAdjustment;
   }
   return line.beginningQuantity +
-    activity.purchases -
+    (line.purchasesQuantity ?? activity.purchases) -
     activity.issuedToProduction -
     activity.losses +
     activity.returns +
     activity.adjustments;
+};
+
+export const calculatePmoIssuedToProduction = (
+  line: PmoInventoryLine,
+  purchases: number,
+): number | null => {
+  if (line.beginningQuantity === undefined || line.endingQuantity === undefined) return null;
+  return purchases + line.beginningQuantity - line.endingQuantity;
 };

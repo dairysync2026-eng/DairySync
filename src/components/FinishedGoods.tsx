@@ -11,7 +11,7 @@ import {
   DollarSign,
   Download,
   Search,
-  Filter,
+  SlidersHorizontal,
   AlertTriangle,
   CheckCircle2,
   MapPin,
@@ -19,7 +19,7 @@ import {
   LayoutGrid,
   TrendingDown,
   Layers,
-  ChevronDown,
+  Pencil,
   Printer,
   Trash2
 } from 'lucide-react';
@@ -29,6 +29,7 @@ import { ExportMenu } from './ExportMenu';
 import { downloadCsv } from '../utils/csv';
 import { usePagination } from '../hooks/usePagination';
 import { TablePagination } from './TablePagination';
+import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 interface FinishedGoodsProps {
   onNavigateTab?: (tab: string) => void;
@@ -40,6 +41,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     updateFinishedGoodStock, 
     updateFinishedGoodSafetyStock,
     addFinishedGood,
+    updateFinishedGoodRecord,
     currentRole,
     isDeveloperActive,
     deleteFinishedGoodRecord
@@ -59,10 +61,12 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low_stock' | 'overstock' | 'optimal'>('all');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingFinishedGood, setEditingFinishedGood] = useState<FinishedGood | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [stockModalItem, setStockModalItem] = useState<FinishedGood | null>(null);
   const [adjustQtyStr, setAdjustQtyStr] = useState<string>('0');
@@ -117,6 +121,32 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
   const [coldStorageLimitNotApplicable, setColdStorageLimitNotApplicable] = useState(false);
   const [storageLocationNotApplicable, setStorageLocationNotApplicable] = useState(false);
 
+  const resetFinishedGoodDraft = () => {
+    setNewFg({
+      sku: 'FG-' + Math.floor(100 + Math.random() * 900),
+      name: '',
+      category: 'fresh_milk',
+      currentStock: 200,
+      safetyStock: 50,
+      unit: 'bottles',
+      coldStorageCapacity: 500,
+      maxThreshold: 450,
+      unitPrice: 50,
+      allocatedFeedingProgram: 100,
+      allocatedRetail: 100,
+      batchUnitQuantity: 100,
+      shelfLifeDays: 14,
+      location: 'Cold Storage Room 1 - Rack A',
+      recipe: []
+    });
+    setNewUnitPriceStr('50');
+    setNewColdStorageLimitStr('500');
+    setColdStorageLimitNotApplicable(false);
+    setStorageLocationNotApplicable(false);
+    setNewInitialStockStr('200');
+    setNewSafetyStockStr('50');
+  };
+
   // Category definitions
   const categories: { key: string; label: string }[] = [
     { key: 'all', label: 'All Categories' },
@@ -137,7 +167,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
   const stockMetrics = useMemo(() => {
     const totalUnits = finishedGoods.reduce((sum, fg) => sum + fg.currentStock, 0);
     const totalValuation = finishedGoods.reduce((sum, fg) => sum + (fg.currentStock * fg.unitPrice), 0);
-    const lowStockCount = finishedGoods.filter(fg => fg.currentStock <= (fg.safetyStock ?? 50)).length;
+    const lowStockCount = finishedGoods.filter(fg => isAtOrBelowBuffer(fg.currentStock, fg.safetyStock ?? 50)).length;
     const overstockCount = finishedGoods.filter(fg => fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold).length;
 
     return {
@@ -169,11 +199,11 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       const safetyStockVal = fg.safetyStock ?? 50;
       let matchStock = true;
       if (stockFilter === 'low_stock') {
-        matchStock = fg.currentStock <= safetyStockVal;
+        matchStock = isAtOrBelowBuffer(fg.currentStock, safetyStockVal);
       } else if (stockFilter === 'overstock') {
         matchStock = fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold;
       } else if (stockFilter === 'optimal') {
-        matchStock = fg.currentStock > safetyStockVal &&
+        matchStock = !isAtOrBelowBuffer(fg.currentStock, safetyStockVal) &&
           (fg.maxThreshold <= 0 || fg.currentStock < fg.maxThreshold);
       }
 
@@ -206,7 +236,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newFg.name) return;
+    if (!newFg.name.trim()) return;
 
     const parsedUnitPrice = Math.max(0, parseFloat(newUnitPriceStr) || 0);
     const parsedColdStorageCapacity = coldStorageLimitNotApplicable
@@ -215,7 +245,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     const parsedCurrentStock = Math.max(0, parseFloat(newInitialStockStr) || 0);
     const parsedSafetyStock = Math.max(0, parseFloat(newSafetyStockStr) || 0);
 
-    addFinishedGood({
+    const productData: Omit<FinishedGood, 'id'> = {
       ...newFg,
       location: storageLocationNotApplicable ? 'N/A' : newFg.location,
       unitPrice: parsedUnitPrice,
@@ -225,32 +255,46 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       allocatedFeedingProgram: Math.floor(parsedCurrentStock / 2),
       allocatedRetail: Math.ceil(parsedCurrentStock / 2),
       safetyStock: parsedSafetyStock
-    });
+    };
+
+    if (editingFinishedGood) {
+      const updatedProduct: FinishedGood = {
+        ...productData,
+        id: editingFinishedGood.id,
+        sku: newFg.sku.trim(),
+        name: newFg.name.trim(),
+        allocatedFeedingProgram: editingFinishedGood.allocatedFeedingProgram,
+        allocatedRetail: editingFinishedGood.allocatedRetail,
+      };
+      if (!updateFinishedGoodRecord(updatedProduct)) {
+        window.alert('The finished good could not be updated. Confirm you are signed in as the Lead Developer and check the entered values.');
+        return;
+      }
+      setEditingFinishedGood(null);
+    } else {
+      addFinishedGood(productData);
+    }
 
     setShowAddModal(false);
-    setNewFg({
-      sku: 'FG-' + Math.floor(100 + Math.random() * 900),
-      name: '',
-      category: 'fresh_milk',
-      currentStock: 200,
-      safetyStock: 50,
-      unit: 'bottles',
-      coldStorageCapacity: 500,
-      maxThreshold: 450,
-      unitPrice: 50,
-      allocatedFeedingProgram: 100,
-      allocatedRetail: 100,
-      batchUnitQuantity: 100,
-      shelfLifeDays: 14,
-      location: 'Cold Storage Room 1 - Rack A',
-      recipe: []
-    });
-    setNewUnitPriceStr('50');
-    setNewColdStorageLimitStr('500');
-    setColdStorageLimitNotApplicable(false);
-    setStorageLocationNotApplicable(false);
-    setNewInitialStockStr('200');
-    setNewSafetyStockStr('50');
+    resetFinishedGoodDraft();
+  };
+
+  const openEditFinishedGood = (product: FinishedGood) => {
+    if (!canDeleteRecords) return;
+    setEditingFinishedGood(product);
+    setNewFg({ ...product });
+    setNewUnitPriceStr(String(product.unitPrice));
+    setNewColdStorageLimitStr(String(product.coldStorageCapacity));
+    setNewInitialStockStr(String(product.currentStock));
+    setNewSafetyStockStr(String(product.safetyStock ?? 0));
+    setColdStorageLimitNotApplicable(product.coldStorageCapacity <= 0);
+    setStorageLocationNotApplicable(product.location.trim().toLowerCase() === 'n/a');
+    setShowAddModal(true);
+  };
+
+  const closeProductForm = () => {
+    setShowAddModal(false);
+    setEditingFinishedGood(null);
   };
 
   const handleExportFinishedGoodsCsv = () => {
@@ -291,41 +335,25 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     <div className="space-y-6">
       
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border-2 border-slate-200 p-6 rounded-3xl shadow-sm text-slate-900">
+      <div className="flex flex-col gap-4 bg-white border-2 border-slate-200 p-5 sm:p-6 rounded-3xl shadow-sm text-slate-900">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center space-x-2 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center space-x-2 tracking-tight">
             <Snowflake className="w-6 h-6 text-teal-600" />
             <span>Finished Goods &amp; Cold Storage Management</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
             Cold storage vault inventory tracking, safety buffers &amp; FEFO (First-Expiry First-Out) alignment
           </p>
           {isDirectorReadOnly && <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Director / PMO · Read only</span>}
         </div>
 
-        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-          {/* View Toggle (Grid / Table) */}
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-            <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold mr-1">
-              <button
-                id="view-toggle-grid"
-                type="button"
-                onClick={() => setViewMode('grid')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
-                  viewMode === 'grid'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Grid Cards View"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Grid</span>
-              </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-100 p-1 text-xs font-bold">
               <button
                 id="view-toggle-table"
                 type="button"
                 onClick={() => setViewMode('table')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
+                className={`flex items-center space-x-1 rounded-xl px-3 py-1.5 transition-all ${
                   viewMode === 'table'
                     ? 'bg-white text-indigo-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -335,28 +363,51 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                 <LayoutList className="w-3.5 h-3.5" />
                 <span>Table</span>
               </button>
+              <button
+                id="view-toggle-grid"
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`flex items-center space-x-1 rounded-xl px-3 py-1.5 transition-all ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-indigo-700 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Grid Cards View"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>Grid</span>
+              </button>
             </div>
 
             <button
               id="btn-print-finished-goods-hardcopy"
               type="button"
               onClick={() => setShowPrintModal(true)}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-200 transition-all cursor-pointer"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-700 shadow-sm transition-all hover:bg-slate-200"
               title="Generate and print cold storage physical inventory hard copy"
+              aria-label="Print cold storage inventory report"
             >
-              <Printer className="w-4 h-4 text-slate-600" />
+              <Printer className="h-4 w-4" />
             </button>
-            <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportFinishedGoodsCsv} />
-          </div>
-
-          {!isDirectorReadOnly && <button
-            id="btn-add-finished-product"
-            onClick={() => setShowAddModal(true)}
-            className="flex w-full items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-sm transition-all sm:w-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add New Product</span>
-          </button>}
+          {!isDirectorReadOnly && (
+            <button
+              id="btn-add-finished-product"
+              onClick={() => {
+                setEditingFinishedGood(null);
+                resetFinishedGoodDraft();
+                setShowAddModal(true);
+              }}
+              className="flex min-h-11 items-center justify-center space-x-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Product</span>
+            </button>
+          )}
+          <ExportMenu
+            onPdf={() => setShowPrintModal(true)}
+            onCsv={handleExportFinishedGoodsCsv}
+            className="flex h-11 items-center justify-center space-x-1.5 rounded-2xl border border-indigo-500 bg-indigo-600 px-4 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700"
+          />
         </div>
       </div>
 
@@ -446,102 +497,113 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       {/* ========================================================= */}
       {/* SEARCH AND FILTER BAR CONTROLS FOR COLD STORAGE */}
       {/* ========================================================= */}
-      <div className="space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+      <div className="space-y-0 rounded-3xl border-2 border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input 
               id="input-search-cold-storage"
               type="text" 
               placeholder="Search cold storage goods, SKU, room location (e.g. Rack A, Room 1)..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-11 pr-10 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-sm"
+              className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-2.5 pl-10 pr-10 text-xs text-slate-900 placeholder-slate-400 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none sm:text-sm"
             />
             {search && (
               <button 
                 id="btn-clear-cold-search"
+                type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 p-0.5 rounded-lg"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-lg p-0.5 text-slate-400 hover:text-slate-600"
                 title="Clear search"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-
-          {/* Location Selector */}
-          <div className="relative min-w-[210px]">
-            <div className="absolute left-3.5 top-3.5 pointer-events-none text-slate-400">
-              <MapPin className="w-4 h-4 text-indigo-500" />
-            </div>
-            <select
-              id="select-storage-location"
-              value={selectedLocation}
-              onChange={e => setSelectedLocation(e.target.value)}
-              className="w-full pl-10 pr-9 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-800 appearance-none focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              id="btn-finished-goods-filters"
+              aria-expanded={isFiltersOpen}
+              onClick={() => setIsFiltersOpen(open => !open)}
+              className={`flex items-center justify-center space-x-2 rounded-2xl border px-4 py-2.5 text-xs font-bold transition-all ${
+                isFiltersOpen || selectedCategory !== 'all' || selectedLocation !== 'all' || stockFilter !== 'all'
+                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
             >
-              <option value="all">All Cold Storage Vaults</option>
-              {uniqueLocations.map(loc => (
-                <option key={loc} value={loc}>{loc}</option>
-              ))}
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
-          </div>
-
-          {/* Stock Level Selector */}
-          <div className="relative min-w-[190px]">
-            <div className="absolute left-3.5 top-3.5 pointer-events-none text-slate-400">
-              <Filter className="w-4 h-4 text-indigo-500" />
-            </div>
-            <select
-              id="select-stock-status"
-              value={stockFilter}
-              onChange={e => setStockFilter(e.target.value as any)}
-              className="w-full pl-10 pr-9 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-800 appearance-none focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
-            >
-              <option value="all">All Stock Statuses</option>
-              <option value="low_stock">Below Safety Buffer ({stockMetrics.lowStockCount})</option>
-              <option value="overstock">Overstock Risk ({stockMetrics.overstockCount})</option>
-              <option value="optimal">Optimal Stock Range</option>
-            </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
-          </div>
-
-        </div>
-
-        {/* Category Filter Pills & Quick Badges */}
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {categories.map(cat => {
-            const count = cat.key === 'all'
-              ? finishedGoods.length
-              : finishedGoods.filter(fg => fg.category === cat.key).length;
-            const isSelected = selectedCategory === cat.key;
-
-            return (
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Filters</span>
+              {(selectedCategory !== 'all' || selectedLocation !== 'all' || stockFilter !== 'all') && (
+                <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-600" />
+              )}
+            </button>
+            {hasActiveFilters && (
               <button
-                key={cat.key}
-                id={`filter-cat-${cat.key}`}
+                id="btn-reset-cold-filters"
                 type="button"
-                onClick={() => setSelectedCategory(cat.key)}
-                className={`px-3.5 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-white border-2 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
+                onClick={clearAllFilters}
+                className="rounded-2xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                title="Reset all filters"
               >
-                <span>{cat.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                  isSelected ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {count}
-                </span>
+                Reset
               </button>
-            );
-          })}
+            )}
+          </div>
         </div>
+        {isFiltersOpen && (
+          <div className="mt-4 grid grid-cols-1 gap-3 border-t-2 border-slate-100 pt-4 animate-in fade-in duration-150 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label htmlFor="select-finished-category-filter" className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Category
+              </label>
+              <select
+                id="select-finished-category-filter"
+                value={selectedCategory}
+                onChange={event => setSelectedCategory(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+              >
+                {categories.map(category => {
+                  const count = category.key === 'all'
+                    ? finishedGoods.length
+                    : finishedGoods.filter(product => product.category === category.key).length;
+                  return <option key={category.key} value={category.key}>{category.label} ({count})</option>;
+                })}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="select-storage-location" className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Storage Location
+              </label>
+              <select
+                id="select-storage-location"
+                value={selectedLocation}
+                onChange={event => setSelectedLocation(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="all">All Cold Storage Vaults</option>
+                {uniqueLocations.map(location => <option key={location} value={location}>{location}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="select-stock-status" className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                Stock Status
+              </label>
+              <select
+                id="select-stock-status"
+                value={stockFilter}
+                onChange={event => setStockFilter(event.target.value as typeof stockFilter)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="all">All Stock Statuses</option>
+                <option value="low_stock">Below Safety Buffer ({stockMetrics.lowStockCount})</option>
+                <option value="overstock">Overstock Risk ({stockMetrics.overstockCount})</option>
+                <option value="optimal">Optimal Stock Range</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Active Filter Indicators */}
@@ -628,7 +690,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {pagination.pageItems.map(fg => {
             const safetyStockVal = fg.safetyStock ?? 50;
-            const isLowStock = fg.currentStock <= safetyStockVal;
+            const isLowStock = isAtOrBelowBuffer(fg.currentStock, safetyStockVal);
             const isOverstock = fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold;
             const capacityPercent = fg.coldStorageCapacity > 0
               ? Math.min(100, Math.round((fg.currentStock / fg.coldStorageCapacity) * 100))
@@ -758,6 +820,18 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                   </div>
 
                   <div className="flex items-center gap-2">
+                  {canDeleteRecords && (
+                    <button
+                      type="button"
+                      onClick={() => openEditFinishedGood(fg)}
+                      aria-label={`Edit ${fg.name}`}
+                      title="Edit finished good details and stock"
+                      className="flex items-center space-x-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  )}
                   {!isDirectorReadOnly && (
                     <button
                       onClick={() => openAdjustModal(fg)}
@@ -825,7 +899,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
             <tbody className="divide-y divide-slate-100">
               {pagination.pageItems.map(fg => {
                 const safetyStockVal = fg.safetyStock ?? 50;
-                const isLowStock = fg.currentStock <= safetyStockVal;
+                const isLowStock = isAtOrBelowBuffer(fg.currentStock, safetyStockVal);
                 const isOverstock = fg.maxThreshold > 0 && fg.currentStock >= fg.maxThreshold;
                 const capacityPercent = fg.coldStorageCapacity > 0
                   ? Math.min(100, Math.round((fg.currentStock / fg.coldStorageCapacity) * 100))
@@ -916,6 +990,18 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex justify-end gap-2">
+                      {canDeleteRecords && (
+                        <button
+                          type="button"
+                          onClick={() => openEditFinishedGood(fg)}
+                          aria-label={`Edit ${fg.name}`}
+                          title="Edit finished good details and stock"
+                          className="inline-flex items-center space-x-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                      )}
                       {!isDirectorReadOnly && (
                         <button
                           onClick={() => openAdjustModal(fg)}
@@ -1085,17 +1171,31 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
       )}
 
       {/* Add Product Modal */}
-      {showAddModal && !isDirectorReadOnly && (
+      {(showAddModal || (editingFinishedGood && canDeleteRecords)) && !isDirectorReadOnly && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-200 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-slate-900">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-extrabold text-lg text-slate-900">Add New Finished Good</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-900">
+              <h3 className="font-extrabold text-lg text-slate-900">
+                {editingFinishedGood ? 'Update Finished Good' : 'Add New Finished Good'}
+              </h3>
+              <button onClick={closeProductForm} className="text-slate-400 hover:text-slate-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleAddSubmit} className="space-y-4">
+              {editingFinishedGood && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">SKU / Item Code</label>
+                  <input
+                    type="text"
+                    required
+                    value={newFg.sku}
+                    onChange={e => setNewFg({ ...newFg, sku: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono focus:outline-none focus:border-indigo-500 shadow-sm"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">Product Title *</label>
                 <input 
@@ -1153,7 +1253,9 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Initial Stock (bottles)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {editingFinishedGood ? 'Current Stock' : 'Initial Stock'} ({newFg.unit})
+                  </label>
                   <input 
                     type="number" 
                     step="any"
@@ -1208,7 +1310,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
               <div className="pt-2 flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeProductForm}
                   className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl"
                 >
                   Cancel
@@ -1217,7 +1319,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                   type="submit"
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-2xl shadow-md shadow-indigo-100"
                 >
-                  Save Product
+                  {editingFinishedGood ? 'Save Changes' : 'Save Product'}
                 </button>
               </div>
             </form>

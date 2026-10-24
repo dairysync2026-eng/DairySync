@@ -13,6 +13,7 @@ import {
   Calendar,
   AlertTriangle
 } from 'lucide-react';
+import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 interface PrintStockReportModalProps {
   type: 'raw_ingredients' | 'cold_storage';
@@ -62,8 +63,8 @@ export const PrintStockReportModal: React.FC<PrintStockReportModalProps> = ({
     : (itemsToPrint as FinishedGood[]).reduce((sum, fg) => sum + (fg.currentStock * fg.unitPrice), 0);
 
   const lowStockCount = isRaw
-    ? (itemsToPrint as RawIngredient[]).filter(ing => ing.currentStock <= ing.reorderPoint).length
-    : (itemsToPrint as FinishedGood[]).filter(fg => fg.currentStock <= (fg.safetyStock ?? 50)).length;
+    ? (itemsToPrint as RawIngredient[]).filter(ing => isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint)).length
+    : (itemsToPrint as FinishedGood[]).filter(fg => isAtOrBelowBuffer(fg.currentStock, fg.safetyStock ?? 50)).length;
 
   const handleTriggerPrint = () => {
     window.print();
@@ -255,7 +256,7 @@ export const PrintStockReportModal: React.FC<PrintStockReportModalProps> = ({
                 </thead>
                 <tbody>
                   {(itemsToPrint as RawIngredient[]).map((ing, idx) => {
-                    const isBelowRop = ing.currentStock <= ing.reorderPoint;
+                    const isBelowRop = isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint);
                     const itemValue = ing.currentStock * ing.costPerUnit;
 
                     return (
@@ -352,7 +353,7 @@ export const PrintStockReportModal: React.FC<PrintStockReportModalProps> = ({
                 <tbody>
                   {(itemsToPrint as FinishedGood[]).map((fg, idx) => {
                     const safetyStockVal = fg.safetyStock ?? 50;
-                    const isLowStock = fg.currentStock <= safetyStockVal;
+                    const isLowStock = isAtOrBelowBuffer(fg.currentStock, safetyStockVal);
                     const itemValue = fg.currentStock * fg.unitPrice;
 
                     return (

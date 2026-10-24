@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Award
 } from 'lucide-react';
+import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 interface DashboardProps {
   onNavigateTab: (tab: string) => void;
@@ -47,10 +48,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Role-Specific Summary Card Computations
   // 1. Procurement Metrics (Warehouse & Procurement staff)
-  const criticalRopCount = ingredients.filter(i => i.currentStock <= i.reorderPoint).length;
+  const criticalRopCount = ingredients.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint)).length;
   const rawMilk = ingredients.find(i => i.category === 'milk');
   const packagingItems = ingredients.filter(i => i.category === 'packaging');
-  const lowPackagingCount = packagingItems.filter(i => i.currentStock <= i.reorderPoint).length;
+  const lowPackagingCount = packagingItems.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint)).length;
   const totalRawValuation = ingredients.reduce((sum, i) => sum + (i.currentStock * i.costPerUnit), 0);
 
   // 2. Production Metrics (Supervisors & Production staff)

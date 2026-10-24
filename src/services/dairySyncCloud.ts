@@ -13,6 +13,7 @@ import {
   deleteCommitment,
   deleteFinishedGood,
   deleteIsoRating,
+  deletePmoInventoryPeriod,
   deleteRawIngredient,
   deleteStockTransaction,
   deleteSystemAlert,
@@ -183,7 +184,16 @@ export function subscribeToStockTransactions(
 
 export async function saveStockTransaction(transaction: StockTransaction): Promise<void> {
   await upsertStockTransaction(dataConnect, {
-    ...transaction,
+    id: transaction.id,
+    timestamp: transaction.timestamp,
+    itemId: transaction.itemId,
+    itemName: transaction.itemName,
+    itemType: transaction.itemType,
+    action: transaction.action,
+    quantity: transaction.quantity,
+    unit: transaction.unit,
+    previousStock: transaction.previousStock,
+    newStock: transaction.newStock,
     referenceId: transaction.referenceId ?? null,
     unitPrice: transaction.unitPrice ?? null,
     notes: transaction.notes ?? null,
@@ -265,9 +275,17 @@ async function seedHistoricalIsoRating(rating: IsoEvaluationRating): Promise<voi
 
 async function saveAuditLog(entry: AuditLogEntry): Promise<void> {
   await upsertAuditLogEntry(dataConnect, {
-    ...entry,
+    id: entry.id,
+    timestamp: entry.timestamp,
+    category: entry.category,
+    subsystem: entry.subsystem,
+    action: entry.action,
+    description: entry.description,
     details: entry.details ?? null,
+    userName: entry.userName,
+    userTitle: entry.userTitle,
     terminalOrStation: entry.terminalOrStation ?? null,
+    severity: entry.severity,
   });
 }
 
@@ -387,8 +405,8 @@ export const sqlConnectCollections = {
   commitment: createCollectionAdapter(listCommitmentsRef(dataConnect), 'supplyDemandCommitments', mapCommitment, saveCommitment, async id => { await deleteCommitment(dataConnect, { id }); }),
   alert: createCollectionAdapter(listSystemAlertsRef(dataConnect), 'systemAlerts', mapSystemAlert, saveSystemAlert, async id => { await deleteSystemAlert(dataConnect, { id }); }),
   stock_adjustment: createCollectionAdapter(listStockTransactionsRef(dataConnect), 'stockTransactions', mapStockTransaction, saveStockTransaction, removeStockTransaction, seedHistoricalStockTransaction),
-  pmo_inventory_period: createCollectionAdapter(listPmoInventoryPeriodsRef(dataConnect), 'pmoInventoryPeriods', mapPmoInventoryPeriod, savePmoInventoryPeriod, async () => {
-    throw new Error('PMO inventory periods are retained as inventory history and cannot be deleted here.');
+  pmo_inventory_period: createCollectionAdapter(listPmoInventoryPeriodsRef(dataConnect), 'pmoInventoryPeriods', mapPmoInventoryPeriod, savePmoInventoryPeriod, async id => {
+    await deletePmoInventoryPeriod(dataConnect, { id });
   }),
   iso_rating: createCollectionAdapter(listIsoRatingsRef(dataConnect), 'isoEvaluationRatings', mapIsoRating, saveIsoRating, async id => { await deleteIsoRating(dataConnect, { id }); }, seedHistoricalIsoRating),
   audit_log: createCollectionAdapter(listAuditLogEntriesRef(dataConnect), 'auditLogEntries', mapAuditLog, saveAuditLog, async id => { await deleteAuditLogEntry(dataConnect, { id }); }, seedHistoricalAuditLog),

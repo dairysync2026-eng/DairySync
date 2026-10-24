@@ -3,6 +3,7 @@ import { useDairySync } from '../context/DairySyncContext';
 import { Truck, AlertTriangle, CheckCircle2, ShoppingBag, Send, FileText, Trash2 } from 'lucide-react';
 import { usePagination } from '../hooks/usePagination';
 import { TablePagination } from './TablePagination';
+import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 export const Procurement: React.FC = () => {
   const { ingredients, updateIngredientStock, currentRole, isDeveloperActive, deleteIngredientRecord } = useDairySync();
@@ -11,7 +12,7 @@ export const Procurement: React.FC = () => {
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const pagination = usePagination(ingredients);
 
-  const ropTriggered = ingredients.filter(i => i.currentStock <= i.reorderPoint);
+  const ropTriggered = ingredients.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint));
 
   const handleSimulateRestock = (id: string, ropQty: number) => {
     if (isDirectorReadOnly) return;

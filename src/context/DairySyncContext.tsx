@@ -58,6 +58,7 @@ import {
 } from '../data/initialData';
 import { auth } from '../services/firebase';
 import { calculatePmoExpectedEnding, getPmoInventoryActivity } from '../utils/pmoInventoryLedger';
+import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
   developer: ['dashboard', 'ingredients', 'pmo_inventory', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
@@ -117,8 +118,10 @@ interface DairySyncContextType {
   
   // Actions
   addIngredient: (ingredient: Omit<RawIngredient, 'id'>) => void;
+  updateIngredientRecord: (ingredient: RawIngredient) => boolean;
   updateIngredientStock: (id: string, newStock: number, notes?: string, expiryDate?: string) => boolean;
   addFinishedGood: (product: Omit<FinishedGood, 'id'>) => void;
+  updateFinishedGoodRecord: (product: FinishedGood) => boolean;
   updateFinishedGoodRecipe: (
     id: string,
     recipe: BomIngredientRequirement[],
@@ -212,11 +215,6 @@ const DairySyncContext = createContext<DairySyncContextType | undefined>(undefin
 
 const LOCAL_STORAGE_KEY = 'dairysync_pcc_mmsu_state_v1';
 const AUTH_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
-const AUTH_LAST_ACTIVITY_KEY = 'dairysync_auth_last_activity';
-const IS_PAGE_RELOAD = typeof performance !== 'undefined' &&
-  performance.getEntriesByType('navigation').some(
-    entry => (entry as PerformanceNavigationTiming).type === 'reload'
-  );
 const AUDIT_HISTORY_CLEAR_BEFORE = Date.parse('2026-10-14T23:59:59+08:00');
 const SCREENSHOT_RAW_INGREDIENT_ID = 'ing-1791910661741-2wtls13';
 const SCREENSHOT_PRODUCT_IDS = new Set([
@@ -386,7 +384,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [authError, setAuthError] = useState<string | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [authenticatedRole, setAuthenticatedRole] = useState<UserRole | null>(null);
-  const didSignOutOnReload = useRef(false);
 
   const [currentRole, setCurrentRoleState] = useState<UserRole>('production_staff');
 
@@ -408,24 +405,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           setIsAuthenticated(false);
           setDeveloperActive(false);
           setIsAuthReady(true);
-          return;
-        }
-
-        if (IS_PAGE_RELOAD && !didSignOutOnReload.current) {
-          didSignOutOnReload.current = true;
-          try {
-            await firebaseSignOut(auth);
-            setAuthError('You were signed out because the app was reloaded. Please sign in again.');
-          } catch (error) {
-            console.error('Automatic sign-out after page reload failed:', error);
-            setAuthError('Could not securely end the previous session. Please sign in again.');
-            setFirebaseUser(null);
-            setAuthenticatedRole(null);
-            setIsAuthenticated(false);
-            setDeveloperActive(false);
-          } finally {
-            setIsAuthReady(true);
-          }
           return;
         }
 
@@ -465,7 +444,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!isAuthenticated || !firebaseUser) return;
 
     let lastActivityAt = Date.now();
-    let lastBroadcastAt = 0;
     let timeoutId = 0;
 
     const scheduleSignOut = () => {
@@ -485,30 +463,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }, Math.max(remaining, 0));
     };
 
-    const broadcastActivity = (timestamp: number) => {
-      try {
-        localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(timestamp));
-      } catch (error) {
-        console.warn('Could not share activity with other DairySync tabs:', error);
-      }
-    };
-
     const handleActivity = () => {
       lastActivityAt = Date.now();
-      scheduleSignOut();
-
-      if (lastActivityAt - lastBroadcastAt >= 1000) {
-        lastBroadcastAt = lastActivityAt;
-        broadcastActivity(lastActivityAt);
-      }
-    };
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== AUTH_LAST_ACTIVITY_KEY || !event.newValue) return;
-      const sharedActivityAt = Number(event.newValue);
-      if (!Number.isFinite(sharedActivityAt) || sharedActivityAt <= lastActivityAt) return;
-
-      lastActivityAt = sharedActivityAt;
       scheduleSignOut();
     };
 
@@ -522,10 +478,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     activityEvents.forEach(eventName => {
       window.addEventListener(eventName, handleActivity, { passive: true });
     });
-    window.addEventListener('storage', handleStorage);
-    lastActivityAt = Date.now();
-    lastBroadcastAt = lastActivityAt;
-    broadcastActivity(lastActivityAt);
     scheduleSignOut();
 
     return () => {
@@ -533,7 +485,6 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       activityEvents.forEach(eventName => {
         window.removeEventListener(eventName, handleActivity);
       });
-      window.removeEventListener('storage', handleStorage);
     };
   }, [isAuthenticated, firebaseUser?.uid]);
   
@@ -1209,19 +1160,23 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Automated Checker for ROP Alerts & Overstock Flags
   useEffect(() => {
     setAlerts(prev => {
-      const seen = new Set<string>();
+      const dedupedIds = new Set<string>();
       const deduped = prev.filter(a => {
-        if (seen.has(a.id)) return false;
-        seen.add(a.id);
+        if (dedupedIds.has(a.id)) return false;
+        dedupedIds.add(a.id);
         return true;
       });
-
-      let changed = deduped.length !== prev.length;
-      const nextAlerts = [...deduped];
+      const inactiveBufferAlertIds = new Set([
+        ...ingredients.filter(ing => ing.reorderPoint <= 0).map(ing => `rop-${ing.id}`),
+        ...finishedGoods.filter(fg => (fg.safetyStock ?? 0) <= 0).map(fg => `fg-safety-${fg.id}`),
+      ]);
+      const nextAlerts = deduped.filter(alert => !inactiveBufferAlertIds.has(alert.id));
+      const seen = new Set(nextAlerts.map(alert => alert.id));
+      let changed = nextAlerts.length !== prev.length;
 
       // Check ingredients for ROP
       ingredients.forEach(ing => {
-        if (ing.currentStock <= ing.reorderPoint) {
+        if (isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint)) {
           const alertId = `rop-${ing.id}`;
           if (!seen.has(alertId)) {
             seen.add(alertId);
@@ -1231,7 +1186,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               type: 'rop_triggered',
               title: `REORDER POINT: ${ing.name}`,
               message: `Stock (${ing.currentStock} ${ing.unit}) has dropped below ROP (${ing.reorderPoint} ${ing.unit}). Immediate procurement required.`,
-              severity: ing.currentStock <= ing.safetyStock ? 'critical' : 'warning',
+              severity: isAtOrBelowBuffer(ing.currentStock, ing.safetyStock) ? 'critical' : 'warning',
               read: false,
               targetRole: ['procurement', 'plant_manager', 'director']
             });
@@ -1261,7 +1216,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
 
         // Check finished goods for safety stock buffer breach
-        if (typeof fg.safetyStock === 'number' && fg.currentStock <= fg.safetyStock) {
+        if (isAtOrBelowBuffer(fg.currentStock, fg.safetyStock)) {
           const alertId = `fg-safety-${fg.id}`;
           if (!seen.has(alertId)) {
             seen.add(alertId);
@@ -1761,7 +1716,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           unit: targetIng.unit,
           reason: notes || 'Warehouse inventory adjustment'
         },
-        severity: diff < 0 && newStock <= targetIng.reorderPoint ? 'warning' : 'info'
+        severity: diff < 0 && isAtOrBelowBuffer(newStock, targetIng.reorderPoint) ? 'warning' : 'info'
       });
     }
     triggerManualCloudSync();
@@ -1884,7 +1839,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           unit: targetFg.unit,
           reason: notes || 'Cold storage audit count'
         },
-        severity: newStock <= targetFg.safetyStock ? 'warning' : 'info'
+        severity: isAtOrBelowBuffer(newStock, targetFg.safetyStock) ? 'warning' : 'info'
       });
     }
     triggerManualCloudSync();
@@ -2806,6 +2761,154 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     isDeveloperActive &&
     currentRole === 'developer';
 
+  const updateIngredientRecord = (ingredient: RawIngredient) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    const target = ingredients.find(item => item.id === ingredient.id);
+    if (!target) return false;
+
+    const numericValues = [
+      ingredient.currentStock,
+      ingredient.costPerUnit,
+      ingredient.safetyStock,
+      ingredient.reorderPoint,
+      ingredient.maxStock,
+      ingredient.avgDailyConsumption,
+      ingredient.leadTimeDays,
+    ];
+    if (
+      !ingredient.sku.trim() ||
+      !ingredient.name.trim() ||
+      !ingredient.category.trim() ||
+      !ingredient.unit.trim() ||
+      !ingredient.supplier.trim() ||
+      !ingredient.location.trim() ||
+      numericValues.some(value => !Number.isFinite(value) || value < 0)
+    ) return false;
+
+    const updatedIngredient: RawIngredient = {
+      ...ingredient,
+      sku: ingredient.sku.trim(),
+      name: ingredient.name.trim(),
+      category: ingredient.category.trim(),
+      unit: ingredient.unit.trim(),
+      supplier: ingredient.supplier.trim(),
+      location: ingredient.location.trim(),
+      expiryDate: ingredient.expiryDate || undefined,
+      lastRestocked: ingredient.currentStock > target.currentStock
+        ? new Date().toLocaleString() + ' PST'
+        : ingredient.lastRestocked,
+    };
+    setIngredients(prev => prev.map(item => item.id === updatedIngredient.id ? updatedIngredient : item));
+    void recordOfflineMutation('ingredient', 'UPSERT_RAW_INGREDIENT', updatedIngredient);
+
+    if (updatedIngredient.currentStock !== target.currentStock) {
+      const difference = updatedIngredient.currentStock - target.currentStock;
+      const transaction: StockTransaction = {
+        id: `tx-ing-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        itemId: target.id,
+        itemName: updatedIngredient.name,
+        itemType: 'ingredient',
+        action: 'inventory_adjustment',
+        quantity: Math.abs(difference),
+        unit: updatedIngredient.unit,
+        previousStock: target.currentStock,
+        newStock: updatedIngredient.currentStock,
+        performedBy: currentUser.name,
+        notes: 'Developer item details and stock update',
+      };
+      setTransactions(previous => [transaction, ...previous]);
+      void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', transaction);
+    }
+
+    logAuditAction({
+      category: 'inventory',
+      subsystem: 'Raw Ingredients',
+      action: 'INGREDIENT_RECORD_UPDATED',
+      description: `Updated raw material record ${target.name} (${target.sku})`,
+      details: {
+        itemOrBatch: updatedIngredient.name,
+        previousValue: target.currentStock,
+        newValue: updatedIngredient.currentStock,
+        unit: updatedIngredient.unit,
+        reason: 'Developer updated raw material specifications',
+      },
+      severity: 'info',
+    });
+    triggerManualCloudSync();
+    return true;
+  };
+
+  const updateFinishedGoodRecord = (product: FinishedGood) => {
+    if (!canDeleteDataAsDeveloper()) return false;
+    const target = finishedGoods.find(item => item.id === product.id);
+    if (!target) return false;
+
+    const numericValues = [
+      product.currentStock,
+      product.coldStorageCapacity,
+      product.maxThreshold,
+      product.safetyStock,
+      product.unitPrice,
+      product.allocatedFeedingProgram,
+      product.allocatedRetail,
+      product.batchUnitQuantity,
+      product.shelfLifeDays,
+    ];
+    if (
+      !product.sku.trim() ||
+      !product.name.trim() ||
+      !product.location.trim() ||
+      numericValues.some(value => !Number.isFinite(value) || value < 0)
+    ) return false;
+
+    const updatedProduct: FinishedGood = {
+      ...product,
+      sku: product.sku.trim(),
+      name: product.name.trim(),
+      location: product.location.trim(),
+    };
+    setFinishedGoods(prev => prev.map(item => item.id === updatedProduct.id ? updatedProduct : item));
+    void recordOfflineMutation('finished_good', 'CREATE_FINISHED_GOOD', updatedProduct);
+
+    if (updatedProduct.currentStock !== target.currentStock) {
+      const difference = updatedProduct.currentStock - target.currentStock;
+      const transaction: StockTransaction = {
+        id: `tx-fg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        itemId: target.id,
+        itemName: updatedProduct.name,
+        itemType: 'finished_good',
+        action: 'inventory_adjustment',
+        quantity: Math.abs(difference),
+        unit: updatedProduct.unit,
+        previousStock: target.currentStock,
+        newStock: updatedProduct.currentStock,
+        performedBy: currentUser.name,
+        notes: 'Developer product details and stock update',
+      };
+      setTransactions(previous => [transaction, ...previous]);
+      void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', transaction);
+    }
+
+    logAuditAction({
+      category: 'cold_storage',
+      subsystem: 'Cold Storage',
+      action: 'FINISHED_GOOD_RECORD_UPDATED',
+      description: `Updated finished good record ${target.name} (${target.sku})`,
+      details: {
+        itemOrBatch: updatedProduct.name,
+        previousValue: target.currentStock,
+        newValue: updatedProduct.currentStock,
+        unit: updatedProduct.unit,
+        reason: 'Developer updated finished good specifications',
+      },
+      severity: 'info',
+    });
+    triggerManualCloudSync();
+    return true;
+  };
+
   const deleteIngredientRecord = (id: string) => {
     if (!canDeleteDataAsDeveloper()) return false;
     const target = ingredients.find(item => item.id === id);
@@ -3022,8 +3125,10 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isoRatings,
       auditLogs,
       addIngredient,
+      updateIngredientRecord,
       updateIngredientStock,
       addFinishedGood,
+      updateFinishedGoodRecord,
       updateFinishedGoodRecipe,
       deleteFinishedGoodRecipe,
       deleteIngredientRecord,

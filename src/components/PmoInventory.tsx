@@ -14,10 +14,13 @@ import {
 import { useDairySync } from '../context/DairySyncContext';
 import { IngredientCategory, PmoInventoryLine, PmoInventoryPeriod, RawIngredient } from '../types';
 import { downloadCsv } from '../utils/csv';
-import { calculatePmoExpectedEnding, getPmoInventoryActivity } from '../utils/pmoInventoryLedger';
+import {
+  calculatePmoExpectedEnding,
+  calculatePmoIssuedToProduction,
+  getPmoInventoryActivity,
+} from '../utils/pmoInventoryLedger';
 
-type QuantityField =
-  | 'endingQuantity';
+type QuantityField = 'purchasesQuantity' | 'endingQuantity';
 
 type ExternalPurchaseDraft = {
   sku: string;
@@ -55,8 +58,8 @@ const makeExternalPurchaseDraft = (): ExternalPurchaseDraft => ({
   expiryNotApplicable: false,
 });
 
-const quantityLabel = (value: number | undefined) =>
-  value === undefined ? '—' : value.toLocaleString(undefined, { maximumFractionDigits: 3 });
+const quantityLabel = (value: number | null | undefined) =>
+  value == null ? '—' : value.toLocaleString(undefined, { maximumFractionDigits: 3 });
 
 export const PmoInventory: React.FC = () => {
   const {
@@ -263,13 +266,22 @@ export const PmoInventory: React.FC = () => {
     if (!selectedPeriod) return;
     const liveLine = (line: PmoInventoryLine) => {
       if (line.liveLedger) {
-        return { ...line, ...getPmoInventoryActivity(selectedPeriod, line, transactions) };
+        const activity = getPmoInventoryActivity(selectedPeriod, line, transactions);
+        return {
+          ...line,
+          ...activity,
+          purchases: line.purchasesQuantity ?? activity.purchases,
+          issuedToProduction: calculatePmoIssuedToProduction(
+            line,
+            line.purchasesQuantity ?? activity.purchases,
+          ),
+        };
       }
       const adjustment = line.lossOrReturnQuantity || 0;
       return {
         ...line,
         purchases: line.purchasesQuantity || 0,
-        issuedToProduction: line.issuedToProductionQuantity || 0,
+        issuedToProduction: calculatePmoIssuedToProduction(line, line.purchasesQuantity || 0),
         losses: line.lossOrReturnDirection === 'increase' ? 0 : adjustment,
         returns: line.lossOrReturnDirection === 'increase' ? adjustment : 0,
         adjustments: 0,
@@ -499,11 +511,11 @@ export const PmoInventory: React.FC = () => {
                 <thead>
                   <tr className="bg-slate-50 text-[9px] uppercase tracking-wide text-slate-600">
                     <th className="px-3 py-3">Item Description</th>
-                    <th className="px-3 py-3 text-right">Beginning Inventory /<br />Physical Count Qty</th>
-                    <th className="px-3 py-3">Unit</th>
-                    <th className="px-3 py-3 text-right">Purchases Qty</th>
-                    <th className="px-3 py-3">Unit</th>
-                    <th className="px-3 py-3 text-right">Issued to<br />Production</th>
+                    <th className="px-3 py-3 text-center">Beginning Inventory /<br />Physical Count Qty</th>
+                    <th className="px-3 py-3 text-center">Unit</th>
+                    <th className="px-3 py-3 text-center">Purchases Qty</th>
+                    <th className="px-3 py-3 text-center">Unit</th>
+                    <th className="px-3 py-3 text-center">Issued to<br />Production</th>
                     <th className="px-3 py-3">Expired / Damage /<br />Waste / Returned</th>
                     <th className="px-3 py-3 text-right">Ending Inventory /<br />Physical Count Qty</th>
                     <th className="px-3 py-3">Unit</th>
@@ -515,8 +527,10 @@ export const PmoInventory: React.FC = () => {
                     const expected = calculatePmoExpectedEnding(line, activity);
                     const item = ingredients.find(ingredient => ingredient.id === line.ingredientId);
                     const readOnly = !canEdit || isPosted;
-                    const purchases = line.liveLedger ? activity.purchases : line.purchasesQuantity || 0;
-                    const issued = line.liveLedger ? activity.issuedToProduction : line.issuedToProductionQuantity || 0;
+                    const purchases = line.liveLedger
+                      ? line.purchasesQuantity ?? activity.purchases
+                      : line.purchasesQuantity || 0;
+                    const issued = calculatePmoIssuedToProduction(line, purchases);
                     const losses = line.liveLedger ? activity.losses : (
                       line.lossOrReturnDirection === 'increase' ? 0 : line.lossOrReturnQuantity || 0
                     );
@@ -529,7 +543,7 @@ export const PmoInventory: React.FC = () => {
                         type="number"
                         min="0"
                         step="any"
-                        value={line[field] ?? ''}
+                        value={field === 'purchasesQuantity' ? purchases : line[field] ?? ''}
                         disabled={readOnly}
                         onChange={event => updateLine(line.id, {
                           [field]: event.target.value === '' ? undefined : Number(event.target.value),
@@ -547,11 +561,13 @@ export const PmoInventory: React.FC = () => {
                               : 'Not linked to Raw Ingredients'}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right font-mono">{quantityLabel(line.beginningQuantity)}</td>
-                        <td className="px-3 py-3 text-slate-500">{line.unit}</td>
-                        <td className="px-3 py-3 text-right font-mono">{quantityLabel(purchases)}</td>
-                        <td className="px-3 py-3 text-slate-500">{line.unit}</td>
-                        <td className="px-3 py-3 text-right font-mono">{quantityLabel(issued)}</td>
+                        <td className="px-3 py-3 text-center font-mono">{quantityLabel(line.beginningQuantity)}</td>
+                        <td className="px-3 py-3 text-center text-slate-500">{line.unit}</td>
+                        <td className="px-3 py-3 text-center">
+                          {numberInput('purchasesQuantity', 'purchases quantity')}
+                        </td>
+                        <td className="px-3 py-3 text-center text-slate-500">{line.unit}</td>
+                        <td className="px-3 py-3 text-center font-mono">{quantityLabel(issued)}</td>
                         <td className="px-3 py-3 text-[10px]">
                           <span className="block text-amber-800">Losses: {quantityLabel(losses)}</span>
                           <span className="block text-emerald-700">Returns: {quantityLabel(returns)}</span>

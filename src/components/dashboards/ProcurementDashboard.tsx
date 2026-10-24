@@ -16,6 +16,7 @@ import {
   TrendingUp,
   FileText
 } from 'lucide-react';
+import { isAtOrBelowBuffer } from '../../utils/inventoryThresholds';
 
 interface SubsystemDashboardProps {
   onNavigateTab: (tab: string) => void;
@@ -25,11 +26,11 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
   const { ingredients, transactions, currentUser, canAccessTab } = useDairySync();
 
   // Procurement specific computations
-  const criticalRopItems = ingredients.filter(i => i.currentStock <= i.reorderPoint);
+  const criticalRopItems = ingredients.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint));
   const totalRawValuation = ingredients.reduce((sum, i) => sum + (i.currentStock * i.costPerUnit), 0);
   const rawMilk = ingredients.find(i => i.category === 'milk');
   const packagingItems = ingredients.filter(i => i.category === 'packaging');
-  const lowPackagingCount = packagingItems.filter(i => i.currentStock <= i.reorderPoint).length;
+  const lowPackagingCount = packagingItems.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint)).length;
   const authorizedSubsystems = [
     {
       id: 'procurement',
@@ -290,8 +291,8 @@ export const ProcurementDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
                 </div>
                 <div className="text-right">
                   <p className="font-mono font-bold text-slate-900">{ing.currentStock} {ing.unit}</p>
-                  <span className={`text-[10px] font-bold ${ing.currentStock <= ing.reorderPoint ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {ing.currentStock <= ing.reorderPoint ? 'Low Stock' : 'Optimal'}
+                  <span className={`text-[10px] font-bold ${isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    {isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint) ? 'Low Stock' : 'Optimal'}
                   </span>
                 </div>
               </div>

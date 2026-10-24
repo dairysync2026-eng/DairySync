@@ -16,9 +16,11 @@ import {
   LayoutList,
   LayoutGrid,
   DollarSign,
+  Pencil,
   Printer,
   MapPin,
   Filter,
+  SlidersHorizontal,
   ChevronDown,
   Trash2
 } from 'lucide-react';
@@ -27,6 +29,7 @@ import { ExportMenu } from './ExportMenu';
 import { downloadCsv } from '../utils/csv';
 import { usePagination } from '../hooks/usePagination';
 import { TablePagination } from './TablePagination';
+import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 export interface ExpiryInfo {
   dateStr?: string;
@@ -35,6 +38,9 @@ export interface ExpiryInfo {
   label: string;
   isFlagged: boolean; // Flagged if expiring within next 7 days or already expired
 }
+
+const STANDARD_INGREDIENT_CATEGORIES = ['milk', 'sweetener', 'flavoring', 'packaging', 'additive', 'culture', 'stabilizer', 'sanitizer'];
+const STANDARD_INGREDIENT_UNITS = ['l', 'kg', 'pieces', 'grams', 'packs', 'bottles', 'boxes', 'bags', 'caps', 'labels', 'rolls', 'sachets'];
 
 export const getIngredientExpiryInfo = (expiryDate?: string): ExpiryInfo => {
   if (!expiryDate) {
@@ -108,6 +114,7 @@ export const RawIngredients: React.FC = () => {
   const { 
     ingredients, 
     addIngredient, 
+    updateIngredientRecord,
     updateIngredientStock,
     currentRole,
     isDeveloperActive,
@@ -125,12 +132,14 @@ export const RawIngredients: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low_stock' | 'overstock' | 'optimal'>('all');
   const [filterExpiringSoonOnly, setFilterExpiringSoonOnly] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingIngredient, setEditingIngredient] = useState<RawIngredient | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [stockModalItem, setStockModalItem] = useState<RawIngredient | null>(null);
   const [stockAdjustQty, setStockAdjustQty] = useState<number>(0);
@@ -159,18 +168,48 @@ export const RawIngredients: React.FC = () => {
   const [addSupplier, setAddSupplier] = useState('PCC Local Cooperatives');
   const [addLocation, setAddLocation] = useState('Dry Storage Bay 1');
 
+  const resetMaterialDraft = () => {
+    setAddSku('ING-' + Math.floor(100 + Math.random() * 900));
+    setAddName('');
+    setAddCategory('milk');
+    setAddCategorySelect('milk');
+    setCustomCategory('');
+    setAddUnit('kg');
+    setAddUnitSelect('kg');
+    setCustomUnit('');
+    setAddInitialStock('100');
+    setAddUnitCost('50');
+    setUnitCostNotApplicable(false);
+    setAddSafetyStock('15');
+    setAddReorderPoint('30');
+    setAddMaxStock('500');
+    setMaxStockNotApplicable(false);
+    setIsNonPerishable(false);
+    setAddExpiryDate(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+    setAddSupplier('PCC Local Cooperatives');
+    setAddLocation('Dry Storage Bay 1');
+  };
+
   // Dynamic available categories across inventory
   const availableCategories = useMemo(() => {
-    const defaultCategories = ['milk', 'sweetener', 'flavoring', 'packaging', 'additive', 'culture', 'stabilizer', 'sanitizer'];
-    const current = ingredients.map(i => i.category).filter(Boolean);
+    const current = ingredients
+      .map(ingredient => ingredient.category.trim().toLowerCase())
+      .filter(Boolean);
+    const defaultCategories = STANDARD_INGREDIENT_CATEGORIES;
     return Array.from(new Set([...defaultCategories, ...current]));
   }, [ingredients]);
+  const customCategories = useMemo(
+    () => availableCategories.filter(category => !STANDARD_INGREDIENT_CATEGORIES.includes(category)),
+    [availableCategories]
+  );
 
   // Dynamic available units
   const availableUnits = useMemo(() => {
     const defaultUnits = ['L', 'kg', 'pieces', 'grams', 'packs', 'bottles', 'boxes', 'bags', 'caps', 'labels', 'rolls', 'sachets'];
-    const current = ingredients.map(i => i.unit).filter(Boolean);
-    return Array.from(new Set([...defaultUnits, ...current]));
+    const current = ingredients.map(ingredient => ingredient.unit.trim()).filter(Boolean);
+    return Array.from(
+      new Map([...defaultUnits, ...current].map(unit => [unit.toLowerCase(), unit])).values()
+    );
   }, [ingredients]);
 
   const categories = useMemo(() => {
@@ -184,10 +223,7 @@ export const RawIngredients: React.FC = () => {
     ];
     availableCategories.forEach(cat => {
       if (!list.some(c => c.key === cat)) {
-        list.push({
-          key: cat,
-          label: cat.charAt(0).toUpperCase() + cat.slice(1).replace('_', ' ')
-        });
+        list.push({ key: cat, label: cat.replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase()) });
       }
     });
     return list;
@@ -199,7 +235,7 @@ export const RawIngredients: React.FC = () => {
   );
 
   const stockMetrics = useMemo(() => ({
-    lowStockCount: ingredients.filter(ingredient => ingredient.currentStock <= ingredient.safetyStock).length,
+    lowStockCount: ingredients.filter(ingredient => isAtOrBelowBuffer(ingredient.currentStock, ingredient.safetyStock)).length,
     overstockCount: ingredients.filter(ingredient => ingredient.maxStock > 0 && ingredient.currentStock >= ingredient.maxStock).length,
   }), [ingredients]);
 
@@ -219,7 +255,7 @@ export const RawIngredients: React.FC = () => {
     });
 
     const totalValuation = ingredients.reduce((sum, i) => sum + (i.currentStock * i.costPerUnit), 0);
-    const belowRopCount = ingredients.filter(i => i.currentStock <= i.reorderPoint).length;
+    const belowRopCount = ingredients.filter(i => isAtOrBelowBuffer(i.currentStock, i.reorderPoint)).length;
 
     return {
       expiringCount,
@@ -238,9 +274,9 @@ export const RawIngredients: React.FC = () => {
         i.sku.toLowerCase().includes(query) ||
         i.supplier.toLowerCase().includes(query) ||
         i.location.toLowerCase().includes(query);
-      const matchCategory = selectedCategory === 'all' || i.category === selectedCategory;
+      const matchCategory = selectedCategory === 'all' || i.category.trim().toLowerCase() === selectedCategory;
       const matchLocation = selectedLocation === 'all' || i.location === selectedLocation;
-      const isLowStock = i.currentStock <= i.safetyStock;
+      const isLowStock = isAtOrBelowBuffer(i.currentStock, i.safetyStock);
       const isOverstock = i.maxStock > 0 && i.currentStock >= i.maxStock;
       const matchStock = stockFilter === 'all' ||
         (stockFilter === 'low_stock' && isLowStock) ||
@@ -259,7 +295,7 @@ export const RawIngredients: React.FC = () => {
     e.preventDefault();
     if (!addName.trim()) return;
 
-    const newIngredient: Omit<RawIngredient, 'id'> = {
+    const ingredientData = {
       sku: addSku.trim() || ('ING-' + Math.floor(100 + Math.random() * 900)),
       name: addName.trim(),
       category: (addCategory.trim().toLowerCase() || 'milk') as IngredientCategory,
@@ -277,27 +313,25 @@ export const RawIngredients: React.FC = () => {
       expiryDate: isNonPerishable ? undefined : (addExpiryDate || undefined)
     };
 
-    addIngredient(newIngredient);
+    if (editingIngredient) {
+      const updatedIngredient: RawIngredient = {
+        ...editingIngredient,
+        ...ingredientData,
+        avgDailyConsumption: editingIngredient.avgDailyConsumption,
+        leadTimeDays: editingIngredient.leadTimeDays,
+        lastRestocked: editingIngredient.lastRestocked,
+      };
+      if (!updateIngredientRecord(updatedIngredient)) {
+        window.alert('The raw material could not be updated. Confirm you are signed in as the Lead Developer and check the entered values.');
+        return;
+      }
+      setEditingIngredient(null);
+    } else {
+      addIngredient(ingredientData);
+    }
     setShowAddModal(false);
 
-    // Reset form fields
-    setAddSku('ING-' + Math.floor(100 + Math.random() * 900));
-    setAddName('');
-    setAddCategory('milk');
-    setAddCategorySelect('milk');
-    setCustomCategory('');
-    setAddUnit('kg');
-    setAddUnitSelect('kg');
-    setCustomUnit('');
-    setAddInitialStock('100');
-    setAddUnitCost('50');
-    setUnitCostNotApplicable(false);
-    setAddSafetyStock('15');
-    setAddReorderPoint('30');
-    setAddMaxStock('500');
-    setMaxStockNotApplicable(false);
-    setIsNonPerishable(false);
-    setAddExpiryDate(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+    resetMaterialDraft();
   };
 
   const handleStockUpdate = (e: React.FormEvent) => {
@@ -321,6 +355,39 @@ export const RawIngredients: React.FC = () => {
     setStockAdjustQtyStr(String(item.currentStock));
     setStockExpiryDate(item.expiryDate || '');
     setStockNotes('');
+  };
+
+  const openEditIngredient = (item: RawIngredient) => {
+    if (!canDeleteRecords) return;
+    setEditingIngredient(item);
+    setAddSku(item.sku);
+    setAddName(item.name);
+    setAddCategory(item.category);
+    const normalizedCategory = item.category.trim().toLowerCase();
+    const hasCategoryOption = availableCategories.includes(normalizedCategory);
+    setAddCategorySelect(hasCategoryOption ? normalizedCategory : 'custom');
+    setCustomCategory(hasCategoryOption ? '' : item.category);
+    setAddUnit(item.unit);
+    const isStandardUnit = STANDARD_INGREDIENT_UNITS.includes(item.unit.trim().toLowerCase());
+    setAddUnitSelect(isStandardUnit ? item.unit : 'custom');
+    setCustomUnit(isStandardUnit ? '' : item.unit);
+    setAddInitialStock(String(item.currentStock));
+    setAddUnitCost(String(item.costPerUnit));
+    setUnitCostNotApplicable(item.costPerUnit === 0);
+    setAddSafetyStock(String(item.safetyStock));
+    setAddReorderPoint(String(item.reorderPoint));
+    setAddMaxStock(String(item.maxStock));
+    setMaxStockNotApplicable(item.maxStock === 0);
+    setIsNonPerishable(!item.expiryDate);
+    setAddExpiryDate(item.expiryDate || '');
+    setAddSupplier(item.supplier);
+    setAddLocation(item.location);
+    setShowAddModal(true);
+  };
+
+  const closeMaterialForm = () => {
+    setShowAddModal(false);
+    setEditingIngredient(null);
   };
 
   const handleExportIngredientsCsv = () => {
@@ -449,26 +516,24 @@ export const RawIngredients: React.FC = () => {
     <div className="space-y-6">
       
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border-2 border-slate-200 p-6 rounded-3xl shadow-sm text-slate-900">
+      <div className="flex flex-col gap-4 bg-white border-2 border-slate-200 p-5 sm:p-6 rounded-3xl shadow-sm text-slate-900">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 flex items-center space-x-2 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center space-x-2 tracking-tight">
             <Package className="w-6 h-6 text-amber-500" />
             <span>Raw Ingredients & Packaging Inventory</span>
           </h1>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
             Raw materials, batch expiry tracking, safety buffers & inventory management
           </p>
           {isDirectorReadOnly && <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Director / PMO · Read only</span>}
         </div>
 
-        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-          {/* View Toggle */}
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-            <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold mr-1">
+        <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-100 p-1 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setViewMode('table')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
+                className={`flex items-center space-x-1 rounded-xl px-3 py-1.5 transition-all ${
                   viewMode === 'table'
                     ? 'bg-white text-indigo-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -481,7 +546,7 @@ export const RawIngredients: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl transition-all ${
+                className={`flex items-center space-x-1 rounded-xl px-3 py-1.5 transition-all ${
                   viewMode === 'grid'
                     ? 'bg-white text-indigo-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
@@ -497,22 +562,31 @@ export const RawIngredients: React.FC = () => {
               id="btn-print-ingredients-hardcopy"
               type="button"
               onClick={() => setShowPrintModal(true)}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-200 transition-all cursor-pointer"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-700 shadow-sm transition-all hover:bg-slate-200"
               title="Generate and print physical stock inventory hard copy"
+              aria-label="Print inventory report"
             >
-              <Printer className="w-4 h-4 text-slate-600" />
+              <Printer className="h-4 w-4" />
             </button>
-            <ExportMenu onPdf={() => setShowPrintModal(true)} onCsv={handleExportIngredientsCsv} />
-          </div>
-
-          {!isDirectorReadOnly && <button
-            id="btn-add-new-material"
-            onClick={() => setShowAddModal(true)}
-            className="flex min-h-10 w-full items-center justify-center space-x-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700 sm:min-w-44 sm:w-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add New Material</span>
-          </button>}
+          {!isDirectorReadOnly && (
+            <button
+              id="btn-add-new-material"
+              onClick={() => {
+                setEditingIngredient(null);
+                resetMaterialDraft();
+                setShowAddModal(true);
+              }}
+              className="flex min-h-11 items-center justify-center space-x-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Material</span>
+            </button>
+          )}
+          <ExportMenu
+            onPdf={() => setShowPrintModal(true)}
+            onCsv={handleExportIngredientsCsv}
+            className="flex h-11 items-center justify-center space-x-1.5 rounded-2xl border border-indigo-500 bg-indigo-600 px-4 text-xs font-bold text-white shadow-sm transition-all hover:bg-indigo-700"
+          />
         </div>
       </div>
 
@@ -578,110 +652,133 @@ export const RawIngredients: React.FC = () => {
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="space-y-2.5">
-        <div className="flex flex-col lg:flex-row gap-2.5">
+      <div className="space-y-0 rounded-3xl border-2 border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1 min-w-0">
-            <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               id="input-search-raw-ingredients"
               type="text"
               placeholder="Search raw materials, SKU, supplier, location..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-11 pr-10 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 shadow-sm"
+              className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-2.5 pl-10 pr-10 text-xs text-slate-900 placeholder-slate-400 transition-colors focus:border-indigo-500 focus:bg-white focus:outline-none sm:text-sm"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 p-0.5 rounded-lg"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-lg p-0.5 text-slate-400 hover:text-slate-600"
                 title="Clear search"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
           </div>
-
-          <div className="relative w-full lg:w-64 shrink-0">
-            <MapPin className="w-4 h-4 text-indigo-500 absolute left-3.5 top-3.5 pointer-events-none" />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              id="btn-raw-category-filter"
+              aria-expanded={isCategoryFilterOpen}
+              onClick={() => setIsCategoryFilterOpen(open => !open)}
+              className={`flex items-center justify-center space-x-2 rounded-2xl border px-4 py-2.5 text-xs font-bold transition-all ${
+                isCategoryFilterOpen || selectedCategory !== 'all' || selectedLocation !== 'all' || stockFilter !== 'all' || filterExpiringSoonOnly
+                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                  : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Filters</span>
+              {(selectedCategory !== 'all' || selectedLocation !== 'all' || stockFilter !== 'all' || filterExpiringSoonOnly) && (
+                <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-600" />
+              )}
+            </button>
+            {(search || selectedCategory !== 'all' || selectedLocation !== 'all' || stockFilter !== 'all' || filterExpiringSoonOnly) && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="rounded-2xl border border-slate-200 px-3 py-2.5 text-xs font-bold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                title="Reset all filters"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+        {isCategoryFilterOpen && (
+          <div className="mt-4 grid grid-cols-1 gap-3 border-t-2 border-slate-100 pt-4 animate-in fade-in duration-150 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label htmlFor="select-raw-category-filter" className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+              Category
+            </label>
+            <select
+              id="select-raw-category-filter"
+              value={selectedCategory}
+              onChange={event => setSelectedCategory(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
+            >
+              {categories.map(category => {
+                const count = category.key === 'all'
+                  ? ingredients.length
+                  : ingredients.filter(ingredient => ingredient.category.trim().toLowerCase() === category.key).length;
+                return (
+                  <option key={category.key} value={category.key}>
+                    {category.label} ({count})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="select-raw-storage-location" className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+              Storage Location
+            </label>
             <select
               id="select-raw-storage-location"
               value={selectedLocation}
-              onChange={e => setSelectedLocation(e.target.value)}
-              className="w-full appearance-none pl-10 pr-9 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
+              onChange={event => setSelectedLocation(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
             >
               <option value="all">All Storage Locations</option>
               {uniqueLocations.map(location => <option key={location} value={location}>{location}</option>)}
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
           </div>
-
-          <div className="relative w-full lg:w-64 shrink-0">
-            <Filter className="w-4 h-4 text-indigo-500 absolute left-3.5 top-3.5 pointer-events-none" />
+          <div>
+            <label htmlFor="select-raw-stock-status" className="mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+              Stock Status
+            </label>
             <select
               id="select-raw-stock-status"
               value={stockFilter}
-              onChange={e => setStockFilter(e.target.value as typeof stockFilter)}
-              className="w-full appearance-none pl-10 pr-9 py-3 bg-white border-2 border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm cursor-pointer"
+              onChange={event => setStockFilter(event.target.value as typeof stockFilter)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
             >
               <option value="all">All Stock Statuses</option>
               <option value="low_stock">Below Safety Stock ({stockMetrics.lowStockCount})</option>
               <option value="overstock">At or Above Max Stock ({stockMetrics.overstockCount})</option>
               <option value="optimal">Optimal Stock Range</option>
             </select>
-            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
           </div>
-        </div>
-
-        {/* Expiry and category filters remain available below the search row. */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* Quick Flag: Expiring within 7 Days */}
-          <button
-            type="button"
-            id="filter-expiring-within-7-days"
-            onClick={() => setFilterExpiringSoonOnly(prev => !prev)}
-            className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
-              filterExpiringSoonOnly
-                ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/30'
-                : 'bg-amber-50/80 border-2 border-amber-200 text-amber-800 hover:bg-amber-100'
-            }`}
-          >
-            <AlertTriangle className={`w-3.5 h-3.5 ${filterExpiringSoonOnly ? 'text-white' : 'text-amber-600'}`} />
-            <span>Expiring &le; 7 Days</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-              filterExpiringSoonOnly ? 'bg-amber-700 text-amber-100' : 'bg-amber-200/80 text-amber-900'
-            }`}>
-              {expiryMetrics.expiringCount}
-            </span>
-          </button>
-
-          {categories.map(cat => {
-            const count = cat.key === 'all' 
-              ? ingredients.length 
-              : ingredients.filter(i => i.category === cat.key).length;
-            const isSelected = selectedCategory === cat.key;
-
-            return (
-              <button
-                key={cat.key}
-                id={`filter-cat-${cat.key}`}
-                onClick={() => setSelectedCategory(cat.key)}
-                className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center space-x-1.5 ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-white border-2 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                <span>{cat.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                  isSelected ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          <div className="flex items-end">
+            <button
+              type="button"
+              id="filter-expiring-within-7-days"
+              aria-pressed={filterExpiringSoonOnly}
+              onClick={() => setFilterExpiringSoonOnly(prev => !prev)}
+              className={`flex h-[34px] w-full items-center justify-between gap-2 rounded-xl border px-3 text-xs font-medium transition-all ${
+                filterExpiringSoonOnly
+                  ? 'border-amber-300 bg-amber-100 text-amber-800'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-amber-50'
+              }`}
+            >
+              <span>Expiring &le; 7 Days</span>
+              <span className="rounded-full bg-amber-200/80 px-1.5 py-0.2 text-[10px] font-mono font-bold text-amber-900">
+                {expiryMetrics.expiringCount}
+              </span>
+            </button>
+          </div>
+          </div>
+        )}
       </div>
 
       {/* Active Filter Indicators */}
@@ -766,8 +863,8 @@ export const RawIngredients: React.FC = () => {
             <tbody className="divide-y divide-slate-100">
               {pagination.pageItems.map(ing => {
                 const exp = getIngredientExpiryInfo(ing.expiryDate);
-                const isBelowRop = ing.currentStock <= ing.reorderPoint;
-                const isBelowSafety = ing.currentStock <= ing.safetyStock;
+                const isBelowRop = isAtOrBelowBuffer(ing.currentStock, ing.reorderPoint);
+                const isBelowSafety = isAtOrBelowBuffer(ing.currentStock, ing.safetyStock);
 
                 return (
                   <tr
@@ -849,6 +946,18 @@ export const RawIngredients: React.FC = () => {
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex justify-end gap-2">
+                      {canDeleteRecords && (
+                        <button
+                          type="button"
+                          onClick={() => openEditIngredient(ing)}
+                          aria-label={`Edit ${ing.name}`}
+                          title="Edit raw material details and stock"
+                          className="inline-flex items-center space-x-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                      )}
                       {!isDirectorReadOnly && (
                         <button
                           onClick={() => openAdjustModal(ing)}
@@ -957,6 +1066,18 @@ export const RawIngredients: React.FC = () => {
                     <strong className="text-slate-900 font-mono font-bold">{ing.costPerUnit > 0 ? `₱${ing.costPerUnit}.00` : 'N/A'}</strong>
                   </div>
                   <div className="flex items-center gap-2">
+                  {canDeleteRecords && (
+                    <button
+                      type="button"
+                      onClick={() => openEditIngredient(ing)}
+                      aria-label={`Edit ${ing.name}`}
+                      title="Edit raw material details and stock"
+                      className="flex items-center space-x-1.5 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-1.5 rounded-xl transition-colors font-bold shadow-sm"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  )}
                   {!isDirectorReadOnly && (
                     <button
                       onClick={() => openAdjustModal(ing)}
@@ -1083,17 +1204,19 @@ export const RawIngredients: React.FC = () => {
       )}
 
       {/* Add New Material Modal */}
-      {showAddModal && !isDirectorReadOnly && (
+      {(showAddModal || (editingIngredient && canDeleteRecords)) && !isDirectorReadOnly && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-200 rounded-3xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden text-slate-900 animate-in fade-in zoom-in-95 duration-150">
             {/* Fixed Header */}
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50 shrink-0">
               <div>
-                <h3 className="font-extrabold text-lg text-slate-900">Add Raw Material / Packaging</h3>
+                <h3 className="font-extrabold text-lg text-slate-900">
+                  {editingIngredient ? 'Update Raw Material / Packaging' : 'Add Raw Material / Packaging'}
+                </h3>
                 <p className="text-xs text-slate-500">Configure ingredient specifications, reorder triggers, and shelf-life</p>
               </div>
               <button 
-                onClick={() => setShowAddModal(false)} 
+                onClick={closeMaterialForm}
                 className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -1137,6 +1260,11 @@ export const RawIngredients: React.FC = () => {
                     <option value="additive">Additives & Minerals</option>
                     <option value="stabilizer">Stabilizer & Emulsifiers</option>
                     <option value="sanitizer">Sanitizer & Cleaning Agents</option>
+                    {customCategories.map(category => (
+                      <option key={category} value={category}>
+                        {category.replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase())}
+                      </option>
+                    ))}
                     <option value="custom">+ Custom Category...</option>
                   </select>
                   {addCategorySelect === 'custom' && (
@@ -1170,7 +1298,9 @@ export const RawIngredients: React.FC = () => {
               {/* Stock and Units */}
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Initial Stock</label>
+                  <label className="block font-bold text-slate-600 mb-1">
+                    {editingIngredient ? 'Current Stock' : 'Initial Stock'}
+                  </label>
                   <input 
                     type="number" 
                     step="any"
@@ -1206,6 +1336,14 @@ export const RawIngredients: React.FC = () => {
                     <option value="grams">Grams (g)</option>
                     <option value="boxes">Boxes</option>
                     <option value="bags">Bags</option>
+                    <option value="labels">Labels</option>
+                    <option value="rolls">Rolls</option>
+                    <option value="sachets">Sachets</option>
+                    {availableUnits
+                      .filter(unit => !STANDARD_INGREDIENT_UNITS.includes(unit.toLowerCase()))
+                      .map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
                     <option value="custom">+ Custom Unit...</option>
                   </select>
                   {addUnitSelect === 'custom' && (
@@ -1373,12 +1511,24 @@ export const RawIngredients: React.FC = () => {
               {/* Supplier & Storage Bay */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Primary Supplier</label>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label htmlFor="raw-material-primary-supplier" className="block font-bold text-slate-600">Primary Supplier</label>
+                    <button
+                      type="button"
+                      aria-pressed={addSupplier.trim().toLowerCase() === 'n/a'}
+                      onClick={() => setAddSupplier(addSupplier.trim().toLowerCase() === 'n/a' ? 'PCC Local Cooperatives' : 'N/A')}
+                      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {addSupplier.trim().toLowerCase() === 'n/a' ? 'Set supplier' : 'Supplier N/A'}
+                    </button>
+                  </div>
                   <input 
+                    id="raw-material-primary-supplier"
                     type="text" 
                     value={addSupplier} 
                     onChange={e => setAddSupplier(e.target.value)} 
                     placeholder="e.g., PCC Local Cooperatives"
+                    disabled={addSupplier.trim().toLowerCase() === 'n/a'}
                     className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs" 
                   />
                 </div>
@@ -1411,7 +1561,7 @@ export const RawIngredients: React.FC = () => {
             <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 shrink-0">
               <button 
                 type="button" 
-                onClick={() => setShowAddModal(false)} 
+                onClick={closeMaterialForm}
                 className="px-4 py-2 font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer text-xs"
               >
                 Cancel
@@ -1421,7 +1571,7 @@ export const RawIngredients: React.FC = () => {
                 form="add-raw-material-form"
                 className="px-5 py-2.5 font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow cursor-pointer text-xs"
               >
-                Save Material to Inventory
+                {editingIngredient ? 'Save Changes' : 'Save Material to Inventory'}
               </button>
             </div>
           </div>

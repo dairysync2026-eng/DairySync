@@ -6,13 +6,15 @@ interface ExportMenuProps {
   onCsv: () => void;
   className?: string;
   menuClassName?: string;
+  iconOnly?: boolean;
 }
 
 export const ExportMenu: React.FC<ExportMenuProps> = ({
   onPdf,
   onCsv,
   className = 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200',
-  menuClassName = 'bg-white border-slate-200 text-slate-700'
+  menuClassName = 'bg-white border-slate-200 text-slate-700',
+  iconOnly = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -30,9 +32,10 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         title="Export data as PDF or Excel/CSV"
+        aria-label={iconOnly ? 'Export data as PDF or Excel/CSV' : undefined}
       >
         <Download className="w-4 h-4" />
-        <span>Export</span>
+        {!iconOnly && <span>Export</span>}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 

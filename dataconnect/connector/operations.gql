@@ -142,7 +142,8 @@ mutation UpdateFinishedGoodRecipe(
 
 query ListPmoInventoryPeriods
   @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff']")
-  @refresh(onMutationExecuted: { operation: "UpsertPmoInventoryPeriod" }) {
+  @refresh(onMutationExecuted: { operation: "UpsertPmoInventoryPeriod" })
+  @refresh(onMutationExecuted: { operation: "DeletePmoInventoryPeriod" }) {
   pmoInventoryPeriods(orderBy: [{ createdAt: DESC }]) {
     id
     title
@@ -180,4 +181,9 @@ mutation UpsertPmoInventoryPeriod(
     updatedAt_expr: "request.time"
     updatedBy_expr: "auth.uid"
   })
+}
+
+mutation DeletePmoInventoryPeriod($id: String!)
+  @auth(expr: "auth != null && auth.token.role == 'developer'") {
+  pmoInventoryPeriod_delete(id: $id)
 }
