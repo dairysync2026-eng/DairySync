@@ -6,6 +6,8 @@ DairySync is a cloud-enabled inventory, production, supply-demand, and retail ma
 
 Open the [DairySync Visual User Manual](docs/DairySync-User-Manual.html) for a task-based guide to sign-in, role access, inventory, production, replenishment, Dairy Box sales, reports, and offline use. The manual is responsive and can be printed or saved as a PDF from a web browser.
 
+For a narrated walkthrough from sign-in through each role's authorized subsystems, open the [PDF walkthrough script](docs/DairySync-Role-Usage-Script.pdf) or its [editable Markdown source](docs/DairySync-Role-Usage-Script.md).
+
 ## Overview
 
 This project was developed to support operational planning and monitoring across the full dairy value chain:
