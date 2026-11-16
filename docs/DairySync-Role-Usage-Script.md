@@ -1,22 +1,14 @@
 # DairySync Role-by-Role Voice-Over Script
 
-This narration follows each role from the login page through its authorized DairySync subsystems. Read the voice-over paragraphs while showing the corresponding screen. Use an authorized demonstration account and safe sample records; do not read passwords aloud or make unapproved changes to live data.
-
-## Shared opening: login page to Command Center
-
-**On screen:** Open the DairySync System Login page. Sign in with an authorized account's registered email address or username and password. When authentication completes, point out the signed-in name, role and available navigation tabs.
-
-**Voice-over**
-
-> DairySync starts at a secure sign-in page. Each staff member uses their own account, with a registered email address or username and password. After sign-in, the Command Center opens with a dashboard tailored to the user's role. The tabs and actions shown are the areas authorized for that account.
-
-> If sign-in does not work, check the account details. To reset a password, enter the registered email address and use the password-reset option. Contact the system administrator if you still cannot access your account.
+This script contains seven independent role demonstrations. For each role, start at the login page, narrate the sign-in, demonstrate that role's authorized subsystems, and finish by signing out. Use an authorized demonstration account and safe sample records; do not read passwords aloud or make unapproved changes to live data. If sign-in fails, use the registered email address with the password-reset option or contact the system administrator.
 
 ## 1. Lead Developer (Developer / Super Administrator)
 
-**On screen:** Sign in with a Lead Developer account. Show the Developer Command Center, then open the subsystems as they are discussed. For a smaller screen, scroll the navigation strip to reveal additional tabs.
+**On screen:** Start on the DairySync System Login page. Sign in with a Lead Developer account, show the Developer Command Center, then open the subsystems as they are discussed. For a smaller screen, scroll the navigation strip to reveal additional tabs. At the end, sign out and confirm the login page returns.
 
 **Voice-over**
+
+> We begin on the DairySync System Login page. I enter the registered email address or username and password for the Lead Developer account, then select Sign In. After authentication, I confirm the Lead Developer name and role in the header and open the Developer Command Center.
 
 > The Lead Developer Command Center gives a broad view of DairySync operations and shortcuts to every authorized work area. From here, the Lead Developer can open Raw Ingredients, PMO Inventory, WIP Batches, WIP Inventory, Finished Goods, Product Recipes, Supply and demand, ROP Procurement, Dairy Box POS, Audit Trail, User Manual, and System Administration. A dashboard preview does not sign in as another staff member; always use that staff member's own account when demonstrating their role.
 
@@ -44,11 +36,15 @@ This narration follows each role from the login page through its authorized Dair
 
 > The Lead Developer has the broadest access, but every change should still follow the operational procedure. In particular, starting a batch deducts materials, posting a PMO count changes shared stock, and the ROP restock action updates ingredient stock immediately.
 
+> The Lead Developer walkthrough is complete. I open the account menu, select Sign Out / Lock System, and confirm DairySync returns to the login page before anyone else uses this session.
+
 ## 2. System Administrator
 
-**On screen:** Sign in as a System Administrator. Show the Administrator Overview, System Administration, Audit Trail, and User Manual.
+**On screen:** Start on the DairySync System Login page. Sign in as a System Administrator. Show the Administrator Overview, System Administration, Audit Trail, and User Manual. At the end, sign out and confirm the login page returns.
 
 **Voice-over**
+
+> We begin on the DairySync System Login page. I enter the registered email address or username and password for the System Administrator account, then select Sign In. After authentication, I confirm the System Administrator name and role and open the Administrator Overview.
 
 > The System Administrator's Command Center is the Administrator Overview. It summarizes staff accounts and shows network and cloud synchronization status. Select System Administration to refresh and review the staff account directory. To create an account, enter the staff member's name, email, username, title, department, and operational role, then create the account and send its setup email.
 
@@ -58,11 +54,15 @@ This narration follows each role from the login page through its authorized Dair
 
 > This role manages accounts and shared branding, not inventory or production. System Administrators cannot grant or modify Developer or System Administrator privileges, and cannot change their own protected role or disable their own account. The Lead Developer is responsible for privileged access.
 
+> The System Administrator walkthrough is complete. I open the account menu, select Sign Out / Lock System, and confirm DairySync returns to the login page before the next role signs in.
+
 ## 3. Director / PMO Supervisor
 
-**On screen:** Sign in as a Director / PMO Supervisor. Show the executive Command Center, then visit each available subsystem. Point out read-only labels where shown.
+**On screen:** Start on the DairySync System Login page. Sign in as a Director / PMO Supervisor. Show the executive Command Center, then visit each available subsystem. Point out read-only labels where shown. At the end, sign out and confirm the login page returns.
 
 **Voice-over**
+
+> We begin on the DairySync System Login page. I enter the registered email address or username and password for the Director / PMO Supervisor account, then select Sign In. After authentication, I confirm the Director / PMO role in the header and open the executive Command Center.
 
 > The Director / PMO Supervisor Command Center brings together executive indicators such as inventory valuation, cold-storage occupancy, commitments, and operational shortcuts. It is an oversight view for understanding performance and directing planning.
 
@@ -80,11 +80,15 @@ This narration follows each role from the login page through its authorized Dair
 
 > The Director's role connects operational visibility with planning. Use the read-only inventory, production, procurement, and sales views to understand status, then coordinate any changes with the staff responsible for those operations.
 
+> The Director / PMO Supervisor walkthrough is complete. I open the account menu, select Sign Out / Lock System, and confirm DairySync returns to the login page before the next role signs in.
+
 ## 4. Procurement
 
-**On screen:** Sign in as Procurement. Show the Procurement Command Center, then open ROP Procurement, Raw Ingredients, and PMO Inventory.
+**On screen:** Start on the DairySync System Login page. Sign in as Procurement. Show the Procurement Command Center, then open ROP Procurement, Raw Ingredients, and PMO Inventory. At the end, sign out and confirm the login page returns.
 
 **Voice-over**
+
+> We begin on the DairySync System Login page. I enter the registered email address or username and password for the Procurement account, then select Sign In. After authentication, I confirm the Procurement role in the header and open the Procurement Command Center.
 
 > The Procurement Command Center summarizes raw-material stock and reorder concerns. Start in ROP Procurement, where DairySync identifies materials at or below their reorder thresholds. Review each item's current stock, reorder point, safety stock, supplier, lead time, usage, recommended order quantity, and estimated cost to help prioritize purchasing.
 
@@ -96,11 +100,15 @@ This narration follows each role from the login page through its authorized Dair
 
 > Procurement's tabs focus on purchasing and stock control. WIP production, finished goods, retail sales, and account administration are not part of this role's navigation.
 
+> The Procurement walkthrough is complete. I open the account menu, select Sign Out / Lock System, and confirm DairySync returns to the login page before the next role signs in.
+
 ## 5. Plant Manager
 
-**On screen:** Sign in as a Plant Manager. Show the plant Command Center, including production, cold-storage, reorder, and Dairy Box request summaries. Visit each available subsystem and the dashboard stock-request panel.
+**On screen:** Start on the DairySync System Login page. Sign in as a Plant Manager. Show the plant Command Center, including production, cold-storage, reorder, and Dairy Box request summaries. Visit each available subsystem and the dashboard stock-request panel. At the end, sign out and confirm the login page returns.
 
 **Voice-over**
+
+> We begin on the DairySync System Login page. I enter the registered email address or username and password for the Plant Manager account, then select Sign In. After authentication, I confirm the Plant Manager role in the header and open the plant Command Center.
 
 > The Plant Manager Command Center brings together plant operations, including active production, cold-storage occupancy, material warnings, and Dairy Box requests. Use its shortcuts to move from planning to production, finished-goods custody, and outlet replenishment.
 
@@ -122,11 +130,15 @@ This narration follows each role from the login page through its authorized Dair
 
 > Sales History shows Dairy Box receipts for review, not checkout. Audit Trail provides search, filters, and details for operational activity. Together, these areas help the Plant Manager connect production, cold storage, and retail replenishment while keeping an accountable record of changes.
 
+> The Plant Manager walkthrough is complete. I open the account menu, select Sign Out / Lock System, and confirm DairySync returns to the login page before the next role signs in.
+
 ## 6. Production Staff
 
-**On screen:** Sign in as Production Staff. Show the processing-floor Command Center, open WIP Batches, then open Raw Ingredients.
+**On screen:** Start on the DairySync System Login page. Sign in as Production Staff. Show the processing-floor Command Center, open WIP Batches, then open Raw Ingredients. At the end, sign out and confirm the login page returns.
 
 **Voice-over**
+
+> We begin on the DairySync System Login page. I enter the registered email address or username and password for the Production Staff account, then select Sign In. After authentication, I confirm the Production Staff role in the header and open the processing-floor Command Center.
 
 > The Production Staff Command Center is the processing-floor overview. It highlights active batch runs, planned output, and raw milk in process, with shortcuts to WIP Batches and Raw Ingredients.
 
@@ -136,11 +148,15 @@ This narration follows each role from the login page through its authorized Dair
 
 > Production Staff do not have a separate WIP Inventory tab. Coordinate detailed processing records, recipe changes, and finished-goods release with the Plant Manager. If a batch or material is unavailable, ask the supervisor to confirm access or update the production plan rather than using another account.
 
+> The Production Staff walkthrough is complete. I open the account menu, select Sign Out / Lock System, and confirm DairySync returns to the login page before the next role signs in.
+
 ## 7. Store Outlet (Dairy Box)
 
-**On screen:** Sign in as Store Outlet. Show the retail Command Center, open Dairy Box POS, then return to the dashboard to show stock requests and open Cold Storage.
+**On screen:** Start on the DairySync System Login page. Sign in as Store Outlet. Show the retail Command Center, open Dairy Box POS, then return to the dashboard to show stock requests and open Cold Storage. At the end, sign out and confirm the login page returns.
 
 **Voice-over**
+
+> We begin on the DairySync System Login page. I enter the registered email address or username and password for the Store Outlet account, then select Sign In. After authentication, I confirm the Store Outlet role in the header and open the retail Command Center.
 
 > The Store Outlet Command Center summarizes retail stock, sales, and open replenishment requests. Its shortcuts lead to the Dairy Box POS and finished-goods availability, while the dashboard request panel lets staff ask the plant for more stock.
 
@@ -150,10 +166,4 @@ This narration follows each role from the login page through its authorized Dair
 
 > Cold Storage, also labeled Finished Goods, helps the outlet check product availability, location, and stock warnings. Use it to inform sales and replenishment requests. Contact the Plant Manager about discrepancies, adjustments, or fulfillment; the Store Outlet account does not include production, procurement, recipe, or PMO count tabs.
 
-## Shared closing: sign out
-
-**On screen:** Return to the Command Center, open the account/profile menu, and select **Sign Out / Lock System**. Confirm that DairySync returns to the login page before the next person signs in.
-
-**Voice-over**
-
-> When your work is complete, sign out or lock DairySync from the account menu. Before repeating an action, verify the result—especially for a sale, stock adjustment, batch start, or posted inventory count. This protects both the account and the shared operational records.
+> The Store Outlet walkthrough is complete. I return to the account menu, select Sign Out / Lock System, and confirm DairySync returns to the login page before another staff member signs in. Before repeating any action, verify the result, especially for a sale, stock change, or stock request.
