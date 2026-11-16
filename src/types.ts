@@ -1,5 +1,6 @@
 export type UserRole = 
   | 'developer'           // System Developer / Super Administrator (Full Access)
+  | 'system_admin'        // System Administrator (User & System Administration)
   | 'director'            // Director / PMO Supervisor
   | 'procurement'         // Administrative Assistant IV (Procurement)
   | 'plant_manager'        // Internal Custodian / Plant Manager
@@ -8,6 +9,7 @@ export type UserRole =
 
 export const USER_ROLES: readonly UserRole[] = [
   'developer',
+  'system_admin',
   'director',
   'procurement',
   'plant_manager',
@@ -17,6 +19,7 @@ export const USER_ROLES: readonly UserRole[] = [
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   developer: 'Lead Developer',
+  system_admin: 'System Administrator',
   director: 'Director / PMO Supervisor',
   procurement: 'Procurement',
   plant_manager: 'Plant Manager',
@@ -61,10 +64,15 @@ export interface PmoInventoryLine {
   id: string;
   itemName: string;
   ingredientId?: string;
+  finishedGoodId?: string;
   unit: string;
   beginningQuantity?: number;
   purchasesQuantity?: number;
   issuedToProductionQuantity?: number;
+  cashSalesQuantity?: number;
+  creditSalesQuantity?: number;
+  productPromoQuantity?: number;
+  remarksQuantity?: number;
   lossOrReturnQuantity?: number;
   lossOrReturnDirection?: 'decrease' | 'increase';
   lossOrReturnType?: 'expired' | 'damage' | 'waste' | 'returned';
@@ -79,6 +87,7 @@ export type PmoInventoryPeriodStatus = 'draft' | 'posted';
 export interface PmoInventoryPeriod {
   id: string;
   title: string;
+  inventoryType?: 'ingredient' | 'finished_good';
   sourceFileName: string;
   lines: PmoInventoryLine[];
   createdAt: string;
@@ -92,7 +101,17 @@ export interface BomIngredientRequirement {
   ingredientId: string;
   ingredientName: string;
   quantityRequired: number;
+  quantityRequiredMax?: number;
   unit: string;
+  recipeUnitsPerInventoryUnit?: number;
+  optional?: boolean;
+  substitutes?: BomIngredientSubstitute[];
+}
+
+export interface BomIngredientSubstitute {
+  ingredientId: string;
+  ingredientName: string;
+  recipeUnitsPerInventoryUnit?: number;
 }
 
 export type ProductCategory = 'fresh_milk' | 'flavored_milk' | 'cultured' | 'confectionery' | 'cheese';
@@ -103,7 +122,8 @@ export interface FinishedGood {
   name: string;
   category: ProductCategory;
   currentStock: number;
-  unit: 'bottles' | 'packs' | 'blocks' | 'cups';
+  unit: string;
+  containerVolumeMl?: number;
   coldStorageCapacity: number; // Maximum allocated cold storage capacity
   maxThreshold: number;       // Overstock warning threshold
   safetyStock: number;        // Minimum safety stock buffer to prevent stockouts
@@ -114,6 +134,28 @@ export interface FinishedGood {
   batchUnitQuantity: number;        // e.g. recipe produces 100 bottles
   shelfLifeDays: number;
   location: string;
+}
+
+export type StockRequestStatus = 'pending' | 'approved' | 'rejected' | 'fulfilled' | 'cancelled';
+
+export interface StockRequest {
+  id: string;
+  finishedGoodId: string;
+  finishedGoodName: string;
+  finishedGoodSku: string;
+  quantity: number;
+  unit: string;
+  requestedByEmail: string;
+  requestedByName: string;
+  requestedAt: string;
+  neededBy?: string;
+  status: StockRequestStatus;
+  notes?: string;
+  responseNotes?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  fulfilledAt?: string;
+  fulfilledQuantity?: number;
 }
 
 export type WipStep = 'scheduled' | 'pasteurization' | 'cooling' | 'bottling_packaging' | 'completed' | 'cancelled';
@@ -152,6 +194,23 @@ export interface WipBatch {
   coldStorageTemp: string; // e.g. "3.8°C"
 }
 
+export interface WipYieldPackage {
+  quantity: number;
+  packSize: string;
+}
+
+export interface WipProductionRecord {
+  id: string;
+  batchId: string;
+  pasteurizationTempC?: number;
+  pasteurizationTimeMinutes?: number;
+  coolingTempC?: number;
+  coolingTimeMinutes?: number;
+  yieldPackages: WipYieldPackage[];
+  bestBeforeDate?: string;
+  remarks?: string;
+}
+
 export type CommitmentType = 'school_feeding' | 'coop_collection' | 'dairy_box_retail' | (string & {});
 
 export interface SupplyDemandCommitment {
@@ -170,7 +229,7 @@ export interface SupplyDemandCommitment {
   cancelledAt?: string;
 }
 
-export type AlertType = 'low_stock' | 'overstock' | 'rop_triggered' | 'temp_warning' | 'delivery_due';
+export type AlertType = 'low_stock' | 'overstock' | 'rop_triggered' | 'temp_warning' | 'delivery_due' | 'stock_request';
 
 export interface SystemAlert {
   id: string;

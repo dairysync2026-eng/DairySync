@@ -48,7 +48,7 @@ export const AuditTrail: React.FC = () => {
   const canManageAuditTrail = currentRole === 'developer' || currentRole === 'director';
 
   // Plant Managers may review the audit trail but cannot change or clear audit records.
-  const isAuthorized = canManageAuditTrail || currentRole === 'plant_manager';
+  const isAuthorized = canManageAuditTrail || currentRole === 'plant_manager' || currentRole === 'system_admin';
 
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');

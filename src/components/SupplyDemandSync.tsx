@@ -142,7 +142,7 @@ export const SupplyDemandSync: React.FC = () => {
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center space-x-2 tracking-tight">
             <TrendingUp className="w-6 h-6 text-emerald-600" />
-            <span>Supply & Demand Synchronization Hub</span>
+            <span>Supply and demand</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
             Synchronizing raw carabao milk intake with National School Feeding commitments & Dairy Box retail

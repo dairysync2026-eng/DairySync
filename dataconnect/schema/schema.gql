@@ -26,6 +26,7 @@ type FinishedGood @table(key: "id") {
   category: String!
   currentStock: Float!
   unit: String!
+  containerVolumeMl: Float
   coldStorageCapacity: Float!
   maxThreshold: Float!
   safetyStock: Float!
@@ -36,6 +37,28 @@ type FinishedGood @table(key: "id") {
   batchUnitQuantity: Float!
   shelfLifeDays: Int!
   location: String!
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
+type StockRequest @table(key: "id") {
+  id: String!
+  finishedGoodId: String!
+  finishedGoodName: String!
+  finishedGoodSku: String!
+  quantity: Float!
+  unit: String!
+  requestedByEmail: String!
+  requestedByName: String!
+  requestedAt: String!
+  neededBy: String
+  status: String!
+  notes: String
+  responseNotes: String
+  reviewedBy: String
+  reviewedAt: String
+  fulfilledAt: String
+  fulfilledQuantity: Float
   updatedAt: Timestamp! @default(expr: "request.time")
   updatedBy: String! @default(expr: "auth.uid")
 }
@@ -57,6 +80,20 @@ type WipBatch @table(key: "id") {
   cancelledAt: String
   notes: String
   coldStorageTemp: String!
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
+}
+
+type WipProductionRecord @table(key: "id") {
+  id: String!
+  batchId: String! @unique
+  pasteurizationTempC: Float
+  pasteurizationTimeMinutes: Float
+  coolingTempC: Float
+  coolingTimeMinutes: Float
+  yieldPackages: [Any!]!
+  bestBeforeDate: Date
+  remarks: String
   updatedAt: Timestamp! @default(expr: "request.time")
   updatedBy: String! @default(expr: "auth.uid")
 }
@@ -110,6 +147,7 @@ type StockTransaction @table(key: "id") {
 type PmoInventoryPeriod @table(key: "id") {
   id: String!
   title: String!
+  inventoryType: String
   sourceFileName: String!
   lines: [Any!]!
   createdAt: String!
@@ -166,4 +204,11 @@ type AuditLogEntry @table(key: "id") {
   userTitle: String!
   terminalOrStation: String
   severity: String!
+}
+
+type AppBranding @table(key: "id") {
+  id: String!
+  logoDataUrl: String!
+  updatedAt: Timestamp! @default(expr: "request.time")
+  updatedBy: String! @default(expr: "auth.uid")
 }

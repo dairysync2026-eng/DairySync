@@ -21,6 +21,7 @@ import {
   MapPin,
   Filter,
   SlidersHorizontal,
+  Info,
   ChevronDown,
   Trash2
 } from 'lucide-react';
@@ -30,6 +31,12 @@ import { downloadCsv } from '../utils/csv';
 import { usePagination } from '../hooks/usePagination';
 import { TablePagination } from './TablePagination';
 import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
+import {
+  formatIngredientCategory,
+  formatIngredientCategoryOption,
+  INGREDIENT_CATEGORY_GROUPS,
+  LEGACY_INGREDIENT_CATEGORY_KEYS,
+} from '../utils/ingredientCategories';
 
 export interface ExpiryInfo {
   dateStr?: string;
@@ -39,8 +46,10 @@ export interface ExpiryInfo {
   isFlagged: boolean; // Flagged if expiring within next 7 days or already expired
 }
 
-const STANDARD_INGREDIENT_CATEGORIES = ['milk', 'sweetener', 'flavoring', 'packaging', 'additive', 'culture', 'stabilizer', 'sanitizer'];
-const STANDARD_INGREDIENT_UNITS = ['l', 'kg', 'pieces', 'grams', 'packs', 'bottles', 'boxes', 'bags', 'caps', 'labels', 'rolls', 'sachets'];
+const STANDARD_INGREDIENT_CATEGORIES = INGREDIENT_CATEGORY_GROUPS.flatMap(group =>
+  group.categories.map(category => category.key)
+);
+const STANDARD_INGREDIENT_UNITS = ['l', 'ml', 'kg', 'pieces', 'grams', 'gal', 'packs', 'bottles', 'cans', 'boxes', 'bags', 'caps', 'labels', 'rolls', 'sachets', 'tank', 'blocks'];
 
 export const getIngredientExpiryInfo = (expiryDate?: string): ExpiryInfo => {
   if (!expiryDate) {
@@ -118,10 +127,19 @@ export const RawIngredients: React.FC = () => {
     updateIngredientStock,
     currentRole,
     isDeveloperActive,
-    deleteIngredientRecord
+    deleteIngredientRecord,
+    recoverRawIngredients,
   } = useDairySync();
   const isDirectorReadOnly = currentRole === 'director';
   const canDeleteRecords = isDeveloperActive && currentRole === 'developer';
+  const [isRecoveringIngredients, setIsRecoveringIngredients] = useState(false);
+  const [ingredientRecoveryMessage, setIngredientRecoveryMessage] = useState('');
+  const generateUniqueIngredientSku = () => {
+    const existingSkus = new Set(ingredients.map(ingredient => ingredient.sku.trim().toLowerCase()));
+    let suffix = 100;
+    while (existingSkus.has(`ing-${suffix}`)) suffix += 1;
+    return `ING-${suffix}`;
+  };
 
   const handleDeleteIngredient = (ingredient: RawIngredient) => {
     if (!window.confirm(`Delete ${ingredient.name} (${ingredient.sku}) from Raw Ingredients? This removes the ingredient record only; related history will remain.`)) return;
@@ -130,9 +148,26 @@ export const RawIngredients: React.FC = () => {
     }
   };
 
+  const handleRecoverIngredients = async () => {
+    setIsRecoveringIngredients(true);
+    setIngredientRecoveryMessage('');
+    try {
+      const result = await recoverRawIngredients();
+      setIngredientRecoveryMessage(
+        `Verified ${result.cloudCount} cloud records from ${result.sourceCount} local records; added ${result.addedCount}.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Ingredient recovery failed unexpectedly.';
+      setIngredientRecoveryMessage(message);
+    } finally {
+      setIsRecoveringIngredients(false);
+    }
+  };
+
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
+  const [showCategoryInfo, setShowCategoryInfo] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low_stock' | 'overstock' | 'optimal'>('all');
   const [filterExpiringSoonOnly, setFilterExpiringSoonOnly] = useState<boolean>(false);
@@ -140,6 +175,7 @@ export const RawIngredients: React.FC = () => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<RawIngredient | null>(null);
+  const [materialFormError, setMaterialFormError] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [stockModalItem, setStockModalItem] = useState<RawIngredient | null>(null);
   const [stockAdjustQty, setStockAdjustQty] = useState<number>(0);
@@ -148,7 +184,7 @@ export const RawIngredients: React.FC = () => {
   const [stockExpiryDate, setStockExpiryDate] = useState<string>('');
 
   // Form state for new raw material / packaging
-  const [addSku, setAddSku] = useState('ING-' + Math.floor(100 + Math.random() * 900));
+  const [addSku, setAddSku] = useState(() => generateUniqueIngredientSku());
   const [addName, setAddName] = useState('');
   const [addCategory, setAddCategory] = useState('milk');
   const [addCategorySelect, setAddCategorySelect] = useState('milk');
@@ -169,7 +205,7 @@ export const RawIngredients: React.FC = () => {
   const [addLocation, setAddLocation] = useState('Dry Storage Bay 1');
 
   const resetMaterialDraft = () => {
-    setAddSku('ING-' + Math.floor(100 + Math.random() * 900));
+    setAddSku(generateUniqueIngredientSku());
     setAddName('');
     setAddCategory('milk');
     setAddCategorySelect('milk');
@@ -194,7 +230,7 @@ export const RawIngredients: React.FC = () => {
   const availableCategories = useMemo(() => {
     const current = ingredients
       .map(ingredient => ingredient.category.trim().toLowerCase())
-      .filter(Boolean);
+      .filter(category => Boolean(category) && !LEGACY_INGREDIENT_CATEGORY_KEYS.includes(category));
     const defaultCategories = STANDARD_INGREDIENT_CATEGORIES;
     return Array.from(new Set([...defaultCategories, ...current]));
   }, [ingredients]);
@@ -205,7 +241,7 @@ export const RawIngredients: React.FC = () => {
 
   // Dynamic available units
   const availableUnits = useMemo(() => {
-    const defaultUnits = ['L', 'kg', 'pieces', 'grams', 'packs', 'bottles', 'boxes', 'bags', 'caps', 'labels', 'rolls', 'sachets'];
+    const defaultUnits = ['L', 'ml', 'kg', 'pieces', 'grams', 'packs', 'bottles', 'cans', 'boxes', 'bags', 'caps', 'labels', 'rolls', 'sachets', 'gal', 'blocks'];
     const current = ingredients.map(ingredient => ingredient.unit.trim()).filter(Boolean);
     return Array.from(
       new Map([...defaultUnits, ...current].map(unit => [unit.toLowerCase(), unit])).values()
@@ -213,17 +249,24 @@ export const RawIngredients: React.FC = () => {
   }, [ingredients]);
 
   const categories = useMemo(() => {
-    const list: { key: string; label: string }[] = [
+    const standardCategories = INGREDIENT_CATEGORY_GROUPS.flatMap(group =>
+      group.categories.map(category => ({
+        ...category,
+        label: formatIngredientCategoryOption(category.key),
+        group: group.label,
+      }))
+    );
+    const list: { key: string; label: string; group?: string }[] = [
       { key: 'all', label: 'All Categories' },
-      { key: 'milk', label: 'Carabao Milk' },
-      { key: 'sweetener', label: 'Sweetener' },
-      { key: 'flavoring', label: 'Flavoring' },
-      { key: 'packaging', label: 'Packaging' },
-      { key: 'additive', label: 'Additive' },
+      ...standardCategories,
     ];
     availableCategories.forEach(cat => {
       if (!list.some(c => c.key === cat)) {
-        list.push({ key: cat, label: cat.replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase()) });
+        list.push({
+          key: cat,
+          label: formatIngredientCategory(cat),
+          group: 'Other Categories',
+        });
       }
     });
     return list;
@@ -293,7 +336,11 @@ export const RawIngredients: React.FC = () => {
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addName.trim()) return;
+    setMaterialFormError('');
+    if (!addName.trim()) {
+      setMaterialFormError('Enter a material name before saving.');
+      return;
+    }
 
     const ingredientData = {
       sku: addSku.trim() || ('ING-' + Math.floor(100 + Math.random() * 900)),
@@ -313,6 +360,15 @@ export const RawIngredients: React.FC = () => {
       expiryDate: isNonPerishable ? undefined : (addExpiryDate || undefined)
     };
 
+    const duplicateSku = ingredients.some(ingredient =>
+      ingredient.id !== editingIngredient?.id &&
+      ingredient.sku.trim().toLowerCase() === ingredientData.sku.toLowerCase()
+    );
+    if (duplicateSku) {
+      setMaterialFormError(`SKU "${ingredientData.sku}" is already in use. Enter a unique SKU and try again.`);
+      return;
+    }
+
     if (editingIngredient) {
       const updatedIngredient: RawIngredient = {
         ...editingIngredient,
@@ -322,12 +378,15 @@ export const RawIngredients: React.FC = () => {
         lastRestocked: editingIngredient.lastRestocked,
       };
       if (!updateIngredientRecord(updatedIngredient)) {
-        window.alert('The raw material could not be updated. Confirm you are signed in as the Lead Developer and check the entered values.');
+        setMaterialFormError('The raw material could not be updated. Confirm you are signed in as the Lead Developer and check the entered values.');
         return;
       }
       setEditingIngredient(null);
     } else {
-      addIngredient(ingredientData);
+      if (!addIngredient(ingredientData)) {
+        setMaterialFormError('The raw material could not be added. Confirm your account has permission and try again.');
+        return;
+      }
     }
     setShowAddModal(false);
 
@@ -413,7 +472,7 @@ export const RawIngredients: React.FC = () => {
       return [
         i.sku,
         i.name,
-        i.category,
+        formatIngredientCategory(i.category),
         i.currentStock,
         i.unit,
         i.reorderPoint,
@@ -516,7 +575,7 @@ export const RawIngredients: React.FC = () => {
     <div className="space-y-6">
       
       {/* Top Header */}
-      <div className="flex flex-col gap-4 bg-white border-2 border-slate-200 p-5 sm:p-6 rounded-3xl shadow-sm text-slate-900">
+      <div className="flex flex-col gap-4 bg-white border-2 border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6 rounded-3xl shadow-sm text-slate-900">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center space-x-2 tracking-tight">
             <Package className="w-6 h-6 text-amber-500" />
@@ -528,7 +587,7 @@ export const RawIngredients: React.FC = () => {
           {isDirectorReadOnly && <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Director / PMO · Read only</span>}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
             <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-100 p-1 text-xs font-bold">
               <button
                 type="button"
@@ -571,8 +630,10 @@ export const RawIngredients: React.FC = () => {
           {!isDirectorReadOnly && (
             <button
               id="btn-add-new-material"
+              type="button"
               onClick={() => {
                 setEditingIngredient(null);
+                setMaterialFormError('');
                 resetMaterialDraft();
                 setShowAddModal(true);
               }}
@@ -582,6 +643,18 @@ export const RawIngredients: React.FC = () => {
               <span>Add New Material</span>
             </button>
           )}
+          {canDeleteRecords && (
+            <button
+              id="btn-recover-raw-ingredients"
+              type="button"
+              onClick={() => void handleRecoverIngredients()}
+              disabled={isRecoveringIngredients}
+              className="flex min-h-11 items-center justify-center space-x-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-800 shadow-sm transition-all hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRecoveringIngredients ? 'animate-spin' : ''}`} />
+              <span>{isRecoveringIngredients ? 'Verifying cloud...' : 'Recover & Verify Cloud'}</span>
+            </button>
+          )}
           <ExportMenu
             onPdf={() => setShowPrintModal(true)}
             onCsv={handleExportIngredientsCsv}
@@ -589,6 +662,15 @@ export const RawIngredients: React.FC = () => {
           />
         </div>
       </div>
+
+      {ingredientRecoveryMessage && (
+        <div
+          role="status"
+          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
+        >
+          {ingredientRecoveryMessage}
+        </div>
+      )}
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -717,16 +799,20 @@ export const RawIngredients: React.FC = () => {
               onChange={event => setSelectedCategory(event.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-none"
             >
-              {categories.map(category => {
+              {categories.filter(category => !category.group).map(category => {
                 const count = category.key === 'all'
                   ? ingredients.length
                   : ingredients.filter(ingredient => ingredient.category.trim().toLowerCase() === category.key).length;
-                return (
-                  <option key={category.key} value={category.key}>
-                    {category.label} ({count})
-                  </option>
-                );
+                return <option key={category.key} value={category.key}>{category.label} ({count})</option>;
               })}
+              {Array.from(new Set(categories.map(category => category.group).filter((group): group is string => Boolean(group)))).map(group => (
+                <optgroup key={group} label={group}>
+                  {categories.filter(category => category.group === group).map(category => {
+                    const count = ingredients.filter(ingredient => ingredient.category.trim().toLowerCase() === category.key).length;
+                    return <option key={category.key} value={category.key}>{category.label} ({count})</option>;
+                  })}
+                </optgroup>
+              ))}
             </select>
           </div>
           <div>
@@ -786,7 +872,7 @@ export const RawIngredients: React.FC = () => {
         <div className="flex items-center justify-between text-xs text-slate-500 px-1">
           <span>
             Showing <strong className="text-slate-800 font-bold">{filtered.length}</strong> of {ingredients.length} raw materials
-            {selectedCategory !== 'all' && <> in <span className="font-semibold text-indigo-600 capitalize">{selectedCategory}</span></>}
+            {selectedCategory !== 'all' && <> in <span className="font-semibold text-indigo-600">{formatIngredientCategory(selectedCategory)}</span></>}
             {selectedLocation !== 'all' && <> at <span className="font-semibold text-indigo-600">{selectedLocation}</span></>}
             {stockFilter !== 'all' && <> &bull; <span className="font-semibold text-indigo-600">{stockFilter === 'low_stock' ? 'Below Safety Stock' : stockFilter === 'overstock' ? 'At or Above Max Stock' : 'Optimal Stock Range'}</span></>}
             {filterExpiringSoonOnly && <> &bull; <span className="font-semibold text-amber-700">Flagged Expiring Within 7 Days</span></>}
@@ -826,9 +912,62 @@ export const RawIngredients: React.FC = () => {
       {viewMode === 'table' && filtered.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <div className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
+            <div className="relative flex items-center space-x-1.5 text-xs font-bold text-slate-700">
               <span>Ingredients &amp; Materials Registry</span>
               <span className="text-slate-400 font-normal">({filtered.length} shown)</span>
+              <button
+                id="btn-ingredient-category-info"
+                type="button"
+                aria-label="Show ingredient category information"
+                aria-expanded={showCategoryInfo}
+                onClick={() => setShowCategoryInfo(open => !open)}
+                className="rounded-full p-1 text-indigo-500 transition-colors hover:bg-indigo-50 hover:text-indigo-700"
+                title="Category information"
+              >
+                <Info className="h-4 w-4" />
+              </button>
+              {showCategoryInfo && (
+                <div
+                  id="ingredient-category-info"
+                  role="region"
+                  aria-label="Ingredient category information"
+                  className="absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-4 text-left font-normal shadow-xl"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-xs font-extrabold text-slate-900">Category Reference</h3>
+                    <button
+                      type="button"
+                      aria-label="Close category information"
+                      onClick={() => setShowCategoryInfo(false)}
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="max-h-64 space-y-3 overflow-y-auto">
+                    {INGREDIENT_CATEGORY_GROUPS.map(group => (
+                      <section key={group.label}>
+                        <h4 className="mb-1 text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                          {group.label}
+                        </h4>
+                        <ul className="space-y-1">
+                          {group.categories.map(category => (
+                            <li key={category.key} className="flex justify-between gap-3 text-[11px] text-slate-700">
+                              <span>{category.label}</span>
+                              <span className="shrink-0 font-mono font-bold text-indigo-600">
+                                {formatIngredientCategoryOption(category.key).split(' - ')[0]}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                  <p className="mt-3 border-t border-slate-100 pt-2 text-[10px] leading-relaxed text-slate-500">
+                    Custom categories are shown with their entered name and do not use a category prefix.
+                  </p>
+                </div>
+              )}
             </div>
             <button
               id="btn-table-print-ingredients"
@@ -890,8 +1029,8 @@ export const RawIngredients: React.FC = () => {
 
                     {/* Category */}
                     <td className="py-3.5 px-3">
-                      <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        {ing.category}
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {formatIngredientCategory(ing.category)}
                       </span>
                     </td>
 
@@ -1013,8 +1152,8 @@ export const RawIngredients: React.FC = () => {
                       <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                         {ing.sku}
                       </span>
-                      <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        {ing.category}
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {formatIngredientCategory(ing.category)}
                       </span>
                     </div>
                     <h3 className="font-extrabold text-slate-900 text-base mt-2">{ing.name}</h3>
@@ -1224,7 +1363,18 @@ export const RawIngredients: React.FC = () => {
             </div>
 
             {/* Scrollable Form Body with internal padding and custom sleek scrollbar */}
-            <form onSubmit={handleAddSubmit} id="add-raw-material-form" className="p-6 space-y-4 text-xs overflow-y-auto custom-scrollbar flex-1">
+            <form
+              onSubmit={handleAddSubmit}
+              onInvalidCapture={() => setMaterialFormError('Complete each required field with a valid value before saving.')}
+              onInputCapture={() => setMaterialFormError('')}
+              id="add-raw-material-form"
+              className="p-6 space-y-4 text-xs overflow-y-auto custom-scrollbar flex-1"
+            >
+              {materialFormError && (
+                <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+                  {materialFormError}
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-600 mb-1">SKU / Item Code</label>
@@ -1252,19 +1402,22 @@ export const RawIngredients: React.FC = () => {
                     }}
                     className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl font-semibold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer shadow-sm text-xs"
                   >
-                    <option value="milk">Milk (Raw Carabao Milk, Skim, Cream)</option>
-                    <option value="packaging">Packaging (Bottles, Caps, Pouches, Labels)</option>
-                    <option value="sweetener">Sweetener (Refined Sugar, Syrup)</option>
-                    <option value="flavoring">Flavoring (Cocoa, Vanilla, Fruit Extracts)</option>
-                    <option value="culture">Cultures (Starter, Rennet, Probiotics)</option>
-                    <option value="additive">Additives & Minerals</option>
-                    <option value="stabilizer">Stabilizer & Emulsifiers</option>
-                    <option value="sanitizer">Sanitizer & Cleaning Agents</option>
-                    {customCategories.map(category => (
-                      <option key={category} value={category}>
-                        {category.replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase())}
-                      </option>
+                    {INGREDIENT_CATEGORY_GROUPS.map(group => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.categories.map(category => (
+                          <option key={category.key} value={category.key}>{formatIngredientCategoryOption(category.key)}</option>
+                        ))}
+                      </optgroup>
                     ))}
+                    {customCategories.length > 0 && (
+                      <optgroup label="Other Categories">
+                        {customCategories.map(category => (
+                          <option key={category} value={category}>
+                            {category.replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase())}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                     <option value="custom">+ Custom Category...</option>
                   </select>
                   {addCategorySelect === 'custom' && (
@@ -1312,7 +1465,7 @@ export const RawIngredients: React.FC = () => {
                     className="w-full px-3 py-2 bg-slate-50 border rounded-xl font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
                   />
                 </div>
-                <div>
+                <div className="order-2">
                   <label className="block font-bold text-slate-600 mb-1">Unit</label>
                   <select
                     value={addUnitSelect}
@@ -1329,8 +1482,11 @@ export const RawIngredients: React.FC = () => {
                   >
                     <option value="kg">Kilograms (kg)</option>
                     <option value="L">Liters (L)</option>
+                    <option value="ml">Milliliters (ml)</option>
+                    <option value="gal">Gallon (gal)</option>
                     <option value="pieces">Pieces (pcs)</option>
                     <option value="bottles">Bottles</option>
+                    <option value="cans">Cans</option>
                     <option value="caps">Caps / Seals</option>
                     <option value="packs">Packs / Pouches</option>
                     <option value="grams">Grams (g)</option>
@@ -1339,6 +1495,7 @@ export const RawIngredients: React.FC = () => {
                     <option value="labels">Labels</option>
                     <option value="rolls">Rolls</option>
                     <option value="sachets">Sachets</option>
+                    <option value="blocks">Blocks</option>
                     {availableUnits
                       .filter(unit => !STANDARD_INGREDIENT_UNITS.includes(unit.toLowerCase()))
                       .map(unit => (
@@ -1360,7 +1517,7 @@ export const RawIngredients: React.FC = () => {
                     />
                   )}
                 </div>
-                <div>
+                <div className="order-3">
                   <div className="mb-1 flex items-center justify-between gap-1">
                     <label className="block font-bold text-slate-600">Unit Cost (₱)</label>
                     <button

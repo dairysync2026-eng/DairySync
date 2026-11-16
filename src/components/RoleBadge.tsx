@@ -24,12 +24,20 @@ export const RoleBadge: React.FC = () => {
           desc: 'Unrestricted master access: all 7 subsystems unlocked, live RBAC role simulation & full administrative operations.',
           isDev: true
         };
+      case 'system_admin':
+        return {
+          icon: UserCog,
+          bg: 'bg-indigo-50 border-indigo-200 text-indigo-900',
+          badgeText: 'System Administrator View',
+          desc: 'Staff account administration, audit review, and system health monitoring.',
+          isDev: false
+        };
       case 'director':
         return {
           icon: ShieldAlert,
           bg: 'bg-purple-50 border-purple-200 text-purple-900',
           badgeText: 'Director / PMO Supervisor View',
-          desc: 'High-level executive oversight, budget allocation, production planning & ISO 25010 compliance monitoring.',
+          desc: 'High-level executive oversight, budget allocation, production planning & system compliance monitoring.',
           isDev: false
         };
       case 'procurement':
@@ -80,6 +88,7 @@ export const RoleBadge: React.FC = () => {
 
   const roleLabels: Record<UserRole, { short: string; roleName: string }> = {
     developer: { short: 'DEV', roleName: 'Lead Dev Command' },
+    system_admin: { short: 'ADMIN', roleName: 'System Administration' },
     director: { short: 'PMO', roleName: 'Director Dashboard' },
     procurement: { short: 'ROP', roleName: 'Procurement Desk' },
     plant_manager: { short: 'PLANT', roleName: 'Plant Manager' },

@@ -731,7 +731,7 @@ export const INITIAL_TRANSACTIONS: StockTransaction[] = [];
 export const INITIAL_AUDIT_LOGS: AuditLogEntry[] = [];
 
 export const SAMPLE_RECORD_IDS: Partial<Record<
-  'user_profile' | 'ingredient' | 'finished_good' | 'wip_batch' | 'commitment' | 'alert' | 'stock_adjustment' | 'audit_log',
+  'user_profile' | 'ingredient' | 'finished_good' | 'wip_batch' | 'wip_production_record' | 'commitment' | 'alert' | 'stock_adjustment' | 'audit_log',
   readonly string[]
 >> = {
   user_profile: ['usr-dev', 'usr-1', 'usr-2', 'usr-3', 'usr-4', 'usr-5'],

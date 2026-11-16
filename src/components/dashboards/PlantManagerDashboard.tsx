@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDairySync } from '../../context/DairySyncContext';
+import { StockRequestsPanel } from './StockRequestsPanel';
 import { 
   Snowflake, 
   Factory, 
@@ -23,7 +24,7 @@ interface SubsystemDashboardProps {
 }
 
 export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNavigateTab }) => {
-  const { finishedGoods, wipBatches, ingredients, commitments, currentUser, canAccessTab } = useDairySync();
+  const { finishedGoods, wipBatches, ingredients, commitments, stockRequests, currentUser, canAccessTab } = useDairySync();
 
   const totalColdCapacity = finishedGoods.reduce((sum, fg) => sum + fg.coldStorageCapacity, 0);
   const currentColdStock = finishedGoods.reduce((sum, fg) => sum + fg.currentStock, 0);
@@ -31,6 +32,8 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
 
   const activeWipBatches = wipBatches.filter(b => b.status !== 'completed' && b.status !== 'cancelled');
   const activeCommitments = commitments.filter(c => c.status === 'pending' || c.status === 'in_progress');
+  const requestsAwaitingReview = stockRequests.filter(request => request.status === 'pending').length;
+  const approvedRequests = stockRequests.filter(request => request.status === 'approved').length;
   const rawMilk = ingredients.find(i => i.category === 'milk');
   const productionStages = [
     { key: 'scheduled', label: 'Scheduled Batch', description: 'Raw milk & materials allocated' },
@@ -43,7 +46,7 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
   const subsystemCards = [
     {
       id: 'finished',
-      label: 'Cold Storage',
+      label: 'Finished Goods',
       title: 'Finished Goods',
       meta: `${coldOccupancyPct}% Occupied`,
       className: 'bg-white hover:bg-teal-50/50 border-2 border-teal-200 rounded-2xl',
@@ -73,7 +76,7 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
     },
     {
       id: 'ingredients',
-      label: 'Raw Ingredients',
+      label: 'Raw Materials',
       title: 'Bulk Storage',
       meta: `${rawMilk?.currentStock ?? 0} L Milk Silo`,
       className: 'bg-white hover:bg-slate-50 border-2 border-slate-200 rounded-2xl',
@@ -93,13 +96,23 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
     },
     {
       id: 'sync',
-      label: 'Supply & Demand',
+      label: 'Supply and demand',
       title: 'Commitment Planning',
       meta: `${activeCommitments.length} Active Commitments`,
       className: 'bg-white hover:bg-emerald-50/50 border-2 border-emerald-200 rounded-2xl',
       textColor: 'text-emerald-700',
       accent: 'text-emerald-600',
       onClick: () => onNavigateTab('sync')
+    },
+    {
+      id: 'pos_stock_requests',
+      label: 'POS Stock Request',
+      title: 'Dairy Box Stock Requests',
+      meta: `${requestsAwaitingReview} Awaiting Review`,
+      className: 'bg-white hover:bg-emerald-50/50 border-2 border-emerald-200 rounded-2xl',
+      textColor: 'text-emerald-700',
+      accent: 'text-emerald-600',
+      onClick: () => document.getElementById('plant-manager-stock-requests')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     },
     {
       id: 'pos',
@@ -121,7 +134,7 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
       accent: 'text-violet-600',
       onClick: () => onNavigateTab('audit')
     }
-  ].filter(card => canAccessTab(card.id));
+  ].filter(card => card.id === 'pos_stock_requests' || canAccessTab(card.id));
 
   // Nearest shelf life products
   const expiringSoon = [...finishedGoods].sort((a, b) => a.shelfLifeDays - b.shelfLifeDays).slice(0, 4);
@@ -237,7 +250,30 @@ export const PlantManagerDashboard: React.FC<SubsystemDashboardProps> = ({ onNav
           })}
         </div>
       </section>
-699999
+
+      <section
+        id="plant-manager-stock-request-summary"
+        className="flex w-full flex-col gap-3 rounded-3xl border-2 border-emerald-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h3 className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+            <ClipboardList className="h-4 w-4 text-emerald-700" />
+            POS Stock Request
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            {requestsAwaitingReview} awaiting review · {approvedRequests} approved and awaiting stock or fulfillment
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-2 self-start rounded-xl bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 sm:self-auto">
+          Request summary
+          <ArrowRight className="h-3.5 w-3.5" />
+        </span>
+      </section>
+
+      <div id="plant-manager-stock-requests" className="scroll-mt-6">
+        <StockRequestsPanel mode="review" onNavigateTab={onNavigateTab} />
+      </div>
+
       {/* Facility & Cold Chain Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         

@@ -12,9 +12,11 @@ import {
   RawIngredient, 
   FinishedGood, 
   WipBatch, 
+  WipProductionRecord,
   SupplyDemandCommitment, 
   SystemAlert, 
   StockTransaction,
+  StockRequest,
   BomIngredientRequirement,
   IsoEvaluationRating,
   WipStep,
@@ -38,8 +40,10 @@ import {
 } from '../services/inventoryDb';
 import {
   deleteSqlConnectEntity,
+  fetchRawIngredients,
   isSqlConnectEntity,
   seedSqlConnectEntity,
+  saveRawIngredient,
   saveSqlConnectEntity,
   sqlConnectCollections,
   SqlConnectEntity
@@ -57,20 +61,34 @@ import {
   SAMPLE_RECORD_IDS
 } from '../data/initialData';
 import { auth } from '../services/firebase';
+import {
+  createManagedAccount,
+  fetchManagedAccounts as fetchManagedAccountsFromAuth,
+  requestManagedAccountPasswordReset,
+  setManagedAccountDisabled,
+  setManagedAccountRole,
+  type ManagedAccount,
+} from '../services/adminAccounts';
 import { calculatePmoExpectedEnding, getPmoInventoryActivity } from '../utils/pmoInventoryLedger';
 import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
+import {
+  convertInventoryQuantityToRecipe,
+  convertRecipeQuantityToInventory,
+  getRecipeUnitsPerInventoryUnit,
+} from '../utils/unitConversions';
 
 export const ROLE_ALLOWED_TABS: Record<UserRole, string[]> = {
-  developer: ['dashboard', 'ingredients', 'pmo_inventory', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit', 'documentation'],
+  developer: ['dashboard', 'ingredients', 'pmo_inventory', 'wip', 'wip_inventory', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit', 'documentation', 'administration'],
+  system_admin: ['dashboard', 'audit', 'documentation', 'administration'],
   director: ['dashboard', 'ingredients', 'pmo_inventory', 'wip', 'finished', 'recipes', 'sync', 'procurement', 'pos', 'audit'],
   procurement: ['dashboard', 'procurement', 'ingredients', 'pmo_inventory'],
-  plant_manager: ['dashboard', 'finished', 'recipes', 'wip', 'ingredients', 'pmo_inventory', 'procurement', 'sync', 'pos', 'audit'],
+  plant_manager: ['dashboard', 'finished', 'recipes', 'wip', 'wip_inventory', 'ingredients', 'pmo_inventory', 'procurement', 'sync', 'pos', 'audit'],
   production_staff: ['dashboard', 'wip', 'ingredients'],
   store_outlet: ['dashboard', 'pos', 'finished']
 };
 
 const isUserRole = (value: unknown): value is UserRole =>
-  value === 'developer' || value === 'director' || value === 'procurement' ||
+  value === 'developer' || value === 'system_admin' || value === 'director' || value === 'procurement' ||
   value === 'plant_manager' || value === 'production_staff' || value === 'store_outlet';
 
 interface DairySyncContextType {
@@ -92,9 +110,12 @@ interface DairySyncContextType {
   allowedTabs: string[];
   
   ingredients: RawIngredient[];
+  recoverRawIngredients: () => Promise<{ sourceCount: number; cloudCount: number; addedCount: number }>;
   finishedGoods: FinishedGood[];
   wipBatches: WipBatch[];
+  wipProductionRecords: WipProductionRecord[];
   commitments: SupplyDemandCommitment[];
+  stockRequests: StockRequest[];
   alerts: SystemAlert[];
   transactions: StockTransaction[];
   isoRatings: IsoEvaluationRating[];
@@ -102,7 +123,7 @@ interface DairySyncContextType {
   pmoInventoryPeriods: PmoInventoryPeriod[];
   importPmoInventoryPeriod: (period: Omit<PmoInventoryPeriod, 'id' | 'createdAt' | 'createdBy' | 'status' | 'postedAt' | 'postedBy'>) => { success: boolean; message: string };
   savePmoInventoryPeriod: (period: PmoInventoryPeriod) => { success: boolean; message: string };
-  postPmoInventoryPeriod: (periodId: string) => { success: boolean; message: string };
+  postPmoInventoryPeriod: (periodId: string, lines?: PmoInventoryLine[]) => { success: boolean; message: string };
   deletePmoInventoryPeriod: (periodId: string) => { success: boolean; message: string };
   addPmoExternalPurchase: (
     periodId: string,
@@ -115,9 +136,15 @@ interface DairySyncContextType {
     kind: 'expired' | 'damage' | 'waste' | 'returned',
     notes?: string
   ) => { success: boolean; message: string };
+  recordPmoFinishedGoodAdjustment: (
+    finishedGoodId: string,
+    quantity: number,
+    kind: 'expired' | 'damage' | 'waste' | 'returned',
+    notes?: string
+  ) => { success: boolean; message: string };
   
   // Actions
-  addIngredient: (ingredient: Omit<RawIngredient, 'id'>) => void;
+  addIngredient: (ingredient: Omit<RawIngredient, 'id'>) => boolean;
   updateIngredientRecord: (ingredient: RawIngredient) => boolean;
   updateIngredientStock: (id: string, newStock: number, notes?: string, expiryDate?: string) => boolean;
   addFinishedGood: (product: Omit<FinishedGood, 'id'>) => void;
@@ -125,7 +152,9 @@ interface DairySyncContextType {
   updateFinishedGoodRecipe: (
     id: string,
     recipe: BomIngredientRequirement[],
-    batchUnitQuantity: number
+    batchUnitQuantity: number,
+    unit: string,
+    containerVolumeMl?: number
   ) => boolean;
   deleteFinishedGoodRecipe: (id: string) => boolean;
   deleteIngredientRecord: (id: string) => boolean;
@@ -141,14 +170,30 @@ interface DairySyncContextType {
     rawMilkVolumeUsed: number;
     assignedStaff: string;
     notes?: string;
+    ingredientSelections?: Record<string, string | null>;
   }) => { success: boolean; message: string };
   
   advanceWipBatchStep: (batchId: string, nextStep: WipStep) => void;
   cancelWipBatch: (batchId: string, reason?: string) => { success: boolean; message: string };
   deleteWipBatchRecord: (batchId: string) => boolean;
+  saveWipProductionRecord: (record: WipProductionRecord) => { success: boolean; message: string };
   
   // Retail / POS Actions
   processRetailSale: (items: { productId: string; quantity: number }[]) => { success: boolean; message: string };
+  createStockRequest: (request: {
+    finishedGoodId: string;
+    quantity: number;
+    neededBy?: string;
+    notes?: string;
+  }) => { success: boolean; message: string };
+  reviewStockRequest: (
+    id: string,
+    status: 'approved' | 'rejected' | 'fulfilled',
+    responseNotes?: string,
+    allocationQuantity?: number
+  ) => { success: boolean; message: string };
+  cancelStockRequest: (id: string) => { success: boolean; message: string };
+  deleteStockRequest: (id: string) => Promise<{ success: boolean; message: string }>;
   
   // Commitment Actions
   addCommitment: (commitment: Omit<SupplyDemandCommitment, 'id'>) => void;
@@ -191,6 +236,12 @@ interface DairySyncContextType {
   // User Profile & Authentication Actions
   addUserProfile: (profile: Omit<UserProfile, 'id'>) => { success: boolean; message: string };
   updateUserProfile: (userId: string, updates: Partial<UserProfile>) => { success: boolean; message: string };
+  fetchManagedAccounts: () => Promise<ManagedAccount[]>;
+  createManagedUser: (profile: Omit<UserProfile, 'id'>) => Promise<{ success: boolean; message: string }>;
+  updateManagedUserProfile: (userId: string, updates: Pick<UserProfile, 'name' | 'username' | 'title' | 'department'>) => Promise<{ success: boolean; message: string }>;
+  updateManagedUserRole: (account: ManagedAccount, role: UserRole) => Promise<{ success: boolean; message: string }>;
+  setManagedUserDisabled: (account: ManagedAccount, disabled: boolean) => Promise<{ success: boolean; message: string }>;
+  sendManagedUserPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
 
   // Accessibility Theme Preferences
   themeMode: ThemeMode;
@@ -324,6 +375,10 @@ const normalizeRole = (role: string | undefined | null): UserRole => {
   switch (normalized) {
     case 'developer':
       return 'developer';
+    case 'system_admin':
+    case 'systemadmin':
+    case 'administrator':
+      return 'system_admin';
     case 'director':
     case 'pmo':
     case 'pmo/director':
@@ -450,16 +505,40 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       window.clearTimeout(timeoutId);
       const remaining = AUTH_IDLE_TIMEOUT_MS - (Date.now() - lastActivityAt);
       timeoutId = window.setTimeout(() => {
-        const idleDuration = Date.now() - lastActivityAt;
-        if (idleDuration < AUTH_IDLE_TIMEOUT_MS) {
-          scheduleSignOut();
-          return;
-        }
+        void (async () => {
+          const idleDuration = Date.now() - lastActivityAt;
+          if (idleDuration < AUTH_IDLE_TIMEOUT_MS) {
+            scheduleSignOut();
+            return;
+          }
 
-        setAuthError('You were signed out after 10 minutes of inactivity. Please sign in again.');
-        void firebaseSignOut(auth).catch(error => {
-          console.error('Automatic sign-out after inactivity failed:', error);
-        });
+          let draftsQueued = true;
+          try {
+            const savedPeriods = localStorage.getItem(`${LOCAL_STORAGE_KEY}_pmo_inventory_periods`);
+            const periods = savedPeriods ? JSON.parse(savedPeriods) as PmoInventoryPeriod[] : [];
+            for (const period of periods) {
+              if (period.status !== 'draft') continue;
+              const queuedId = await enqueueOfflineAction({
+                entity: 'pmo_inventory_period',
+                action: 'SQL_UPSERT',
+                payload: period,
+                userEmail: firebaseUser.email || undefined,
+                userUid: firebaseUser.uid,
+              });
+              if (queuedId < 0) draftsQueued = false;
+            }
+          } catch (error) {
+            draftsQueued = false;
+            console.error('Could not queue PMO drafts before automatic sign-out:', error);
+          }
+
+          setAuthError(draftsQueued
+            ? 'You were signed out after 10 minutes of inactivity. PMO drafts are saved and will sync after you sign in again.'
+            : 'You were signed out after 10 minutes of inactivity. PMO drafts remain saved on this device, but cloud sync could not be queued.');
+          void firebaseSignOut(auth).catch(error => {
+            console.error('Automatic sign-out after inactivity failed:', error);
+          });
+        })();
       }, Math.max(remaining, 0));
     };
 
@@ -537,6 +616,22 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   });
 
+  const [wipProductionRecords, setWipProductionRecords] = useState<WipProductionRecord[]>(() => {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_wip_production_records`);
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved) as WipProductionRecord[];
+      return Array.isArray(parsed) ? parsed.filter(record =>
+        typeof record?.id === 'string' &&
+        typeof record.batchId === 'string' &&
+        Array.isArray(record.yieldPackages)
+      ) : [];
+    } catch (error) {
+      console.error('Could not read saved WIP production records:', error);
+      return [];
+    }
+  });
+
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_theme_mode`);
     return (saved === 'high_contrast' ? 'high_contrast' : 'standard') as ThemeMode;
@@ -577,6 +672,24 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       seen.add(c.id);
       return true;
     });
+  });
+
+  const [stockRequests, setStockRequests] = useState<StockRequest[]>(() => {
+    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_stock_requests`);
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved) as StockRequest[];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(request =>
+        typeof request?.id === 'string' &&
+        typeof request.finishedGoodId === 'string' &&
+        typeof request.quantity === 'number' &&
+        typeof request.status === 'string'
+      );
+    } catch (error) {
+      console.error('Could not read saved finished goods stock requests:', error);
+      return [];
+    }
   });
 
   const [alerts, setAlerts] = useState<SystemAlert[]>(() => {
@@ -645,9 +758,16 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return typeof navigator !== 'undefined' ? navigator.onLine : true;
   });
   const collectionStatusesRef = useRef(new Map<SqlConnectEntity, SqlCollectionStatus>());
+  const offlineSyncInProgressRef = useRef(false);
+  const automaticStockAllocationKeyRef = useRef('');
   const refreshSqlCloudStatus = () => {
-    const statuses = [...collectionStatusesRef.current.values()];
-    const collectionCount = Object.keys(sqlConnectCollections).length;
+    const monitoredEntities: SqlConnectEntity[] = authenticatedRole === 'system_admin'
+      ? ['user_profile', 'audit_log']
+      : Object.keys(sqlConnectCollections) as SqlConnectEntity[];
+    const statuses = monitoredEntities
+      .map(entity => collectionStatusesRef.current.get(entity))
+      .filter((status): status is SqlCollectionStatus => status !== undefined);
+    const collectionCount = monitoredEntities.length;
     setCloudSyncStatus(
       statuses.includes('offline')
         ? 'offline'
@@ -665,6 +785,69 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const userEmail = firebaseUser?.email || undefined;
   const userUid = firebaseUser?.uid;
 
+  const recoverRawIngredients = async () => {
+    if (!isAuthenticated || authenticatedRole !== 'developer' || !firebaseUser) {
+      throw new Error('Sign in with the Lead Developer account to recover raw ingredients.');
+    }
+    if (!isOnline) {
+      throw new Error('Connect to the internet before recovering raw ingredients.');
+    }
+
+    const recoveryBaseKey = 'dairysync_sql_connect_ingredient_backfill_v1';
+    const savedSource = localStorage.getItem(`${recoveryBaseKey}_source`);
+    let preservedRows: RawIngredient[] = [];
+    if (savedSource) {
+      const parsed: unknown = JSON.parse(savedSource);
+      if (!Array.isArray(parsed)) {
+        throw new Error('The saved ingredient recovery copy is invalid. Keep this browser data and contact support.');
+      }
+      preservedRows = parsed.filter((row): row is RawIngredient =>
+        Boolean(row) &&
+        typeof row === 'object' &&
+        typeof (row as RawIngredient).id === 'string'
+      );
+    }
+
+    const sourceById = new Map<string, RawIngredient>();
+    for (const ingredient of preservedRows) sourceById.set(ingredient.id, ingredient);
+    for (const ingredient of ingredients) {
+      if (!isScreenshotRawIngredient(ingredient) && !(SAMPLE_RECORD_IDS.ingredient ?? []).includes(ingredient.id)) {
+        sourceById.set(ingredient.id, ingredient);
+      }
+    }
+    const sourceRows = [...sourceById.values()];
+    const cloudRows = await fetchRawIngredients();
+    const cloudIds = new Set(cloudRows.map(row => row.id));
+    const missingRows = sourceRows.filter(row => !cloudIds.has(row.id));
+
+    for (let index = 0; index < missingRows.length; index += 10) {
+      const results = await Promise.allSettled(missingRows.slice(index, index + 10).map(saveRawIngredient));
+      const failures = results.filter(result => result.status === 'rejected');
+      if (failures.length > 0) {
+        reportSqlCollectionStatus('ingredient', 'offline');
+        throw new Error(`${failures.length} of ${missingRows.length} missing ingredients could not be uploaded. Check permissions and retry; successful uploads are safe to retry.`);
+      }
+    }
+
+    const verifiedRows = await fetchRawIngredients();
+    const verifiedIds = new Set(verifiedRows.map(row => row.id));
+    const missingAfterUpload = sourceRows.filter(row => !verifiedIds.has(row.id));
+    if (missingAfterUpload.length > 0) {
+      reportSqlCollectionStatus('ingredient', 'offline');
+      throw new Error(`Cloud verification found ${missingAfterUpload.length} source ingredients still missing. Keep this browser open and retry.`);
+    }
+
+    localStorage.setItem(`${recoveryBaseKey}_source`, JSON.stringify(sourceRows));
+    localStorage.setItem(recoveryBaseKey, 'complete');
+    setIngredients(verifiedRows);
+    reportSqlCollectionStatus('ingredient', 'synced');
+    return {
+      sourceCount: sourceRows.length,
+      cloudCount: verifiedRows.length,
+      addedCount: missingRows.length,
+    };
+  };
+
   useEffect(() => {
     if (!cloudEnabled) {
       collectionStatusesRef.current.clear();
@@ -673,17 +856,19 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [cloudEnabled]);
 
   useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: users, setRows: setUsers, adapter: sqlConnectCollections.user_profile, entity: 'user_profile', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: ingredients, setRows: setIngredients, adapter: sqlConnectCollections.ingredient, entity: 'ingredient', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotRawIngredient });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: finishedGoods, setRows: setFinishedGoods, adapter: sqlConnectCollections.finished_good, entity: 'finished_good', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotFinishedGood });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: authenticatedRole !== 'system_admin', canSeed: canSeedCloudData, online: isOnline, rows: ingredients, setRows: setIngredients, adapter: sqlConnectCollections.ingredient, entity: 'ingredient', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotRawIngredient, preserveLocalWhenCloudEmpty: false, backfillMissingRowsOnce: true });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: authenticatedRole !== 'system_admin', canSeed: canSeedCloudData, online: isOnline, rows: finishedGoods, setRows: setFinishedGoods, adapter: sqlConnectCollections.finished_good, entity: 'finished_good', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotFinishedGood });
   useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'plant_manager', 'production_staff'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: wipBatches, setRows: setWipBatches, adapter: sqlConnectCollections.wip_batch, entity: 'wip_batch', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotWipBatch });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'plant_manager'].includes(authenticatedRole || ''), canSeed: false, online: isOnline, rows: wipProductionRecords, setRows: setWipProductionRecords, adapter: sqlConnectCollections.wip_production_record, entity: 'wip_production_record', userEmail, userUid, onStatus: reportSqlCollectionStatus });
   useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'procurement', 'plant_manager'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: commitments, setRows: setCommitments, adapter: sqlConnectCollections.commitment, entity: 'commitment', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotCommitment });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: alerts, setRows: setAlerts, adapter: sqlConnectCollections.alert, entity: 'alert', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotAlert });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: transactions, setRows: setTransactions, adapter: sqlConnectCollections.stock_adjustment, entity: 'stock_adjustment', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotTransaction });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'plant_manager', 'store_outlet'].includes(authenticatedRole || ''), canSeed: false, online: isOnline, rows: stockRequests, setRows: setStockRequests, adapter: sqlConnectCollections.stock_request, entity: 'stock_request', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: authenticatedRole !== 'system_admin', canSeed: canSeedCloudData, online: isOnline, rows: alerts, setRows: setAlerts, adapter: sqlConnectCollections.alert, entity: 'alert', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotAlert });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: authenticatedRole !== 'system_admin', canSeed: canSeedCloudData, online: isOnline, rows: transactions, setRows: setTransactions, adapter: sqlConnectCollections.stock_adjustment, entity: 'stock_adjustment', userEmail, userUid, onStatus: reportSqlCollectionStatus, removeMatchingRows: isScreenshotTransaction });
   useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: ['developer', 'director', 'procurement', 'plant_manager'].includes(authenticatedRole || ''), canSeed: canSeedCloudData, online: isOnline, rows: pmoInventoryPeriods, setRows: setPmoInventoryPeriods, adapter: sqlConnectCollections.pmo_inventory_period, entity: 'pmo_inventory_period', userEmail, userUid, onStatus: reportSqlCollectionStatus });
-  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: true, canSeed: canSeedCloudData, online: isOnline, rows: isoRatings, setRows: setIsoRatings, adapter: sqlConnectCollections.iso_rating, entity: 'iso_rating', userEmail, userUid, onStatus: reportSqlCollectionStatus });
+  useSqlConnectCollection({ enabled: cloudEnabled, readEnabled: authenticatedRole !== 'system_admin', canSeed: canSeedCloudData, online: isOnline, rows: isoRatings, setRows: setIsoRatings, adapter: sqlConnectCollections.iso_rating, entity: 'iso_rating', userEmail, userUid, onStatus: reportSqlCollectionStatus });
   useSqlConnectCollection({
     enabled: cloudEnabled,
-    readEnabled: ['developer', 'director'].includes(authenticatedRole || ''),
+    readEnabled: ['developer', 'system_admin', 'director'].includes(authenticatedRole || ''),
     canSeed: canSeedCloudData,
     online: isOnline,
     rows: auditLogs,
@@ -709,6 +894,10 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_wip_batches`, JSON.stringify(wipBatches));
   }, [wipBatches]);
+
+  useEffect(() => {
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_wip_production_records`, JSON.stringify(wipProductionRecords));
+  }, [wipProductionRecords]);
 
   // Persist critical inventory stores to IndexedDB for offline durability
   useEffect(() => {
@@ -746,6 +935,10 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_commitments`, JSON.stringify(commitments));
   }, [commitments]);
+
+  useEffect(() => {
+    localStorage.setItem(`${LOCAL_STORAGE_KEY}_stock_requests`, JSON.stringify(stockRequests));
+  }, [stockRequests]);
 
   useEffect(() => {
     localStorage.setItem(`${LOCAL_STORAGE_KEY}_alerts`, JSON.stringify(alerts));
@@ -824,7 +1017,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     ? {
         ...(directoryUser || selectedRoleUser),
         id: directoryUser?.id || firebaseUser.uid,
-        name: firebaseUser.displayName || directoryUser?.name || firebaseUser.email || selectedRoleUser.name,
+        name: directoryUser?.name || firebaseUser.displayName || firebaseUser.email || selectedRoleUser.name,
         email: firebaseUser.email || directoryUser?.email || selectedRoleUser.email,
         username: directoryUser?.username || firebaseUser.email || selectedRoleUser.username,
         role: authenticatedRole
@@ -947,11 +1140,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
 
+    if (offlineSyncInProgressRef.current) return;
+    offlineSyncInProgressRef.current = true;
     setCloudSyncStatus('syncing');
     let syncedCount = 0;
     const syncedEntities = new Set<SqlConnectEntity>();
     try {
-      await sqlConnectCollections.ingredient.fetch();
       const queue = await getPendingOfflineActions();
       for (const item of queue) {
         if (item.id === undefined) continue;
@@ -1055,6 +1249,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (e) {
       console.warn('Sync error:', e);
       setCloudSyncStatus('offline');
+    } finally {
+      offlineSyncInProgressRef.current = false;
     }
   };
 
@@ -1101,6 +1297,105 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     setAuditLogs(prev => [newEntry, ...prev]);
   };
+
+  useEffect(() => {
+    if (currentRole !== 'plant_manager' && currentRole !== 'developer') return;
+
+    const allocationKey = JSON.stringify({
+      products: finishedGoods.map(product => [
+        product.id,
+        product.currentStock,
+        product.allocatedRetail,
+        product.allocatedFeedingProgram,
+      ]),
+      requests: stockRequests
+        .filter(request => request.status === 'approved')
+        .map(request => [request.id, request.quantity, request.fulfilledQuantity ?? 0, request.finishedGoodId]),
+    });
+    if (automaticStockAllocationKeyRef.current === allocationKey) return;
+    automaticStockAllocationKeyRef.current = allocationKey;
+
+    const availableByProduct = new Map(finishedGoods.map(product => [
+      product.id,
+      Math.max(0, product.currentStock - product.allocatedRetail - product.allocatedFeedingProgram),
+    ]));
+    const additionalAllocationByProduct = new Map<string, number>();
+    const now = new Date().toISOString();
+    const updates = new Map<string, StockRequest>();
+    const allocationAlerts: SystemAlert[] = [];
+
+    const approvedRequests = stockRequests
+      .filter(request => request.status === 'approved')
+      .sort((a, b) => Date.parse(a.requestedAt) - Date.parse(b.requestedAt));
+
+    for (const request of approvedRequests) {
+      const available = availableByProduct.get(request.finishedGoodId) ?? 0;
+      const remaining = Math.max(0, request.quantity - (request.fulfilledQuantity ?? 0));
+      const quantityToAllocate = Math.min(available, remaining);
+      if (quantityToAllocate < 1) continue;
+
+      const fulfilledQuantity = (request.fulfilledQuantity ?? 0) + quantityToAllocate;
+      const isFulfilled = fulfilledQuantity >= request.quantity;
+      availableByProduct.set(request.finishedGoodId, available - quantityToAllocate);
+      additionalAllocationByProduct.set(
+        request.finishedGoodId,
+        (additionalAllocationByProduct.get(request.finishedGoodId) ?? 0) + quantityToAllocate
+      );
+      updates.set(request.id, {
+        ...request,
+        status: isFulfilled ? 'fulfilled' : 'approved',
+        fulfilledQuantity,
+        fulfilledAt: isFulfilled ? now : undefined,
+        reviewedBy: currentUser.email,
+        reviewedAt: now,
+      });
+      allocationAlerts.push({
+        id: `${request.id}-auto-allocation-${fulfilledQuantity}`,
+        timestamp: now,
+        type: 'stock_request',
+        title: `Dairy Box Stock Request ${isFulfilled ? 'fulfilled' : 'partially fulfilled'}`,
+        message: isFulfilled
+          ? `Your request for ${request.quantity} ${request.unit} of ${request.finishedGoodName} was automatically fulfilled.`
+          : `${quantityToAllocate} of ${request.quantity} ${request.unit} of ${request.finishedGoodName} was automatically allocated; the remaining ${request.quantity - fulfilledQuantity} stays approved.`,
+        severity: 'info',
+        read: false,
+        targetRole: ['store_outlet'],
+      });
+      logAuditAction({
+        category: 'cold_storage',
+        subsystem: 'Dairy Box Stock Requests',
+        action: isFulfilled
+          ? 'FINISHED_GOODS_REQUEST_AUTO_FULFILLED'
+          : 'FINISHED_GOODS_REQUEST_AUTO_PARTIALLY_FULFILLED',
+        description: `Automatically allocated ${quantityToAllocate} ${request.unit} of ${request.finishedGoodName} to Dairy Box${isFulfilled ? '' : `; ${request.quantity - fulfilledQuantity} remains approved`}`,
+        details: {
+          itemOrBatch: request.finishedGoodName,
+          quantity: quantityToAllocate,
+          unit: request.unit,
+          referenceId: request.id,
+          reason: 'Automatic allocation of available finished-goods stock',
+        },
+        severity: isFulfilled ? 'success' : 'info',
+      });
+    }
+
+    if (updates.size === 0) return;
+
+    setFinishedGoods(previous => previous.map(product => {
+      const additionalAllocation = additionalAllocationByProduct.get(product.id) ?? 0;
+      return additionalAllocation > 0
+        ? { ...product, allocatedRetail: product.allocatedRetail + additionalAllocation }
+        : product;
+    }));
+    setStockRequests(previous => previous.map(request => updates.get(request.id) ?? request));
+    setAlerts(previous => {
+      const existingIds = new Set(previous.map(alert => alert.id));
+      return [
+        ...allocationAlerts.filter(alert => !existingIds.has(alert.id)),
+        ...previous,
+      ];
+    });
+  }, [currentRole, currentUser.email, finishedGoods, stockRequests]);
 
   const clearAuditLogs = () => {
     if (!authorizeDirectorMutation('clear audit history')) return;
@@ -1239,8 +1534,8 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   }, [ingredients, finishedGoods]);
 
-  const addIngredient = (ingData: Omit<RawIngredient, 'id'>) => {
-    if (!authorizeDirectorMutation('add a raw material')) return;
+  const addIngredient = (ingData: Omit<RawIngredient, 'id'>): boolean => {
+    if (!authorizeDirectorMutation('add a raw material')) return false;
     const newIng: RawIngredient = {
       ...ingData,
       id: `ing-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
@@ -1279,6 +1574,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
     recordOfflineMutation('ingredient', 'CREATE_INGREDIENT', newIng);
     triggerManualCloudSync();
+    return true;
   };
 
   const importPmoInventoryPeriod = (period: Omit<PmoInventoryPeriod, 'id' | 'createdAt' | 'createdBy' | 'status' | 'postedAt' | 'postedBy'>) => {
@@ -1291,6 +1587,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     const newPeriod: PmoInventoryPeriod = {
       ...period,
+      inventoryType: period.inventoryType || 'ingredient',
       id: `pmo-period-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
       createdAt: new Date().toISOString(),
       createdBy: currentUser.name,
@@ -1324,7 +1621,17 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (period.lines.some(line =>
       !line.itemName.trim() ||
       !line.unit.trim() ||
-      [line.beginningQuantity, line.purchasesQuantity, line.issuedToProductionQuantity, line.lossOrReturnQuantity, line.endingQuantity]
+      [
+        line.beginningQuantity,
+        line.purchasesQuantity,
+        line.issuedToProductionQuantity,
+        line.cashSalesQuantity,
+        line.creditSalesQuantity,
+        line.productPromoQuantity,
+        line.remarksQuantity,
+        line.lossOrReturnQuantity,
+        line.endingQuantity,
+      ]
         .some(quantity => quantity !== undefined && (!Number.isFinite(quantity) || quantity < 0))
     )) {
       return { success: false, message: 'Inventory item names, units, and quantities must be valid and non-negative.' };
@@ -1335,6 +1642,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     const updated: PmoInventoryPeriod = {
       ...period,
+      inventoryType: period.inventoryType || existing?.inventoryType || 'ingredient',
       title: period.title.trim(),
       sourceFileName: period.sourceFileName.trim(),
       status: 'draft',
@@ -1360,36 +1668,66 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { success: true, message: `Saved ${updated.title}.` };
   };
 
-  const postPmoInventoryPeriod = (periodId: string) => {
+  const postPmoInventoryPeriod = (periodId: string, draftLines?: PmoInventoryLine[]) => {
     if (!['developer', 'procurement', 'plant_manager'].includes(currentRole)) {
       return { success: false, message: 'Your role cannot post PMO inventory periods.' };
     }
-    const period = pmoInventoryPeriods.find(item => item.id === periodId);
-    if (!period) return { success: false, message: 'Inventory period not found.' };
-    if (period.status === 'posted') {
-      return { success: false, message: `${period.title} has already been posted.` };
+    const existingPeriod = pmoInventoryPeriods.find(item => item.id === periodId);
+    if (!existingPeriod) return { success: false, message: 'Inventory period not found.' };
+    if (existingPeriod.status === 'posted') {
+      return { success: false, message: `${existingPeriod.title} has already been posted.` };
     }
+    const period = draftLines ? { ...existingPeriod, lines: draftLines } : existingPeriod;
     if (period.lines.length === 0) {
       return { success: false, message: 'Add at least one inventory item before posting.' };
     }
 
-    const seenIngredients = new Set<string>();
-    const endingByIngredient = new Map<string, number>();
+    const inventoryType = period.inventoryType || 'ingredient';
+    const seenItems = new Set<string>();
+    const endingByItem = new Map<string, number>();
     for (const line of period.lines) {
-      if (!line.ingredientId) {
-        return { success: false, message: `Link ${line.itemName} to Raw Ingredients before posting.` };
+      const itemId = inventoryType === 'finished_good' ? line.finishedGoodId : line.ingredientId;
+      if (!itemId) {
+        return {
+          success: false,
+          message: inventoryType === 'finished_good'
+            ? `Link ${line.itemName} to Finished Goods before posting.`
+            : `Link ${line.itemName} to Raw Ingredients before posting.`,
+        };
       }
-      if (seenIngredients.has(line.ingredientId)) {
+      if (seenItems.has(itemId)) {
         return { success: false, message: `${line.itemName} appears more than once in this period.` };
       }
-      seenIngredients.add(line.ingredientId);
-      const ingredient = ingredients.find(item => item.id === line.ingredientId);
-      if (!ingredient) return { success: false, message: `Raw ingredient ${line.itemName} no longer exists.` };
-      if (ingredient.unit.trim().toLowerCase() !== line.unit.trim().toLowerCase()) {
-        return { success: false, message: `${line.itemName} uses ${ingredient.unit} in Raw Ingredients but ${line.unit} in this report.` };
+      seenItems.add(itemId);
+      const item = inventoryType === 'finished_good'
+        ? finishedGoods.find(good => good.id === itemId)
+        : ingredients.find(ingredient => ingredient.id === itemId);
+      if (!item) {
+        return {
+          success: false,
+          message: inventoryType === 'finished_good'
+            ? `Finished good ${line.itemName} no longer exists.`
+            : `Raw ingredient ${line.itemName} no longer exists.`,
+        };
+      }
+      if (item.unit.trim().toLowerCase() !== line.unit.trim().toLowerCase()) {
+        return { success: false, message: `${line.itemName} uses ${item.unit} in shared inventory but ${line.unit} in this report.` };
       }
       const activity = getPmoInventoryActivity(period, line, transactions);
-      const expectedEnding = calculatePmoExpectedEnding(line, activity);
+      const expectedEnding = calculatePmoExpectedEnding(line, activity, inventoryType);
+      if ([
+        line.beginningQuantity,
+        line.purchasesQuantity,
+        line.issuedToProductionQuantity,
+        line.cashSalesQuantity,
+        line.creditSalesQuantity,
+        line.productPromoQuantity,
+        line.remarksQuantity,
+        line.lossOrReturnQuantity,
+        line.endingQuantity,
+      ].some(quantity => quantity !== undefined && (!Number.isFinite(quantity) || quantity < 0))) {
+        return { success: false, message: `Enter non-negative values for all inventory columns for ${line.itemName}.` };
+      }
       if (line.beginningQuantity === undefined ||
           !Number.isFinite(line.beginningQuantity) ||
           line.beginningQuantity < 0 ||
@@ -1400,39 +1738,63 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           !Number.isFinite(expectedEnding)) {
         return { success: false, message: `Complete valid beginning and physical ending counts for ${line.itemName}.` };
       }
-      const variance = line.endingQuantity - expectedEnding;
-      if (ingredient.currentStock + variance < 0) {
-        return { success: false, message: `Recorded movements would make ${line.itemName} inventory negative.` };
-      }
-      endingByIngredient.set(line.ingredientId, variance);
+      endingByItem.set(itemId, line.endingQuantity);
     }
 
     const postedAt = new Date().toISOString();
     const updatedIngredients = ingredients.map(ingredient => {
-      const variance = endingByIngredient.get(ingredient.id);
-      return variance === undefined
+      const endingQuantity = inventoryType === 'ingredient' ? endingByItem.get(ingredient.id) : undefined;
+      return endingQuantity === undefined
         ? ingredient
-        : { ...ingredient, currentStock: ingredient.currentStock + variance };
+        : { ...ingredient, currentStock: endingQuantity };
+    });
+    const updatedFinishedGoods = finishedGoods.map(good => {
+      const endingQuantity = inventoryType === 'finished_good' ? endingByItem.get(good.id) : undefined;
+      return endingQuantity === undefined
+        ? good
+        : { ...good, currentStock: endingQuantity };
     });
     const reconciliationTransactions: StockTransaction[] = [];
-    for (const ingredient of ingredients) {
-      const variance = endingByIngredient.get(ingredient.id);
-      if (variance === undefined || variance === 0) continue;
-      reconciliationTransactions.push({
-        id: `tx-pmo-${period.id}-${ingredient.id}`,
-        timestamp: postedAt,
-        itemId: ingredient.id,
-        itemName: ingredient.name,
-        itemType: 'ingredient',
-        action: 'inventory_reconciliation',
-        quantity: Math.abs(variance),
-        unit: ingredient.unit,
-        previousStock: ingredient.currentStock,
-        newStock: ingredient.currentStock + variance,
-        referenceId: period.id,
-        performedBy: currentUser.name,
-        notes: `Physical count reconciliation for ${period.title}`,
-      });
+    if (inventoryType === 'ingredient') {
+      for (const ingredient of ingredients) {
+        const endingQuantity = endingByItem.get(ingredient.id);
+        if (endingQuantity === undefined || endingQuantity === ingredient.currentStock) continue;
+        reconciliationTransactions.push({
+          id: `tx-pmo-${period.id}-${ingredient.id}`,
+          timestamp: postedAt,
+          itemId: ingredient.id,
+          itemName: ingredient.name,
+          itemType: 'ingredient',
+          action: 'inventory_reconciliation',
+          quantity: Math.abs(endingQuantity - ingredient.currentStock),
+          unit: ingredient.unit,
+          previousStock: ingredient.currentStock,
+          newStock: endingQuantity,
+          referenceId: period.id,
+          performedBy: currentUser.name,
+          notes: `Physical count reconciliation for ${period.title}`,
+        });
+      }
+    } else {
+      for (const good of finishedGoods) {
+        const endingQuantity = endingByItem.get(good.id);
+        if (endingQuantity === undefined || endingQuantity === good.currentStock) continue;
+        reconciliationTransactions.push({
+          id: `tx-pmo-${period.id}-${good.id}`,
+          timestamp: postedAt,
+          itemId: good.id,
+          itemName: good.name,
+          itemType: 'finished_good',
+          action: 'inventory_reconciliation',
+          quantity: Math.abs(endingQuantity - good.currentStock),
+          unit: good.unit,
+          previousStock: good.currentStock,
+          newStock: endingQuantity,
+          referenceId: period.id,
+          performedBy: currentUser.name,
+          notes: `Physical count reconciliation for ${period.title}`,
+        });
+      }
     }
     const postedPeriod: PmoInventoryPeriod = {
       ...period,
@@ -1441,26 +1803,34 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       postedBy: currentUser.name,
     };
 
-    setIngredients(updatedIngredients);
+    if (inventoryType === 'ingredient') setIngredients(updatedIngredients);
+    else setFinishedGoods(updatedFinishedGoods);
     setTransactions(previous => [...reconciliationTransactions, ...previous]);
     setPmoInventoryPeriods(previous => previous.map(item => item.id === period.id ? postedPeriod : item));
-    for (const ingredient of updatedIngredients) {
-      if (!endingByIngredient.has(ingredient.id)) continue;
-      void recordOfflineMutation('ingredient', 'UPSERT_RAW_INGREDIENT', ingredient);
+    if (inventoryType === 'ingredient') {
+      for (const ingredient of updatedIngredients) {
+        if (!endingByItem.has(ingredient.id)) continue;
+        void recordOfflineMutation('ingredient', 'UPSERT_RAW_INGREDIENT', ingredient);
+      }
+    } else {
+      for (const good of updatedFinishedGoods) {
+        if (!endingByItem.has(good.id)) continue;
+        void recordOfflineMutation('finished_good', 'CREATE_FINISHED_GOOD', good);
+      }
     }
     reconciliationTransactions.forEach(transaction => {
       void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', transaction);
     });
     void recordOfflineMutation('pmo_inventory_period', 'SQL_UPSERT', postedPeriod);
     logAuditAction({
-      category: 'inventory',
+      category: inventoryType === 'finished_good' ? 'cold_storage' : 'inventory',
       subsystem: 'PMO Inventory Register',
       action: 'PMO_INVENTORY_PERIOD_POSTED',
-      description: `Posted ${postedPeriod.title} and reconciled ${endingByIngredient.size} raw ingredient balances to physical counts.`,
+      description: `Posted ${postedPeriod.title} and reconciled ${endingByItem.size} ${inventoryType === 'finished_good' ? 'finished good' : 'raw ingredient'} balances to physical counts.`,
       details: {
         itemOrBatch: postedPeriod.title,
-        quantity: endingByIngredient.size,
-        unit: 'ingredients reconciled',
+        quantity: endingByItem.size,
+        unit: inventoryType === 'finished_good' ? 'finished goods reconciled' : 'ingredients reconciled',
         reason: `${reconciliationTransactions.length} stock balance adjustments recorded`,
         referenceId: postedPeriod.id,
       },
@@ -1558,6 +1928,66 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { success: true, message: `Recorded ${kind} for ${ingredient.name}; the shared stock balance is now ${newStock} ${ingredient.unit}.` };
   };
 
+  const recordPmoFinishedGoodAdjustment = (
+    finishedGoodId: string,
+    quantity: number,
+    kind: 'expired' | 'damage' | 'waste' | 'returned',
+    notes?: string
+  ) => {
+    if (!['developer', 'procurement', 'plant_manager'].includes(currentRole)) {
+      return { success: false, message: 'Your role cannot record PMO inventory adjustments.' };
+    }
+    const good = finishedGoods.find(item => item.id === finishedGoodId);
+    if (!good) return { success: false, message: 'Finished good not found.' };
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return { success: false, message: 'Enter an adjustment quantity greater than zero.' };
+    }
+    const isReturn = kind === 'returned';
+    const newStock = good.currentStock + (isReturn ? quantity : -quantity);
+    if (newStock < 0) {
+      return { success: false, message: `The adjustment exceeds available ${good.name} stock.` };
+    }
+    const timestamp = new Date().toISOString();
+    const transaction: StockTransaction = {
+      id: `tx-pmo-adjustment-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+      timestamp,
+      itemId: good.id,
+      itemName: good.name,
+      itemType: 'finished_good',
+      action: isReturn ? 'inventory_return' : 'inventory_loss',
+      quantity,
+      unit: good.unit,
+      previousStock: good.currentStock,
+      newStock,
+      performedBy: currentUser.name,
+      notes: `${kind}${notes ? `: ${notes}` : ''}`,
+    };
+    const updatedGood = { ...good, currentStock: newStock };
+
+    setFinishedGoods(previous => previous.map(item => item.id === good.id ? updatedGood : item));
+    setTransactions(previous => [transaction, ...previous]);
+    void recordOfflineMutation('finished_good', 'CREATE_FINISHED_GOOD', updatedGood);
+    void recordOfflineMutation('stock_adjustment', 'UPSERT_STOCK_TRANSACTION', transaction);
+    logAuditAction({
+      category: 'cold_storage',
+      subsystem: 'PMO Inventory Register',
+      action: isReturn ? 'PMO_INVENTORY_RETURN_RECORDED' : 'PMO_INVENTORY_LOSS_RECORDED',
+      description: `${kind} ${quantity} ${good.unit} of ${good.name}; shared stock changed from ${good.currentStock} to ${newStock}.`,
+      details: {
+        itemOrBatch: good.name,
+        previousValue: good.currentStock,
+        newValue: newStock,
+        quantity,
+        unit: good.unit,
+        reason: notes || kind,
+        referenceId: transaction.id,
+      },
+      severity: isReturn ? 'info' : 'warning',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `Recorded ${kind} for ${good.name}; the shared stock balance is now ${newStock} ${good.unit}.` };
+  };
+
   const addPmoExternalPurchase = (
     periodId: string,
     ingredientData: Omit<RawIngredient, 'id' | 'currentStock' | 'lastRestocked'>,
@@ -1567,7 +1997,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return { success: false, message: 'Your role cannot record PMO outside purchases.' };
     }
     const period = pmoInventoryPeriods.find(item => item.id === periodId);
-    if (!period || period.status !== 'draft') {
+    if (!period || period.status !== 'draft' || (period.inventoryType || 'ingredient') !== 'ingredient') {
       return { success: false, message: 'Select an existing draft period before recording an outside purchase.' };
     }
     const name = ingredientData.name.trim();
@@ -1750,32 +2180,71 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const updateFinishedGoodRecipe = (
     id: string,
     recipe: BomIngredientRequirement[],
-    batchUnitQuantity: number
+    batchUnitQuantity: number,
+    unit: string,
+    containerVolumeMl?: number
   ) => {
     if (!['developer', 'director', 'plant_manager'].includes(currentRole)) return false;
     if (!authorizeDirectorMutation('update a finished product recipe')) return false;
     if (!Number.isFinite(batchUnitQuantity) || batchUnitQuantity <= 0) return false;
+    if (!unit.trim()) return false;
+    if (containerVolumeMl !== undefined &&
+        (!Number.isFinite(containerVolumeMl) || containerVolumeMl <= 0)) return false;
     if (recipe.some(item =>
       !item.ingredientId ||
       !item.ingredientName.trim() ||
       !item.unit.trim() ||
       !Number.isFinite(item.quantityRequired) ||
-      item.quantityRequired <= 0
+      item.quantityRequired <= 0 ||
+      (item.quantityRequiredMax !== undefined && (
+        !Number.isFinite(item.quantityRequiredMax) ||
+        item.quantityRequiredMax < item.quantityRequired
+      ))
     )) return false;
+    if (recipe.some(item => {
+      const ingredient = ingredients.find(row => row.id === item.ingredientId);
+      return !ingredient || getRecipeUnitsPerInventoryUnit(
+        ingredient.unit,
+        item.unit,
+        item.recipeUnitsPerInventoryUnit
+      ) === null;
+    })) return false;
     if (new Set(recipe.map(item => item.ingredientId)).size !== recipe.length) return false;
+    if (recipe.some(item => {
+      const substituteIds = (item.substitutes || []).map(substitute => substitute.ingredientId);
+      return substituteIds.some((substituteId, index) => {
+        const substitute = ingredients.find(row => row.id === substituteId);
+        return !substitute ||
+          substituteId === item.ingredientId ||
+          substituteIds.indexOf(substituteId) !== index ||
+          getRecipeUnitsPerInventoryUnit(
+            substitute.unit,
+            item.unit,
+            item.substitutes?.[index].recipeUnitsPerInventoryUnit
+          ) === null;
+      });
+    })) return false;
 
     const target = finishedGoods.find(product => product.id === id);
     if (!target) return false;
 
     setFinishedGoods(prev => prev.map(product => product.id === id
-      ? { ...product, recipe, batchUnitQuantity }
+      ? {
+        ...product,
+        recipe,
+        batchUnitQuantity,
+        unit: unit.trim(),
+        containerVolumeMl: ['bottles', 'tubs'].includes(unit.trim().toLowerCase())
+          ? containerVolumeMl
+          : undefined,
+      }
       : product
     ));
     logAuditAction({
       category: 'production',
       subsystem: 'Finished Goods',
       action: 'PRODUCT_RECIPE_UPDATED',
-      description: `Updated production recipe for ${target.name} to produce ${batchUnitQuantity} ${target.unit}`,
+      description: `Updated production recipe for ${target.name} to produce ${batchUnitQuantity} ${unit.trim()}`,
       details: {
         itemOrBatch: target.name,
         quantity: recipe.length,
@@ -2164,6 +2633,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     rawMilkVolumeUsed: number;
     assignedStaff: string;
     notes?: string;
+    ingredientSelections?: Record<string, string | null>;
   }) => {
     if (!authorizeDirectorMutation('create a production batch')) {
       return { success: false, message: 'Director authorization was canceled or failed.' };
@@ -2179,21 +2649,86 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
     }
 
-    // Calculate BOM requirements based on recipe multiplier
     const multiplier = batchData.targetQuantity / (product.batchUnitQuantity || 100);
-    const requiredIngredients = product.recipe.map(r => ({
-      ...r,
-      totalNeeded: r.quantityRequired * multiplier
-    }));
-
-    // Verify stock availability
-    for (const req of requiredIngredients) {
-      const ing = ingredients.find(i => i.id === req.ingredientId);
-      if (!ing || ing.currentStock < req.totalNeeded) {
-        const currentHave = ing ? ing.currentStock : 0;
+    const requiredIngredients: Array<BomIngredientRequirement & {
+      recipeQuantityNeeded: number;
+      totalNeeded: number;
+      inventoryUnit: string;
+    }> = [];
+    for (const recipeLine of product.recipe) {
+      const selectedIngredientId = batchData.ingredientSelections &&
+        Object.prototype.hasOwnProperty.call(batchData.ingredientSelections, recipeLine.ingredientId)
+        ? batchData.ingredientSelections[recipeLine.ingredientId]
+        : recipeLine.optional ? null : recipeLine.ingredientId;
+      if (!selectedIngredientId) {
+        if (recipeLine.optional) continue;
         return {
           success: false,
-          message: `Insufficient ingredient: ${req.ingredientName}. Needed ${req.totalNeeded.toFixed(1)} ${req.unit}, but only ${currentHave} ${req.unit} available. Production halted to prevent incomplete batches!`
+          message: `Choose a raw ingredient for required recipe item ${recipeLine.ingredientName}.`
+        };
+      }
+
+      const substitute = selectedIngredientId === recipeLine.ingredientId
+        ? undefined
+        : recipeLine.substitutes?.find(item => item.ingredientId === selectedIngredientId);
+      if (selectedIngredientId !== recipeLine.ingredientId && !substitute) {
+        return {
+          success: false,
+          message: `${selectedIngredientId} is not an approved substitute for ${recipeLine.ingredientName}.`
+        };
+      }
+      const selectedRecipeLine = substitute
+        ? {
+            ...recipeLine,
+            ingredientId: substitute.ingredientId,
+            ingredientName: substitute.ingredientName,
+            recipeUnitsPerInventoryUnit: substitute.recipeUnitsPerInventoryUnit,
+          }
+        : recipeLine;
+      const ing = ingredients.find(item => item.id === selectedRecipeLine.ingredientId);
+      const recipeQuantityNeeded = (recipeLine.quantityRequiredMax ?? recipeLine.quantityRequired) * multiplier;
+      const totalNeeded = ing
+        ? convertRecipeQuantityToInventory(
+            recipeQuantityNeeded,
+            ing.unit,
+            selectedRecipeLine.unit,
+            selectedRecipeLine.recipeUnitsPerInventoryUnit
+          )
+        : null;
+      if (!ing || totalNeeded === null) {
+        return {
+          success: false,
+          message: `The recipe unit for ${selectedRecipeLine.ingredientName} is incompatible with its inventory unit. Update its conversion ratio before starting production.`
+        };
+      }
+      requiredIngredients.push({
+        ...selectedRecipeLine,
+        recipeQuantityNeeded,
+        totalNeeded,
+        inventoryUnit: ing.unit,
+      });
+    }
+    if (requiredIngredients.length === 0) {
+      return {
+        success: false,
+        message: 'Select at least one BOM ingredient to include in the production batch.'
+      };
+    }
+
+    const totalsByIngredient = new Map<string, number>();
+    for (const requirement of requiredIngredients) {
+      totalsByIngredient.set(
+        requirement.ingredientId,
+        (totalsByIngredient.get(requirement.ingredientId) || 0) + requirement.totalNeeded
+      );
+    }
+
+    for (const [ingredientId, totalNeeded] of totalsByIngredient) {
+      const ingredient = ingredients.find(item => item.id === ingredientId);
+      if (!ingredient || ingredient.currentStock < totalNeeded) {
+        return {
+          success: false,
+          message: `Insufficient ingredient: ${ingredient?.name || ingredientId}. Needed ${totalNeeded.toFixed(2)} ${ingredient?.unit || 'units'}, but only ${ingredient?.currentStock ?? 0} ${ingredient?.unit || 'units'} available. Production halted to prevent incomplete batches!`
         };
       }
     }
@@ -2202,9 +2737,9 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const newTxs: StockTransaction[] = [];
     const batchRefId = `BATCH-${Date.now()}`;
     const updatedIngredients = ingredients.map(ing => {
-      const req = requiredIngredients.find(r => r.ingredientId === ing.id);
-      if (req) {
-        const newStock = Math.max(0, ing.currentStock - req.totalNeeded);
+      const totalNeeded = totalsByIngredient.get(ing.id);
+      if (totalNeeded !== undefined) {
+        const newStock = Math.max(0, ing.currentStock - totalNeeded);
         
         newTxs.push({
           id: `tx-wip-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${ing.id}`,
@@ -2213,7 +2748,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           itemName: ing.name,
           itemType: 'ingredient',
           action: 'wip_deduct',
-          quantity: req.totalNeeded,
+          quantity: totalNeeded,
           unit: ing.unit,
           previousStock: ing.currentStock,
           newStock: newStock,
@@ -2244,12 +2779,15 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       productName: batchData.productName,
       targetQuantity: batchData.targetQuantity,
       rawMilkVolumeUsed: batchData.rawMilkVolumeUsed,
-      ingredientsUsed: requiredIngredients.map(r => ({
-        ingredientId: r.ingredientId,
-        ingredientName: r.ingredientName,
-        quantity: r.totalNeeded,
-        unit: r.unit
-      })),
+      ingredientsUsed: [...totalsByIngredient].map(([ingredientId, quantity]) => {
+        const ingredient = ingredients.find(item => item.id === ingredientId)!;
+        return {
+          ingredientId,
+          ingredientName: ingredient.name,
+          quantity,
+          unit: ingredient.unit,
+        };
+      }),
       status: 'scheduled',
       assignedStaff: batchData.assignedStaff,
       startDate: new Date().toLocaleString() + ' PST',
@@ -2341,6 +2879,51 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     triggerManualCloudSync();
+  };
+
+  const saveWipProductionRecord = (record: WipProductionRecord) => {
+    if (currentRole !== 'developer' && currentRole !== 'plant_manager') {
+      return { success: false, message: 'Only the Plant Manager or Developer can update WIP Inventory records.' };
+    }
+    if (record.id !== record.batchId || !wipBatches.some(batch => batch.id === record.batchId)) {
+      return { success: false, message: 'Select an existing WIP production batch before saving its inventory record.' };
+    }
+    if (!Array.isArray(record.yieldPackages) || record.yieldPackages.length === 0 || record.yieldPackages.some(pack =>
+      !Number.isFinite(pack.quantity) || pack.quantity <= 0 || !pack.packSize.trim()
+    )) {
+      return { success: false, message: 'Each yield package needs a positive quantity and a pack size.' };
+    }
+    const measuredValues = [
+      record.pasteurizationTempC,
+      record.pasteurizationTimeMinutes,
+      record.coolingTempC,
+      record.coolingTimeMinutes,
+    ];
+    if (measuredValues.some(value => value !== undefined && (!Number.isFinite(value) || value < 0))) {
+      return { success: false, message: 'Temperature and duration values must be valid non-negative numbers.' };
+    }
+
+    setWipProductionRecords(previous => [
+      record,
+      ...previous.filter(existing => existing.batchId !== record.batchId),
+    ]);
+    const batch = wipBatches.find(item => item.id === record.batchId);
+    logAuditAction({
+      category: 'production',
+      subsystem: 'WIP Inventory',
+      action: 'WIP_PRODUCTION_RECORD_SAVED',
+      description: `Saved WIP inventory production record for batch ${batch?.batchNumber || record.batchId}.`,
+      details: {
+        itemOrBatch: batch?.batchNumber || record.batchId,
+        referenceId: record.batchId,
+        quantity: record.yieldPackages.reduce((total, pack) => total + pack.quantity, 0),
+        unit: 'packs',
+        reason: 'Production temperatures, yield, best-before date, and remarks recorded',
+      },
+      severity: 'success',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: `WIP Inventory record saved for batch ${batch?.batchNumber || record.batchId}.` };
   };
 
   // Cancel Scheduled WIP Batch without affecting raw materials (restores ingredients)
@@ -2502,6 +3085,291 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { success: true, message: 'Dairy Box retail transaction processed.' };
   };
 
+  const createStockRequest = (request: {
+    finishedGoodId: string;
+    quantity: number;
+    neededBy?: string;
+    notes?: string;
+  }): { success: boolean; message: string } => {
+    if (currentRole !== 'store_outlet' || (!isDeveloperActive && authenticatedRole !== 'store_outlet')) {
+      return { success: false, message: 'Only Store Outlet staff can submit a finished goods request.' };
+    }
+    const product = finishedGoods.find(item => item.id === request.finishedGoodId);
+    if (!product) return { success: false, message: 'Select a finished good from the current product list.' };
+    if (!Number.isInteger(request.quantity) || request.quantity < 1) {
+      return { success: false, message: 'Enter a whole-number quantity greater than zero.' };
+    }
+    if (request.neededBy && (!Number.isFinite(Date.parse(request.neededBy)) || request.neededBy < new Date().toISOString().slice(0, 10))) {
+      return { success: false, message: 'The needed-by date must be today or later.' };
+    }
+
+    const newRequest: StockRequest = {
+      id: `stock-request-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      finishedGoodId: product.id,
+      finishedGoodName: product.name,
+      finishedGoodSku: product.sku,
+      quantity: request.quantity,
+      unit: product.unit,
+      requestedByEmail: auth.currentUser?.email || currentUser.email,
+      requestedByName: currentUser.name,
+      requestedAt: new Date().toISOString(),
+      neededBy: request.neededBy || undefined,
+      status: 'pending',
+      notes: request.notes?.trim() || undefined,
+    };
+    setStockRequests(previous => [newRequest, ...previous]);
+    setAlerts(previous => {
+      const requestAlerts: SystemAlert[] = [
+        {
+          id: `${newRequest.id}-requested`,
+          timestamp: newRequest.requestedAt,
+          type: 'stock_request',
+          title: 'New Dairy Box Stock Request',
+          message: `${newRequest.requestedByName} requested ${newRequest.quantity} ${newRequest.unit} of ${product.name}.`,
+          severity: 'info',
+          read: false,
+          targetRole: ['plant_manager'],
+        },
+        {
+          id: `${newRequest.id}-submitted`,
+          timestamp: newRequest.requestedAt,
+          type: 'stock_request',
+          title: 'Stock Request Submitted',
+          message: `Your request for ${newRequest.quantity} ${newRequest.unit} of ${product.name} was sent to the Plant Manager.`,
+          severity: 'info',
+          read: false,
+          targetRole: ['store_outlet'],
+        },
+      ];
+      const knownIds = new Set(previous.map(alert => alert.id));
+      return [...requestAlerts.filter(alert => !knownIds.has(alert.id)), ...previous];
+    });
+    logAuditAction({
+      category: 'cold_storage',
+      subsystem: 'Dairy Box Stock Requests',
+      action: 'FINISHED_GOODS_REQUESTED',
+      description: `${currentUser.name} requested ${newRequest.quantity} ${newRequest.unit} of ${product.name}`,
+      details: {
+        itemOrBatch: product.name,
+        quantity: newRequest.quantity,
+        unit: newRequest.unit,
+        referenceId: newRequest.id,
+        reason: newRequest.notes || 'Store Outlet replenishment request',
+      },
+      severity: 'info',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: 'Finished goods request submitted to the Plant Manager.' };
+  };
+
+  const reviewStockRequest = (
+    id: string,
+    status: 'approved' | 'rejected' | 'fulfilled',
+    responseNotes?: string,
+    allocationQuantity?: number
+  ): { success: boolean; message: string } => {
+    if (!['plant_manager', 'developer'].includes(currentRole)) {
+      return { success: false, message: 'Only the Plant Manager can review and fulfill stock requests.' };
+    }
+    const target = stockRequests.find(requestItem => requestItem.id === id);
+    if (!target) return { success: false, message: 'This stock request is no longer available.' };
+    let updatedStatus = status;
+    let allocatedQuantity = target.fulfilledQuantity ?? 0;
+    let quantityToAllocate = 0;
+    if (status === 'approved' || status === 'rejected') {
+      if (target.status !== 'pending') {
+        return { success: false, message: 'Only pending requests can be approved or rejected.' };
+      }
+      if (status === 'approved') {
+        const product = finishedGoods.find(item => item.id === target.finishedGoodId);
+        if (product) {
+          const availableForRetail = Math.max(
+            0,
+            product.currentStock - product.allocatedRetail - product.allocatedFeedingProgram
+          );
+          quantityToAllocate = Math.min(availableForRetail, target.quantity - allocatedQuantity);
+          allocatedQuantity += quantityToAllocate;
+          if (allocatedQuantity >= target.quantity) updatedStatus = 'fulfilled';
+          if (quantityToAllocate > 0) {
+            setFinishedGoods(previous => previous.map(item => item.id === product.id
+              ? { ...item, allocatedRetail: item.allocatedRetail + quantityToAllocate }
+              : item
+            ));
+          }
+        }
+      }
+    } else {
+      if (target.status !== 'approved') {
+        return { success: false, message: 'Approve the request before marking it fulfilled.' };
+      }
+      const product = finishedGoods.find(item => item.id === target.finishedGoodId);
+      if (!product) return { success: false, message: 'The requested finished good is no longer in the catalog.' };
+      const availableForRetail = Math.max(
+        0,
+        product.currentStock - product.allocatedRetail - product.allocatedFeedingProgram
+      );
+      const remainingQuantity = target.quantity - allocatedQuantity;
+      quantityToAllocate = allocationQuantity ?? remainingQuantity;
+      if (!Number.isInteger(quantityToAllocate) || quantityToAllocate < 1) {
+        return { success: false, message: 'Enter a whole-number quantity greater than zero to allocate.' };
+      }
+      if (quantityToAllocate > remainingQuantity) {
+        return {
+          success: false,
+          message: `Only ${remainingQuantity} ${product.unit} remains on this request.`,
+        };
+      }
+      if (availableForRetail < quantityToAllocate) {
+        return {
+          success: false,
+          message: `Only ${availableForRetail} ${product.unit} of unallocated stock is available for this allocation.`,
+        };
+      }
+      allocatedQuantity += quantityToAllocate;
+      if (allocatedQuantity < target.quantity) updatedStatus = 'approved';
+      setFinishedGoods(previous => previous.map(item => item.id === product.id
+        ? { ...item, allocatedRetail: item.allocatedRetail + quantityToAllocate }
+        : item
+      ));
+    }
+
+    const now = new Date().toISOString();
+    const updatedRequest: StockRequest = {
+      ...target,
+      status: updatedStatus,
+      reviewedBy: currentUser.email,
+      reviewedAt: now,
+      responseNotes: responseNotes?.trim() || undefined,
+      fulfilledAt: updatedStatus === 'fulfilled' ? now : undefined,
+      fulfilledQuantity: status === 'fulfilled' || quantityToAllocate > 0
+        ? allocatedQuantity
+        : target.fulfilledQuantity,
+    };
+    setStockRequests(previous => previous.map(item => item.id === id ? updatedRequest : item));
+    const notificationStatus = updatedStatus === 'fulfilled'
+      ? 'fulfilled'
+      : quantityToAllocate > 0
+        ? 'partially_fulfilled'
+        : status;
+    const responseMessage = status === 'fulfilled'
+      ? updatedStatus === 'fulfilled'
+        ? `Your request for ${target.quantity} ${target.unit} of ${target.finishedGoodName} was fulfilled.`
+        : `${quantityToAllocate} of ${target.quantity} ${target.unit} of ${target.finishedGoodName} was allocated; ${target.quantity - allocatedQuantity} remains approved.`
+      : status === 'approved' && quantityToAllocate > 0
+        ? updatedStatus === 'fulfilled'
+          ? `Your request for ${target.quantity} ${target.unit} of ${target.finishedGoodName} was approved and automatically fulfilled.`
+          : `${quantityToAllocate} of ${target.quantity} ${target.unit} of ${target.finishedGoodName} was automatically allocated; the remaining ${target.quantity - allocatedQuantity} stays approved.`
+      : `Your request for ${target.quantity} ${target.unit} of ${target.finishedGoodName} was ${status}${responseNotes?.trim() ? `: ${responseNotes.trim()}` : '.'}`;
+    setAlerts(previous => previous.some(alert => alert.id === `${target.id}-${notificationStatus}`)
+      ? previous
+      : [{
+          id: `${target.id}-${notificationStatus}`,
+          timestamp: now,
+          type: 'stock_request',
+          title: `Dairy Box Stock Request ${updatedStatus === 'fulfilled' ? 'fulfilled' : notificationStatus === 'partially_fulfilled' ? 'partially fulfilled' : status}`,
+          message: responseMessage,
+          severity: status === 'rejected' ? 'warning' : 'info',
+          read: false,
+          targetRole: ['store_outlet'],
+        }, ...previous]
+    );
+    if (status === 'fulfilled' || (status === 'approved' && quantityToAllocate > 0)) {
+      logAuditAction({
+        category: 'cold_storage',
+        subsystem: 'Dairy Box Stock Requests',
+        action: status === 'approved'
+          ? updatedStatus === 'fulfilled'
+            ? 'FINISHED_GOODS_REQUEST_AUTO_FULFILLED'
+            : 'FINISHED_GOODS_REQUEST_AUTO_PARTIALLY_FULFILLED'
+          : updatedStatus === 'fulfilled'
+            ? 'FINISHED_GOODS_REQUEST_FULFILLED'
+            : 'FINISHED_GOODS_REQUEST_PARTIALLY_FULFILLED',
+        description: `${status === 'approved' ? 'Automatically a' : 'A'}llocated ${quantityToAllocate} ${target.unit} of ${target.finishedGoodName} to Dairy Box${updatedStatus === 'fulfilled' ? '' : `; ${target.quantity - allocatedQuantity} remains`}`,
+        details: {
+          itemOrBatch: target.finishedGoodName,
+          quantity: quantityToAllocate,
+          unit: target.unit,
+          referenceId: target.id,
+          reason: status === 'approved'
+            ? 'Automatic allocation of available finished-goods stock on approval'
+            : responseNotes?.trim() || (updatedStatus === 'fulfilled' ? 'Store Outlet stock request fulfilled' : 'Partial Store Outlet stock request allocation'),
+        },
+        severity: updatedStatus === 'fulfilled' ? 'success' : 'info',
+      });
+    } else {
+      logAuditAction({
+        category: 'cold_storage',
+        subsystem: 'Dairy Box Stock Requests',
+        action: status === 'approved' ? 'FINISHED_GOODS_REQUEST_APPROVED' : 'FINISHED_GOODS_REQUEST_REJECTED',
+        description: `${status === 'approved' ? 'Approved' : 'Rejected'} Dairy Box request for ${target.quantity} ${target.unit} of ${target.finishedGoodName}`,
+        details: {
+          itemOrBatch: target.finishedGoodName,
+          quantity: target.quantity,
+          unit: target.unit,
+          referenceId: target.id,
+          reason: responseNotes?.trim() || `Request ${status}`,
+        },
+        severity: status === 'rejected' ? 'warning' : 'info',
+      });
+    }
+    triggerManualCloudSync();
+    return {
+      success: true,
+      message: status === 'fulfilled'
+        ? updatedStatus === 'fulfilled'
+          ? 'Stock allocated and request marked fulfilled.'
+          : `${quantityToAllocate} ${target.unit} allocated; ${target.quantity - allocatedQuantity} ${target.unit} remains approved.`
+        : status === 'approved' && quantityToAllocate > 0
+          ? updatedStatus === 'fulfilled'
+            ? 'Request approved and automatically fulfilled from available stock.'
+            : `${quantityToAllocate} ${target.unit} automatically allocated; ${target.quantity - allocatedQuantity} ${target.unit} remains approved.`
+        : `Request ${status}.`,
+    };
+  };
+
+  const cancelStockRequest = (id: string): { success: boolean; message: string } => {
+    if (currentRole !== 'store_outlet' || (!isDeveloperActive && authenticatedRole !== 'store_outlet')) {
+      return { success: false, message: 'Only Store Outlet staff can cancel their pending requests.' };
+    }
+    const target = stockRequests.find(requestItem =>
+      requestItem.id === id &&
+      (
+        requestItem.requestedByEmail.toLowerCase() === currentUser.email.toLowerCase() ||
+        (isDeveloperActive && requestItem.requestedByName === currentUser.name)
+      )
+    );
+    if (!target || target.status !== 'pending') {
+      return { success: false, message: 'Only your pending stock requests can be cancelled.' };
+    }
+    setStockRequests(previous => previous.map(item => item.id === id
+      ? { ...item, status: 'cancelled' }
+      : item
+    ));
+    setAlerts(previous => previous.some(alert => alert.id === `${target.id}-cancelled`)
+      ? previous
+      : [{
+          id: `${target.id}-cancelled`,
+          timestamp: new Date().toISOString(),
+          type: 'stock_request',
+          title: 'Dairy Box Stock Request Cancelled',
+          message: `${target.requestedByName} cancelled the request for ${target.quantity} ${target.unit} of ${target.finishedGoodName}.`,
+          severity: 'warning',
+          read: false,
+          targetRole: ['plant_manager'],
+        }, ...previous]
+    );
+    logAuditAction({
+      category: 'cold_storage',
+      subsystem: 'Dairy Box Stock Requests',
+      action: 'FINISHED_GOODS_REQUEST_CANCELLED',
+      description: `${currentUser.name} cancelled the request for ${target.finishedGoodName}`,
+      details: { itemOrBatch: target.finishedGoodName, referenceId: target.id },
+      severity: 'warning',
+    });
+    triggerManualCloudSync();
+    return { success: true, message: 'Stock request cancelled.' };
+  };
+
   const addCommitment = (comData: Omit<SupplyDemandCommitment, 'id'>) => {
     if (!authorizeDirectorMutation('add a supply or production commitment')) return;
     const newCom: SupplyDemandCommitment = {
@@ -2607,7 +3475,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const clearAllAlerts = () => {
-    setAlerts(prev => prev.map(a => ({ ...a, read: true })));
+    setAlerts([]);
   };
 
   const submitIsoEvaluation = (ratingData: Omit<IsoEvaluationRating, 'id' | 'date' | 'evaluatorRole'>) => {
@@ -2755,6 +3623,246 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return { success: true, message: 'Profile updated successfully.' };
   };
 
+  const canManageSystemAccounts = () =>
+    isAuthenticated &&
+    ((authenticatedRole === 'system_admin' && currentRole === 'system_admin') ||
+      (authenticatedRole === 'developer' && currentRole === 'developer' && isDeveloperActive));
+
+  const fetchManagedAccountsForAdmin = async (): Promise<ManagedAccount[]> => {
+    if (!canManageSystemAccounts()) {
+      throw new Error('Only an authenticated System Administrator or Lead Developer can view managed accounts.');
+    }
+    return fetchManagedAccountsFromAuth();
+  };
+
+  const createManagedUser = async (
+    profile: Omit<UserProfile, 'id'>
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!canManageSystemAccounts()) {
+      return { success: false, message: 'Only an authenticated System Administrator or Lead Developer can create accounts.' };
+    }
+    const cleanEmail = profile.email.trim().toLowerCase();
+    const cleanUsername = profile.username.trim();
+    const cleanName = profile.name.trim();
+    if (!cleanName || !cleanUsername || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return { success: false, message: 'Enter a name, username, and valid account email.' };
+    }
+    if (!isUserRole(profile.role)) {
+      return { success: false, message: 'Select a supported DairySync role.' };
+    }
+    if (authenticatedRole === 'system_admin' && (profile.role === 'developer' || profile.role === 'system_admin')) {
+      return { success: false, message: 'System administrators cannot create developer or system-administrator accounts.' };
+    }
+    const existingProfile = users.find(user => user.email.toLowerCase() === cleanEmail);
+    if (!existingProfile && users.some(user => user.username.toLowerCase() === cleanUsername.toLowerCase())) {
+      return { success: false, message: `Username "${cleanUsername}" is already taken.` };
+    }
+    if (existingProfile && users.some(user =>
+      user.id !== existingProfile.id && user.username.toLowerCase() === cleanUsername.toLowerCase()
+    )) {
+      return { success: false, message: `Username "${cleanUsername}" is already taken.` };
+    }
+
+    try {
+      const { uid } = await createManagedAccount({
+        name: cleanName,
+        email: cleanEmail,
+        role: profile.role,
+      });
+      const newProfile: UserProfile = {
+        ...profile,
+        id: existingProfile?.id || uid,
+        name: cleanName,
+        email: cleanEmail,
+        username: cleanUsername,
+        title: profile.title.trim(),
+        department: profile.department.trim(),
+        avatar: profile.avatar.trim() || users[0]?.avatar || '',
+        nickname: profile.nickname?.trim() || undefined,
+      };
+
+      try {
+        await sqlConnectCollections.user_profile.save(newProfile);
+      } catch (error) {
+        setUsers(previous => existingProfile
+          ? previous.map(user => user.id === existingProfile.id ? newProfile : user)
+          : [...previous, newProfile]
+        );
+        const reason = error instanceof Error ? error.message : 'Unknown Data Connect error.';
+        return {
+          success: false,
+          message: `The Firebase account was created, but its staff profile could not be saved: ${reason}. The profile is retained locally for cloud-sync retry; do not create the account again.`,
+        };
+      }
+
+      setUsers(previous => existingProfile
+        ? previous.map(user => user.id === existingProfile.id ? newProfile : user)
+        : [...previous, newProfile]
+      );
+      logAuditAction({
+        category: 'security',
+        subsystem: 'User Security',
+        action: 'USER_ACCOUNT_CREATED',
+        description: `Created DairySync account for ${cleanEmail} with role ${profile.role}.`,
+        details: { itemOrBatch: uid, reason: 'Administrative account provisioning' },
+        severity: 'success',
+      });
+
+      try {
+        await requestManagedAccountPasswordReset(cleanEmail);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown email delivery error.';
+        return {
+          success: true,
+          message: `Account created, but the password setup email could not be sent: ${reason}. Use Send password reset to retry.`,
+        };
+      }
+      return { success: true, message: `Account created and password setup email sent to ${cleanEmail}.` };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown account provisioning error.';
+      return { success: false, message: reason };
+    }
+  };
+
+  const updateManagedUserProfile = async (
+    userId: string,
+    updates: Pick<UserProfile, 'name' | 'username' | 'title' | 'department'>
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!canManageSystemAccounts()) {
+      return { success: false, message: 'Only an authenticated System Administrator or Lead Developer can edit staff profiles.' };
+    }
+    const existingProfile = users.find(user => user.id === userId);
+    if (!existingProfile) return { success: false, message: 'The staff profile could not be found.' };
+    const name = updates.name.trim();
+    const username = updates.username.trim();
+    if (!name || !username) return { success: false, message: 'Name and username are required.' };
+    if (users.some(user =>
+      user.id !== userId && user.username.toLowerCase() === username.toLowerCase()
+    )) {
+      return { success: false, message: `Username "${username}" is already taken.` };
+    }
+
+    const updatedProfile = {
+      ...existingProfile,
+      name,
+      username,
+      title: updates.title.trim(),
+      department: updates.department.trim(),
+    };
+    try {
+      await sqlConnectCollections.user_profile.save(updatedProfile);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown Data Connect error.';
+      return { success: false, message: `Profile changes could not be saved: ${reason}` };
+    }
+    setUsers(previous => previous.map(user => user.id === userId ? updatedProfile : user));
+    logAuditAction({
+      category: 'security',
+      subsystem: 'User Security',
+      action: 'USER_PROFILE_UPDATED',
+      description: `Updated account profile for ${updatedProfile.email}.`,
+      details: { itemOrBatch: userId, reason: 'Administrative profile update' },
+      severity: 'info',
+    });
+    return { success: true, message: `Profile for ${updatedProfile.email} updated.` };
+  };
+
+  const updateManagedUserRole = async (
+    account: ManagedAccount,
+    role: UserRole
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!canManageSystemAccounts()) {
+      return { success: false, message: 'Only an authenticated System Administrator or Lead Developer can change account roles.' };
+    }
+    if (!isUserRole(role)) return { success: false, message: 'Select a supported DairySync role.' };
+    if (account.uid === firebaseUser?.uid) return { success: false, message: 'You cannot change your own account role.' };
+    const profile = users.find(user => user.email.toLowerCase() === account.email.toLowerCase());
+    const previousRole = profile?.role;
+    try {
+      await setManagedAccountRole({ uid: account.uid, role });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown Firebase Authentication error.';
+      return { success: false, message: `The account role was not changed: ${reason}` };
+    }
+
+    if (profile) {
+      const updatedProfile = { ...profile, role };
+      try {
+        await sqlConnectCollections.user_profile.save(updatedProfile);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown Data Connect error.';
+        if (previousRole) {
+          try {
+            await setManagedAccountRole({ uid: account.uid, role: previousRole });
+          } catch (rollbackError) {
+            const rollbackReason = rollbackError instanceof Error ? rollbackError.message : 'Unknown role rollback error.';
+            return {
+              success: false,
+              message: `The Firebase role changed, but the profile update failed: ${reason}. Automatic role rollback also failed: ${rollbackReason}. Reconcile this account before further changes.`,
+            };
+          }
+        }
+        return { success: false, message: `Profile synchronization failed and the Firebase role was rolled back: ${reason}` };
+      }
+      setUsers(previous => previous.map(user => user.id === profile.id ? updatedProfile : user));
+    }
+    logAuditAction({
+      category: 'security',
+      subsystem: 'User Security',
+      action: 'USER_ROLE_CHANGED',
+      description: `Changed DairySync role for ${account.email} to ${role}.`,
+      details: { itemOrBatch: account.uid, previousValue: previousRole, newValue: role },
+      severity: 'warning',
+    });
+    return { success: true, message: `Role for ${account.email} changed to ${USER_ROLE_LABELS[role]}.` };
+  };
+
+  const setManagedUserDisabled = async (
+    account: ManagedAccount,
+    disabled: boolean
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!canManageSystemAccounts()) {
+      return { success: false, message: 'Only an authenticated System Administrator or Lead Developer can change account status.' };
+    }
+    try {
+      await setManagedAccountDisabled({ uid: account.uid, disabled });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown Firebase Authentication error.';
+      return { success: false, message: `Account status was not changed: ${reason}` };
+    }
+    logAuditAction({
+      category: 'security',
+      subsystem: 'User Security',
+      action: disabled ? 'USER_ACCOUNT_DISABLED' : 'USER_ACCOUNT_REACTIVATED',
+      description: `${disabled ? 'Disabled' : 'Reactivated'} DairySync account ${account.email}.`,
+      details: { itemOrBatch: account.uid },
+      severity: disabled ? 'warning' : 'info',
+    });
+    return { success: true, message: `${account.email} was ${disabled ? 'disabled' : 'reactivated'}.` };
+  };
+
+  const sendManagedUserPasswordReset = async (
+    email: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!canManageSystemAccounts()) {
+      return { success: false, message: 'Only an authenticated System Administrator or Lead Developer can send password reset emails.' };
+    }
+    try {
+      await requestManagedAccountPasswordReset(email);
+      logAuditAction({
+        category: 'security',
+        subsystem: 'User Security',
+        action: 'PASSWORD_RESET_SENT',
+        description: `Sent a password reset email to ${email}.`,
+        severity: 'info',
+      });
+      return { success: true, message: `Password reset email sent to ${email}.` };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown Firebase Authentication error.';
+      return { success: false, message: `Password reset email could not be sent: ${reason}` };
+    }
+  };
+
   const canDeleteDataAsDeveloper = () =>
     isAuthenticated &&
     authenticatedRole === 'developer' &&
@@ -2858,6 +3966,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (
       !product.sku.trim() ||
       !product.name.trim() ||
+      !product.unit.trim() ||
       !product.location.trim() ||
       numericValues.some(value => !Number.isFinite(value) || value < 0)
     ) return false;
@@ -2949,7 +4058,13 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!canDeleteDataAsDeveloper()) return false;
     const target = finishedGoods.find(item => item.id === id);
     if (!target || !target.recipe?.length) return false;
-    return updateFinishedGoodRecipe(id, [], target.batchUnitQuantity || 100);
+    return updateFinishedGoodRecipe(
+      id,
+      [],
+      target.batchUnitQuantity || 100,
+      target.unit,
+      target.containerVolumeMl,
+    );
   };
 
   const deleteWipBatchRecord = (batchId: string) => {
@@ -2958,6 +4073,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!target) return false;
 
     setWipBatches(prev => prev.filter(batch => batch.id !== batchId));
+    setWipProductionRecords(prev => prev.filter(record => record.batchId !== batchId));
     logAuditAction({
       category: 'production',
       subsystem: 'WIP Batches',
@@ -2986,6 +4102,48 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
     triggerManualCloudSync();
     return true;
+  };
+
+  const deleteStockRequestRecord = async (id: string): Promise<{ success: boolean; message: string }> => {
+    if (
+      !isAuthenticated ||
+      authenticatedRole !== 'developer' ||
+      !isDeveloperActive
+    ) {
+      return { success: false, message: 'Only the authenticated Lead Developer can delete stock requests.' };
+    }
+    const target = stockRequests.find(request => request.id === id);
+    if (!target) return { success: false, message: 'The stock request is no longer available. Refresh the request list and try again.' };
+
+    try {
+      await sqlConnectCollections.stock_request.remove(id);
+    } catch (error) {
+      console.error(`Could not delete stock request ${id} from shared cloud data:`, error);
+      return {
+        success: false,
+        message: error instanceof Error
+          ? `The stock request was not deleted from shared data: ${error.message}`
+          : 'The stock request was not deleted from shared data. Check your connection and try again.',
+      };
+    }
+
+    setStockRequests(previous => previous.filter(request => request.id !== id));
+    setAlerts(previous => previous.filter(alert => !alert.id.startsWith(`${id}-`)));
+    logAuditAction({
+      category: 'cold_storage',
+      subsystem: 'Dairy Box Stock Requests',
+      action: 'STOCK_REQUEST_RECORD_DELETED',
+      description: `Deleted Dairy Box stock request for ${target.quantity} ${target.unit} of ${target.finishedGoodName}`,
+      details: {
+        itemOrBatch: target.finishedGoodName,
+        quantity: target.quantity,
+        unit: target.unit,
+        referenceId: id,
+        reason: `Developer deletion of ${target.status} request; inventory allocations were not changed`,
+      },
+      severity: 'critical',
+    });
+    return { success: true, message: 'Stock request deleted from shared data.' };
   };
 
   const deleteSalesHistoryRecord = (receiptNo: string, transactionIds: string[]) => {
@@ -3084,6 +4242,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIngredients(INITIAL_INGREDIENTS);
     setFinishedGoods(INITIAL_FINISHED_GOODS);
     setWipBatches(INITIAL_WIP_BATCHES);
+    setWipProductionRecords([]);
     setCommitments(INITIAL_COMMITMENTS);
     setAlerts(INITIAL_ALERTS);
     setTransactions(INITIAL_TRANSACTIONS);
@@ -3110,9 +4269,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       canAccessTab,
       allowedTabs,
       ingredients,
+      recoverRawIngredients,
       finishedGoods,
       wipBatches,
+      wipProductionRecords,
       commitments,
+      stockRequests,
       alerts,
       transactions,
       pmoInventoryPeriods,
@@ -3122,6 +4284,7 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       deletePmoInventoryPeriod,
       addPmoExternalPurchase,
       recordPmoInventoryAdjustment,
+      recordPmoFinishedGoodAdjustment,
       isoRatings,
       auditLogs,
       addIngredient,
@@ -3139,7 +4302,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       advanceWipBatchStep,
       cancelWipBatch,
       deleteWipBatchRecord,
+      saveWipProductionRecord,
       processRetailSale,
+      createStockRequest,
+      reviewStockRequest,
+      cancelStockRequest,
+      deleteStockRequest: deleteStockRequestRecord,
       addCommitment,
       updateCommitmentStatus,
       cancelCommitment,
@@ -3156,6 +4324,12 @@ export const DairySyncProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       exportAuditLogsCsv,
       resetToDefaultData,
       addUserProfile,
+      fetchManagedAccounts: fetchManagedAccountsForAdmin,
+      createManagedUser,
+      updateManagedUserProfile,
+      updateManagedUserRole,
+      setManagedUserDisabled,
+      sendManagedUserPasswordReset,
       cloudSyncStatus,
       triggerManualCloudSync,
       forceReCacheInventory,

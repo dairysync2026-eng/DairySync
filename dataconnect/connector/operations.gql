@@ -2,7 +2,7 @@ query ListRawIngredients
   @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
   @refresh(onMutationExecuted: { operation: "UpsertRawIngredient" })
   @refresh(onMutationExecuted: { operation: "DeleteRawIngredient" }) {
-  rawIngredients(orderBy: [{ name: ASC }]) {
+  rawIngredients(orderBy: [{ name: ASC }], limit: 10000) {
     id
     sku
     name
@@ -131,10 +131,12 @@ mutation UpdateFinishedGoodRecipe(
   $id: String!
   $recipe: [Any!]!
   $batchUnitQuantity: Float!
+  $containerVolumeMl: Float
 ) @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'plant_manager']") {
   finishedGood_update(id: $id, data: {
     recipe: $recipe
     batchUnitQuantity: $batchUnitQuantity
+    containerVolumeMl: $containerVolumeMl
     updatedAt_expr: "request.time"
     updatedBy_expr: "auth.uid"
   })
@@ -147,6 +149,7 @@ query ListPmoInventoryPeriods
   pmoInventoryPeriods(orderBy: [{ createdAt: DESC }]) {
     id
     title
+    inventoryType
     sourceFileName
     lines
     createdAt
@@ -160,6 +163,7 @@ query ListPmoInventoryPeriods
 mutation UpsertPmoInventoryPeriod(
   $id: String!
   $title: String!
+  $inventoryType: String
   $sourceFileName: String!
   $lines: [Any!]!
   $createdAt: String!
@@ -171,6 +175,7 @@ mutation UpsertPmoInventoryPeriod(
   pmoInventoryPeriod_upsert(data: {
     id: $id
     title: $title
+    inventoryType: $inventoryType
     sourceFileName: $sourceFileName
     lines: $lines
     createdAt: $createdAt

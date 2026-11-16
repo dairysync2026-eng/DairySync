@@ -35,6 +35,14 @@ interface FinishedGoodsProps {
   onNavigateTab?: (tab: string) => void;
 }
 
+export const productCategoryOptions: { key: ProductCategory; label: string }[] = [
+  { key: 'fresh_milk', label: 'Fresh Milk' },
+  { key: 'flavored_milk', label: 'Flavored Milk' },
+  { key: 'cultured', label: 'Cultured / Yogurt' },
+  { key: 'cheese', label: 'Cheese' },
+  { key: 'confectionery', label: 'Confectionery' },
+];
+
 export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) => {
   const { 
     finishedGoods, 
@@ -118,6 +126,9 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
   const [newColdStorageLimitStr, setNewColdStorageLimitStr] = useState<string>('500');
   const [newInitialStockStr, setNewInitialStockStr] = useState<string>('200');
   const [newSafetyStockStr, setNewSafetyStockStr] = useState<string>('50');
+  const [unitPriceNotApplicable, setUnitPriceNotApplicable] = useState(false);
+  const [initialStockNotApplicable, setInitialStockNotApplicable] = useState(false);
+  const [safetyStockNotApplicable, setSafetyStockNotApplicable] = useState(false);
   const [coldStorageLimitNotApplicable, setColdStorageLimitNotApplicable] = useState(false);
   const [storageLocationNotApplicable, setStorageLocationNotApplicable] = useState(false);
 
@@ -141,20 +152,19 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     });
     setNewUnitPriceStr('50');
     setNewColdStorageLimitStr('500');
+    setUnitPriceNotApplicable(false);
     setColdStorageLimitNotApplicable(false);
     setStorageLocationNotApplicable(false);
     setNewInitialStockStr('200');
     setNewSafetyStockStr('50');
+    setInitialStockNotApplicable(false);
+    setSafetyStockNotApplicable(false);
   };
 
   // Category definitions
   const categories: { key: string; label: string }[] = [
     { key: 'all', label: 'All Categories' },
-    { key: 'fresh_milk', label: 'Fresh Milk' },
-    { key: 'flavored_milk', label: 'Flavored Milk' },
-    { key: 'cultured', label: 'Cultured / Yogurt' },
-    { key: 'cheese', label: 'Cheese' },
-    { key: 'confectionery', label: 'Confectionery' },
+    ...productCategoryOptions,
   ];
 
   // Dynamic unique locations from current inventory
@@ -238,15 +248,16 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     e.preventDefault();
     if (!newFg.name.trim()) return;
 
-    const parsedUnitPrice = Math.max(0, parseFloat(newUnitPriceStr) || 0);
+    const parsedUnitPrice = unitPriceNotApplicable ? 0 : Math.max(0, parseFloat(newUnitPriceStr) || 0);
     const parsedColdStorageCapacity = coldStorageLimitNotApplicable
       ? 0
       : Math.max(1, parseFloat(newColdStorageLimitStr) || 100);
-    const parsedCurrentStock = Math.max(0, parseFloat(newInitialStockStr) || 0);
-    const parsedSafetyStock = Math.max(0, parseFloat(newSafetyStockStr) || 0);
+    const parsedCurrentStock = initialStockNotApplicable ? 0 : Math.max(0, parseFloat(newInitialStockStr) || 0);
+    const parsedSafetyStock = safetyStockNotApplicable ? 0 : Math.max(0, parseFloat(newSafetyStockStr) || 0);
 
     const productData: Omit<FinishedGood, 'id'> = {
       ...newFg,
+      unit: editingFinishedGood?.unit ?? newFg.unit.trim(),
       location: storageLocationNotApplicable ? 'N/A' : newFg.location,
       unitPrice: parsedUnitPrice,
       coldStorageCapacity: parsedColdStorageCapacity,
@@ -287,6 +298,9 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     setNewColdStorageLimitStr(String(product.coldStorageCapacity));
     setNewInitialStockStr(String(product.currentStock));
     setNewSafetyStockStr(String(product.safetyStock ?? 0));
+    setUnitPriceNotApplicable(product.unitPrice <= 0);
+    setInitialStockNotApplicable(product.currentStock <= 0);
+    setSafetyStockNotApplicable((product.safetyStock ?? 0) <= 0);
     setColdStorageLimitNotApplicable(product.coldStorageCapacity <= 0);
     setStorageLocationNotApplicable(product.location.trim().toLowerCase() === 'n/a');
     setShowAddModal(true);
@@ -335,7 +349,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
     <div className="space-y-6">
       
       {/* Top Header */}
-      <div className="flex flex-col gap-4 bg-white border-2 border-slate-200 p-5 sm:p-6 rounded-3xl shadow-sm text-slate-900">
+      <div className="flex flex-col gap-4 bg-white border-2 border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6 rounded-3xl shadow-sm text-slate-900">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 flex items-center space-x-2 tracking-tight">
             <Snowflake className="w-6 h-6 text-teal-600" />
@@ -347,7 +361,7 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
           {isDirectorReadOnly && <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">Director / PMO · Read only</span>}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 sm:justify-end">
             <div className="flex items-center rounded-2xl border border-slate-200 bg-slate-100 p-1 text-xs font-bold">
               <button
                 id="view-toggle-table"
@@ -1114,8 +1128,8 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                 {/* Safety Stock Buffer */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Safety Stock Buffer</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     step="any"
                     min="0"
                     required
@@ -1207,20 +1221,52 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
                   className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm"
                 />
               </div>
-
+              <div>
+                <label htmlFor="finished-good-category" className="block text-xs font-bold text-slate-500 mb-1">
+                  Product Category *
+                </label>
+                <select
+                  id="finished-good-category"
+                  required
+                  value={newFg.category}
+                  onChange={event => {
+                    const category = productCategoryOptions.find(option => option.key === event.target.value);
+                    if (category) setNewFg({ ...newFg, category: category.key });
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500 shadow-sm"
+                >
+                  {productCategoryOptions.map(category => (
+                    <option key={category.key} value={category.key}>{category.label}</option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Unit Price (₱)</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    min="0"
-                    required
-                    value={newUnitPriceStr}
-                    onChange={e => setNewUnitPriceStr(e.target.value)}
-                    placeholder="e.g. 50"
-                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
-                  />
+                  <div className="mb-1 flex items-center justify-between gap-1">
+                    <label className="block text-xs font-bold text-slate-700">Unit Price (₱)</label>
+                    <button
+                      type="button"
+                      aria-pressed={unitPriceNotApplicable}
+                      onClick={() => setUnitPriceNotApplicable(value => !value)}
+                      className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {unitPriceNotApplicable ? 'Set value' : 'N/A'}
+                    </button>
+                  </div>
+                  {unitPriceNotApplicable ? (
+                    <div className="rounded-2xl border-2 border-slate-200 bg-slate-100 px-3.5 py-2.5 text-xs font-semibold text-slate-500">N/A</div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      value={newUnitPriceStr}
+                      onChange={e => setNewUnitPriceStr(e.target.value)}
+                      placeholder="e.g. 50"
+                      className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                  )}
                 </div>
                 <div>
                   <div className="mb-1 flex items-center justify-between gap-1">
@@ -1253,32 +1299,60 @@ export const FinishedGoods: React.FC<FinishedGoodsProps> = ({ onNavigateTab }) =
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    {editingFinishedGood ? 'Current Stock' : 'Initial Stock'} ({newFg.unit})
-                  </label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    min="0"
-                    required
-                    value={newInitialStockStr}
-                    onChange={e => setNewInitialStockStr(e.target.value)}
-                    placeholder="e.g. 200"
-                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
-                  />
+                  <div className="mb-1 flex items-center justify-between gap-1">
+                    <label className="block text-xs font-bold text-slate-700">
+                      {editingFinishedGood ? 'Current Stock' : 'Initial Stock'} ({newFg.unit})
+                    </label>
+                    <button
+                      type="button"
+                      aria-pressed={initialStockNotApplicable}
+                      onClick={() => setInitialStockNotApplicable(value => !value)}
+                      className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {initialStockNotApplicable ? 'Set value' : 'N/A'}
+                    </button>
+                  </div>
+                  {initialStockNotApplicable ? (
+                    <div className="rounded-2xl border-2 border-slate-200 bg-slate-100 px-3.5 py-2.5 text-xs font-semibold text-slate-500">N/A</div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      value={newInitialStockStr}
+                      onChange={e => setNewInitialStockStr(e.target.value)}
+                      placeholder="e.g. 200"
+                      className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                  )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Safety Stock Buffer (bottles)</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    min="0"
-                    required
-                    value={newSafetyStockStr}
-                    onChange={e => setNewSafetyStockStr(e.target.value)}
-                    placeholder="e.g. 50"
-                    className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
-                  />
+                  <div className="mb-1 flex items-center justify-between gap-1">
+                    <label className="block text-xs font-bold text-slate-700">Safety Stock Buffer ({newFg.unit})</label>
+                    <button
+                      type="button"
+                      aria-pressed={safetyStockNotApplicable}
+                      onClick={() => setSafetyStockNotApplicable(value => !value)}
+                      className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      {safetyStockNotApplicable ? 'Set value' : 'N/A'}
+                    </button>
+                  </div>
+                  {safetyStockNotApplicable ? (
+                    <div className="rounded-2xl border-2 border-slate-200 bg-slate-100 px-3.5 py-2.5 text-xs font-semibold text-slate-500">N/A</div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      value={newSafetyStockStr}
+                      onChange={e => setNewSafetyStockStr(e.target.value)}
+                      placeholder="e.g. 50"
+                      className="w-full px-3.5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-xs text-slate-900 font-mono font-bold focus:outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                  )}
                 </div>
               </div>
 

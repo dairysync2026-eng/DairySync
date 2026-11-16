@@ -19,25 +19,23 @@ import {
   Snowflake, 
   ShoppingCart, 
   TrendingUp,
-  ShieldCheck,
-  Award
+  ShieldCheck
 } from 'lucide-react';
 import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
 
 interface DashboardProps {
   onNavigateTab: (tab: string) => void;
-  onOpenIsoSurvey?: () => void;
-  onOpenReports?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
-  onNavigateTab, 
-  onOpenIsoSurvey,
-  onOpenReports
+  onNavigateTab
 }) => {
   const { 
     currentRole, 
     currentUser, 
+    users,
+    isOnline,
+    cloudSyncStatus,
     ingredients, 
     finishedGoods, 
     wipBatches, 
@@ -45,6 +43,44 @@ export const Dashboard: React.FC<DashboardProps> = ({
     transactions, 
     isoRatings 
   } = useDairySync();
+
+  if (currentRole === 'system_admin') {
+    return (
+      <div className="space-y-5">
+        <section className="rounded-3xl border-2 border-indigo-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-indigo-50 p-3 text-indigo-700"><ShieldCheck className="h-6 w-6" /></div>
+              <div>
+                <h1 className="text-xl font-black text-slate-900 sm:text-2xl">Administrator Overview</h1>
+                <p className="mt-1 text-sm text-slate-500">Welcome, {currentUser.name}. Manage accounts and review system activity.</p>
+              </div>
+            </div>
+            <button type="button" onClick={() => onNavigateTab('administration')} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700">
+              Open account administration
+            </button>
+          </div>
+        </section>
+        <section className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Staff profiles</p>
+            <p className="mt-2 text-2xl font-black text-slate-900">{users.length}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Network</p>
+            <p className={`mt-2 text-sm font-bold ${isOnline ? 'text-emerald-700' : 'text-rose-700'}`}>{isOnline ? 'Online' : 'Offline'}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Cloud synchronization</p>
+            <p className="mt-2 text-sm font-bold capitalize text-slate-700">{cloudSyncStatus}</p>
+          </div>
+        </section>
+        <p className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-xs text-indigo-900">
+          System Administrator access is limited to account management, audit review, and system health. Inventory and production records are not available in this role.
+        </p>
+      </div>
+    );
+  }
 
   // Role-Specific Summary Card Computations
   // 1. Procurement Metrics (Warehouse & Procurement staff)
@@ -156,7 +192,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
 
         {(currentRole === 'production_staff' || currentRole === 'plant_manager') && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-white border-2 border-indigo-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold uppercase text-indigo-600 tracking-wider">Active WIP Floor Lines</span>
@@ -246,7 +282,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
 
         {currentRole === 'developer' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Enterprise Valuation</span>
@@ -288,18 +324,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-white border-2 border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">ISO 25010 Quality</span>
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                  <Award className="w-4 h-4" />
-                </div>
-              </div>
-              <div className="mt-3">
-                <span className="text-2xl font-black text-slate-900 font-mono">4.85 / 5.0</span>
-                <p className="text-[11px] text-emerald-600 font-bold mt-1">Excellent Institutional Compliance</p>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -308,16 +332,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {currentRole === 'developer' && (
         <DeveloperDashboard 
           onNavigateTab={onNavigateTab} 
-          onOpenIsoSurvey={onOpenIsoSurvey} 
-          onOpenReports={onOpenReports} 
         />
       )}
 
       {currentRole === 'director' && (
         <DirectorDashboard
           onNavigateTab={onNavigateTab}
-          onOpenIsoSurvey={onOpenIsoSurvey}
-          onOpenReports={onOpenReports}
         />
       )}
 

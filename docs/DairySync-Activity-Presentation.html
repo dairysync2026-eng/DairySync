@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eaf3ff">
+  <title>DairySync | Activity Flow Presentation</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #101318;
+      --blue-lane: #d3e2f5;
+      --green-lane: #d9e9d4;
+      --orange-lane: #ffce91;
+      --blue-stroke: #5b92e8;
+      --green-stroke: #00c82d;
+      --orange-stroke: #ff7800;
+      --red-stroke: #e64949;
+      --line: #111;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #edf2f8;
+      font: 15px/1.35 "Segoe UI", Arial, sans-serif;
+    }
+
+    button { font: inherit; }
+
+    .topbar {
+      position: sticky;
+      z-index: 3;
+      top: 0;
+      display: flex;
+      min-height: 60px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 9px max(16px, calc((100vw - 1000px) / 2));
+      border-bottom: 1px solid #d5deea;
+      background: rgba(255,255,255,.96);
+      box-shadow: 0 2px 8px rgba(20,40,70,.07);
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      display: grid;
+      width: 35px;
+      height: 35px;
+      place-items: center;
+      border-radius: 50%;
+      background: #d7e8ff;
+      color: #225ca1;
+      font-size: 19px;
+      font-weight: 800;
+    }
+    .brand strong { display: block; font-size: 13px; letter-spacing: .06em; }
+    .brand span { display: block; color: #637086; font-size: 11px; }
+    .toolbar { display: flex; align-items: center; gap: 7px; }
+    .counter { min-width: 46px; color: #536177; text-align: center; font-size: 12px; }
+    .control {
+      min-height: 34px;
+      padding: 6px 11px;
+      border: 1px solid #c9d4e2;
+      border-radius: 7px;
+      background: white;
+      color: #1d2b40;
+      cursor: pointer;
+    }
+    .control:hover { background: #f0f6ff; }
+    .control:focus-visible, .dot:focus-visible { outline: 3px solid #75a8ed; outline-offset: 2px; }
+    .control.primary { border-color: #3974c5; background: #3974c5; color: #fff; }
+    .control:disabled { opacity: .48; cursor: default; }
+
+    main { padding: 22px 12px 40px; }
+    .deck { width: min(750px, 100%); margin: 0 auto; }
+    .slide {
+      overflow: hidden;
+      border: 1px solid #7387a0;
+      background: white;
+      box-shadow: 0 7px 25px rgba(25,42,66,.15);
+    }
+    .slide[hidden] { display: none; }
+    .activity-diagram {
+      display: block;
+      width: 100%;
+      height: auto;
+      font-family: Georgia, "Times New Roman", serif;
+      background: #fff;
+    }
+    .diagram-title { fill: #101318; font-size: 19px; font-weight: 700; }
+    .diagram-subtitle { fill: #20242a; font-size: 13px; }
+    .lane-heading { fill: #101318; font-size: 12px; font-weight: 700; }
+    .node-label { fill: #111; font-size: 12px; font-weight: 600; text-anchor: middle; }
+    .node-small { fill: #111; font-size: 10.5px; font-weight: 400; text-anchor: middle; }
+    .path-label { fill: #111; font: 11px "Segoe UI", Arial, sans-serif; font-weight: 600; }
+    .annotation { fill: #273343; font: 10.5px "Segoe UI", Arial, sans-serif; }
+    .task { fill: #fff; stroke-width: 1.15; }
+    .task.system { stroke: var(--blue-stroke); }
+    .task.user { stroke: var(--green-stroke); }
+    .task.cloud { stroke: var(--orange-stroke); }
+    .task.alert { fill: #ffe5e5; stroke: var(--red-stroke); }
+    .decision { fill: #fff; stroke-width: 1.25; }
+    .decision.system { stroke: var(--blue-stroke); }
+    .decision.user { stroke: var(--green-stroke); }
+    .decision.cloud { stroke: var(--orange-stroke); }
+    .connector { fill: none; stroke: var(--line); stroke-width: 1.45; marker-end: url(#arrow-1); }
+    .slide[data-title="Command Center"] .connector { marker-end: url(#arrow-2); }
+    .slide[data-title="Inventory & production"] .connector { marker-end: url(#arrow-3); }
+    .slide[data-title="Sales & commitments"] .connector { marker-end: url(#arrow-4); }
+    .slide[data-title="Oversight & sync"] .connector { marker-end: url(#arrow-5); }
+    .connector.no-arrow { marker-end: none; }
+    .slide[data-title] .connector.no-arrow { marker-end: none; }
+    .connector.dashed { stroke-dasharray: 5 4; }
+    .start-dot { fill: #090909; }
+    .end-ring { fill: none; stroke: #111; stroke-width: 1.4; }
+    .end-dot { fill: #111; }
+    .dot-separator { stroke: #222; stroke-width: 1; }
+
+    .dots { display: flex; justify-content: center; gap: 8px; margin: 14px auto 0; }
+    .dot { width: 9px; height: 9px; padding: 0; border: 0; border-radius: 50%; background: #b7c3d3; cursor: pointer; }
+    .dot[aria-current="true"] { width: 24px; border-radius: 99px; background: #3974c5; }
+    .footnote { margin: 12px auto 0; color: #59677a; text-align: center; font-size: 11px; }
+
+    @media (max-width: 560px) {
+      .topbar { position: static; flex-wrap: wrap; padding: 8px 12px; }
+      .toolbar { width: 100%; justify-content: space-between; }
+      main { padding: 10px 0 28px; }
+      .slide { border-right: 0; border-left: 0; }
+    }
+
+    @media print {
+      @page { size: portrait; margin: 9mm; }
+      body { background: #fff; }
+      .topbar, .dots, .footnote { display: none !important; }
+      main { padding: 0; }
+      .deck { width: 100%; }
+      .slide, .slide[hidden] {
+        display: block !important;
+        margin: 0;
+        border: 0;
+        box-shadow: none;
+        break-after: page;
+      }
+      .slide:last-child { break-after: auto; }
+      .activity-diagram { width: auto; height: 255mm; max-width: 100%; margin: 0 auto; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand" aria-label="DairySync activity flow presentation">
+      <div class="brand-mark" aria-hidden="true">D</div>
+      <div><strong>DAIRYSYNC</strong><span>Activity diagrams · 3 swimlanes</span></div>
+    </div>
+    <div class="toolbar" aria-label="Presentation controls">
+      <button class="control" id="prev" type="button" aria-label="Previous diagram">← Back</button>
+      <span class="counter" id="counter" aria-live="polite">1 / 5</span>
+      <button class="control primary" id="next" type="button" aria-label="Next diagram">Next →</button>
+      <button class="control" id="print" type="button" aria-label="Print or save as PDF">Print</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="deck">
+      <section class="slide" data-title="Portal access" aria-label="Activity diagram: portal access, authentication, and role routing">
+        <svg class="activity-diagram" viewBox="0 0 750 990" role="img" aria-labelledby="title1 desc1">
+          <title id="title1">DairySync activity diagram: portal access, authentication, and role routing</title>
+          <desc id="desc1">Three swimlanes show system session checks, user sign-in, Firebase Authentication, and role-based dashboard routing.</desc>
+          <defs>
+            <linearGradient id="headerBlue1" x2="0" y2="1"><stop stop-color="#d9e9ff"/><stop offset="1" stop-color="#93b3df"/></linearGradient>
+            <linearGradient id="headerGreen1" x2="0" y2="1"><stop stop-color="#c5e7bb"/><stop offset="1" stop-color="#91c982"/></linearGradient>
+            <linearGradient id="headerOrange1" x2="0" y2="1"><stop stop-color="#ffdcaa"/><stop offset="1" stop-color="#ffae55"/></linearGradient>
+            <marker id="arrow-1" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 Z" fill="#111"/></marker>
+          </defs>
+          <rect width="750" height="990" fill="#fff"/>
+          <rect x="0" y="0" width="750" height="60" fill="#cfe4fb"/>
+          <text x="375" y="27" class="diagram-title" text-anchor="middle">DAIRYSYNC ACTIVITY DIAGRAM</text>
+          <text x="375" y="46" class="diagram-subtitle" text-anchor="middle">Portal access, authentication, and role routing</text>
+          <rect x="0" y="60" width="250" height="20" fill="url(#headerBlue1)"/>
+          <rect x="250" y="60" width="250" height="20" fill="url(#headerGreen1)"/>
+          <rect x="500" y="60" width="250" height="20" fill="url(#headerOrange1)"/>
+          <rect x="0" y="80" width="250" height="910" fill="var(--blue-lane)"/>
+          <rect x="250" y="80" width="250" height="910" fill="var(--green-lane)"/>
+          <rect x="500" y="80" width="250" height="910" fill="var(--orange-lane)"/>
+          <path d="M250 60V990 M500 60V990" class="dot-separator"/>
+          <text x="125" y="74" class="lane-heading" text-anchor="middle">SYSTEM</text>
+          <text x="375" y="74" class="lane-heading" text-anchor="middle">USER</text>
+          <text x="625" y="74" class="lane-heading" text-anchor="middle">FIREBASE SERVICES</text>
+
+          <circle cx="125" cy="111" r="11" class="start-dot"/>
+          <path d="M125 122V145" class="connector"/>
+          <rect x="35" y="145" width="180" height="58" rx="7" class="task system"/>
+          <text x="125" y="168" class="node-label"><tspan x="125">Open DairySync;</tspan><tspan x="125" dy="16">check Firebase session</tspan></text>
+          <path d="M125 203V227" class="connector"/>
+          <polygon points="125,227 220,276 125,325 30,276" class="decision system"/>
+          <text x="125" y="272" class="node-label"><tspan x="125">Valid session</tspan><tspan x="125" dy="15">restored?</tspan></text>
+          <text x="226" y="263" class="path-label">YES</text>
+          <path d="M220 276H237V720H215" class="connector"/>
+          <text x="133" y="342" class="path-label">NO</text>
+          <path d="M125 325V351" class="connector"/>
+          <rect x="35" y="351" width="180" height="54" rx="7" class="task system"/>
+          <text x="125" y="373" class="node-label"><tspan x="125">Display sign-in</tspan><tspan x="125" dy="15">screen</tspan></text>
+          <path d="M215 378H280" class="connector"/>
+          <rect x="280" y="351" width="190" height="54" rx="7" class="task user"/>
+          <text x="375" y="373" class="node-label"><tspan x="375">Enter email or username</tspan><tspan x="375" dy="15">and password</tspan></text>
+          <path d="M470 378H535" class="connector"/>
+          <rect x="535" y="351" width="180" height="54" rx="7" class="task cloud"/>
+          <text x="625" y="373" class="node-label"><tspan x="625">Authenticate with</tspan><tspan x="625" dy="15">Firebase Authentication</tspan></text>
+          <path d="M625 405V462H220V497" class="connector"/>
+          <polygon points="125,497 220,545 125,593 30,545" class="decision system"/>
+          <text x="125" y="541" class="node-label"><tspan x="125">Credentials</tspan><tspan x="125" dy="15">valid?</tspan></text>
+          <text x="226" y="535" class="path-label">YES</text>
+          <path d="M220 545H235V720H215" class="connector"/>
+          <text x="133" y="613" class="path-label">NO</text>
+          <path d="M125 593V623" class="connector"/>
+          <rect x="35" y="623" width="180" height="54" rx="7" class="task alert"/>
+          <text x="125" y="645" class="node-label"><tspan x="125">Show error; allow retry</tspan><tspan x="125" dy="15">or password reset</tspan></text>
+          <path d="M35 650H17V378H35" class="connector"/>
+          <rect x="35" y="693" width="180" height="58" rx="7" class="task system"/>
+          <text x="125" y="716" class="node-label"><tspan x="125">Load profile, role,</tspan><tspan x="125" dy="15">and allowed tabs</tspan></text>
+          <path d="M215 722H280" class="connector"/>
+          <rect x="280" y="693" width="190" height="58" rx="7" class="task user"/>
+          <text x="375" y="716" class="node-label"><tspan x="375">Open authorized</tspan><tspan x="375" dy="15">Command Center</tspan></text>
+          <path d="M375 751V925" class="connector"/>
+          <circle cx="375" cy="942" r="15" class="end-ring"/><circle cx="375" cy="942" r="10" class="end-dot"/>
+          <text x="625" y="431" class="annotation" text-anchor="middle">Credential check happens before a role is loaded.</text>
+        </svg>
+      </section>
+
+      <section class="slide" data-title="Command Center" aria-label="Activity diagram: Command Center and role-checked module access" hidden>
+        <svg class="activity-diagram" viewBox="0 0 750 990" role="img" aria-labelledby="title2 desc2">
+          <title id="title2">DairySync activity diagram: Command Center and role-checked module access</title>
+          <desc id="desc2">The signed-in user chooses a module or logout. The system checks module access before opening it and routes denied requests back to the dashboard.</desc>
+          <defs>
+            <linearGradient id="headerBlue2" x2="0" y2="1"><stop stop-color="#d9e9ff"/><stop offset="1" stop-color="#93b3df"/></linearGradient>
+            <linearGradient id="headerGreen2" x2="0" y2="1"><stop stop-color="#c5e7bb"/><stop offset="1" stop-color="#91c982"/></linearGradient>
+            <linearGradient id="headerOrange2" x2="0" y2="1"><stop stop-color="#ffdcaa"/><stop offset="1" stop-color="#ffae55"/></linearGradient>
+            <marker id="arrow-2" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 Z" fill="#111"/></marker>
+          </defs>
+          <rect width="750" height="990" fill="#fff"/><rect width="750" height="60" fill="#cfe4fb"/>
+          <text x="375" y="27" class="diagram-title" text-anchor="middle">DAIRYSYNC ACTIVITY DIAGRAM</text>
+          <text x="375" y="46" class="diagram-subtitle" text-anchor="middle">Command Center and role-checked module access</text>
+          <rect y="60" width="250" height="20" fill="url(#headerBlue2)"/><rect x="250" y="60" width="250" height="20" fill="url(#headerGreen2)"/><rect x="500" y="60" width="250" height="20" fill="url(#headerOrange2)"/>
+          <rect y="80" width="250" height="910" fill="var(--blue-lane)"/><rect x="250" y="80" width="250" height="910" fill="var(--green-lane)"/><rect x="500" y="80" width="250" height="910" fill="var(--orange-lane)"/>
+          <path d="M250 60V990 M500 60V990" class="dot-separator"/>
+          <text x="125" y="74" class="lane-heading" text-anchor="middle">SYSTEM</text><text x="375" y="74" class="lane-heading" text-anchor="middle">AUTHENTICATED USER</text><text x="625" y="74" class="lane-heading" text-anchor="middle">FIREBASE SERVICES</text>
+
+          <circle cx="125" cy="112" r="11" class="start-dot"/>
+          <path d="M125 123V147" class="connector"/>
+          <rect x="30" y="147" width="190" height="58" rx="7" class="task system"/>
+          <text x="125" y="170" class="node-label"><tspan x="125">Load role profile,</tspan><tspan x="125" dy="15">KPIs, and alerts</tspan></text>
+          <path d="M220 176H280" class="connector"/>
+          <rect x="280" y="147" width="190" height="58" rx="7" class="task user"/>
+          <text x="375" y="170" class="node-label"><tspan x="375">View Command Center</tspan><tspan x="375" dy="15">dashboard</tspan></text>
+          <path d="M375 205V236" class="connector"/>
+          <polygon points="375,236 470,285 375,334 280,285" class="decision user"/>
+          <text x="375" y="281" class="node-label"><tspan x="375">Choose module</tspan><tspan x="375" dy="15">or logout?</tspan></text>
+
+          <text x="264" y="350" class="path-label">MODULE</text>
+          <path d="M280 285H240V393H220" class="connector"/>
+          <rect x="30" y="393" width="190" height="58" rx="7" class="task system"/>
+          <text x="125" y="416" class="node-label"><tspan x="125">Check selected tab</tspan><tspan x="125" dy="15">for current role</tspan></text>
+          <path d="M125 451V475" class="connector"/>
+          <polygon points="125,475 220,520 125,565 30,520" class="decision system"/>
+          <text x="125" y="516" class="node-label"><tspan x="125">Access allowed</tspan><tspan x="125" dy="15">for this role?</tspan></text>
+          <text x="227" y="510" class="path-label">YES</text>
+          <path d="M220 520H280" class="connector"/>
+          <rect x="280" y="490" width="190" height="60" rx="7" class="task user"/>
+          <text x="375" y="514" class="node-label"><tspan x="375">Open selected</tspan><tspan x="375" dy="15">module workflow</tspan></text>
+          <path d="M375 550V593" class="connector"/>
+          <circle cx="375" cy="610" r="14" class="end-ring"/><circle cx="375" cy="610" r="9" class="end-dot"/>
+
+          <text x="133" y="586" class="path-label">NO</text>
+          <path d="M125 565V600" class="connector"/>
+          <rect x="30" y="600" width="190" height="56" rx="7" class="task alert"/>
+          <text x="125" y="624" class="node-label"><tspan x="125">Show Access</tspan><tspan x="125" dy="15">Restricted screen</tspan></text>
+          <path d="M30 628H16V735H280" class="connector"/>
+          <rect x="280" y="705" width="190" height="58" rx="7" class="task user"/>
+          <text x="375" y="728" class="node-label"><tspan x="375">Return to</tspan><tspan x="375" dy="15">Command Center</tspan></text>
+          <path d="M375 705V664H493V176H470" class="connector"/>
+
+          <text x="486" y="307" class="path-label">LOGOUT</text>
+          <path d="M470 285H625V393" class="connector"/>
+          <rect x="530" y="393" width="190" height="58" rx="7" class="task cloud"/>
+          <text x="625" y="416" class="node-label"><tspan x="625">End Firebase session</tspan><tspan x="625" dy="15">and clear auth state</tspan></text>
+          <path d="M530 422H510V690H220" class="connector"/>
+          <rect x="30" y="675" width="190" height="58" rx="7" class="task system"/>
+          <text x="125" y="698" class="node-label"><tspan x="125">Return to sign-in;</tspan><tspan x="125" dy="15">role switch signs in again</tspan></text>
+          <path d="M125 733V790" class="connector"/>
+          <circle cx="125" cy="807" r="14" class="end-ring"/><circle cx="125" cy="807" r="9" class="end-dot"/>
+          <text x="625" y="484" class="annotation" text-anchor="middle"><tspan x="625">Role access is not the same</tspan><tspan x="625" dy="13">as edit rights inside a module.</tspan></text>
+        </svg>
+      </section>
+
+      <section class="slide" data-title="Inventory & production" aria-label="Activity diagram: inventory, procurement, PMO, recipes, and production" hidden>
+        <svg class="activity-diagram" viewBox="0 0 750 990" role="img" aria-labelledby="title3 desc3">
+          <title id="title3">DairySync activity diagram: inventory, procurement, PMO, recipes, and production</title>
+          <desc id="desc3">Five alternative work paths show separate checks and cloud writes for ingredients, procurement, PMO counts, recipes, and WIP production.</desc>
+          <defs>
+            <linearGradient id="headerBlue3" x2="0" y2="1"><stop stop-color="#d9e9ff"/><stop offset="1" stop-color="#93b3df"/></linearGradient>
+            <linearGradient id="headerGreen3" x2="0" y2="1"><stop stop-color="#c5e7bb"/><stop offset="1" stop-color="#91c982"/></linearGradient>
+            <linearGradient id="headerOrange3" x2="0" y2="1"><stop stop-color="#ffdcaa"/><stop offset="1" stop-color="#ffae55"/></linearGradient>
+            <marker id="arrow-3" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 Z" fill="#111"/></marker>
+          </defs>
+          <rect width="750" height="990" fill="#fff"/><rect width="750" height="60" fill="#cfe4fb"/>
+          <text x="375" y="27" class="diagram-title" text-anchor="middle">DAIRYSYNC ACTIVITY DIAGRAM</text>
+          <text x="375" y="46" class="diagram-subtitle" text-anchor="middle">Inventory, procurement, PMO, recipes, and production</text>
+          <rect y="60" width="250" height="20" fill="url(#headerBlue3)"/><rect x="250" y="60" width="250" height="20" fill="url(#headerGreen3)"/><rect x="500" y="60" width="250" height="20" fill="url(#headerOrange3)"/>
+          <rect y="80" width="250" height="910" fill="var(--blue-lane)"/><rect x="250" y="80" width="250" height="910" fill="var(--green-lane)"/><rect x="500" y="80" width="250" height="910" fill="var(--orange-lane)"/>
+          <path d="M250 60V990 M500 60V990" class="dot-separator"/>
+          <text x="125" y="74" class="lane-heading" text-anchor="middle">SYSTEM</text><text x="375" y="74" class="lane-heading" text-anchor="middle">AUTHENTICATED USER</text><text x="625" y="74" class="lane-heading" text-anchor="middle">FIREBASE SERVICES</text>
+
+          <circle cx="125" cy="108" r="10" class="start-dot"/>
+          <path d="M125 118V137" class="connector"/>
+          <rect x="25" y="137" width="200" height="48" rx="7" class="task system"/>
+          <text x="125" y="157" class="node-label"><tspan x="125">Verify role; load stock,</tspan><tspan x="125" dy="14">recipe, and WIP data</tspan></text>
+          <path d="M225 161H250V206H375" class="connector"/>
+          <polygon points="375,206 465,249 375,292 285,249" class="decision user"/>
+          <text x="375" y="245" class="node-label"><tspan x="375">Choose inventory</tspan><tspan x="375" dy="14">or production task</tspan></text>
+          <text x="375" y="326" class="path-label" text-anchor="middle">CHOOSE ONE WORKFLOW · EACH ROW HAS ITS OWN VALIDATION</text>
+          <path d="M285 249H5V771" class="connector no-arrow"/>
+          <path d="M5 381H15 M5 477H15 M5 573H15 M5 669H15 M5 771H15" class="connector"/>
+
+          <rect x="15" y="342" width="220" height="78" rx="7" class="task system"/>
+          <text x="125" y="362" class="node-label"><tspan x="125">RAW INGREDIENTS</tspan></text>
+          <text x="125" y="379" class="node-small"><tspan x="125">Check role and input;</tspan><tspan x="125" dy="13">review stock / reorder levels</tspan></text>
+          <rect x="265" y="342" width="220" height="78" rx="7" class="task user"/>
+          <text x="375" y="367" class="node-label"><tspan x="375">Review or adjust ingredients</tspan></text>
+          <text x="375" y="386" class="node-small"><tspan x="375">Read-only review returns</tspan><tspan x="375" dy="13">without a write</tspan></text>
+          <rect x="515" y="342" width="220" height="78" rx="7" class="task cloud"/>
+          <text x="625" y="367" class="node-label"><tspan x="625">Save stock change</tspan></text>
+          <text x="625" y="386" class="node-small"><tspan x="625">Write stock transaction</tspan><tspan x="625" dy="13">and audit entry</tspan></text>
+          <path d="M235 381H265" class="connector"/><path d="M485 381H515" class="connector"/>
+
+          <rect x="15" y="438" width="220" height="78" rx="7" class="task system"/>
+          <text x="125" y="458" class="node-label"><tspan x="125">ROP PROCUREMENT</tspan></text>
+          <text x="125" y="475" class="node-small"><tspan x="125">Validate restock request</tspan><tspan x="125" dy="13">and goods received</tspan></text>
+          <rect x="265" y="438" width="220" height="78" rx="7" class="task user"/>
+          <text x="375" y="463" class="node-label"><tspan x="375">Review reorder alerts</tspan></text>
+          <text x="375" y="482" class="node-small"><tspan x="375">Issue request; receive goods</tspan></text>
+          <rect x="515" y="438" width="220" height="78" rx="7" class="task cloud"/>
+          <text x="625" y="463" class="node-label"><tspan x="625">Record purchase</tspan></text>
+          <text x="625" y="482" class="node-small"><tspan x="625">Update stock + audit</tspan></text>
+          <path d="M235 477H265" class="connector"/><path d="M485 477H515" class="connector"/>
+
+          <rect x="15" y="534" width="220" height="78" rx="7" class="task system"/>
+          <text x="125" y="554" class="node-label"><tspan x="125">PMO INVENTORY</tspan></text>
+          <text x="125" y="571" class="node-small"><tspan x="125">Compare ledger and count;</tspan><tspan x="125" dy="13">allow post only once</tspan></text>
+          <rect x="265" y="534" width="220" height="78" rx="7" class="task user"/>
+          <text x="375" y="559" class="node-label"><tspan x="375">Count and correct draft</tspan></text>
+          <text x="375" y="578" class="node-small"><tspan x="375">Posted periods are locked</tspan></text>
+          <rect x="515" y="534" width="220" height="78" rx="7" class="task cloud"/>
+          <text x="625" y="559" class="node-label"><tspan x="625">Post period + lock</tspan></text>
+          <text x="625" y="578" class="node-small"><tspan x="625">Save posting audit record</tspan></text>
+          <path d="M235 573H265" class="connector"/><path d="M485 573H515" class="connector"/>
+
+          <rect x="15" y="630" width="220" height="78" rx="7" class="task system"/>
+          <text x="125" y="650" class="node-label"><tspan x="125">PRODUCT RECIPES</tspan></text>
+          <text x="125" y="667" class="node-small"><tspan x="125">Check role and recipe</tspan><tspan x="125" dy="13">values / quantities</tspan></text>
+          <rect x="265" y="630" width="220" height="78" rx="7" class="task user"/>
+          <text x="375" y="655" class="node-label"><tspan x="375">Edit BOM or ingredient ratios</tspan></text>
+          <text x="375" y="674" class="node-small"><tspan x="375">No stock is consumed here</tspan></text>
+          <rect x="515" y="630" width="220" height="78" rx="7" class="task cloud"/>
+          <text x="625" y="655" class="node-label"><tspan x="625">Save recipe change</tspan></text>
+          <text x="625" y="674" class="node-small"><tspan x="625">Write audit entry</tspan></text>
+          <path d="M235 669H265" class="connector"/><path d="M485 669H515" class="connector"/>
+
+          <rect x="15" y="726" width="220" height="91" rx="7" class="task system"/>
+          <text x="125" y="746" class="node-label"><tspan x="125">WIP PRODUCTION</tspan></text>
+          <text x="125" y="763" class="node-small"><tspan x="125">Scale recipe; check required</tspan><tspan x="125" dy="13">materials before starting</tspan></text>
+          <rect x="265" y="726" width="220" height="91" rx="7" class="task user"/>
+          <text x="375" y="751" class="node-label"><tspan x="375">Create, advance, or cancel batch</tspan></text>
+          <text x="375" y="770" class="node-small"><tspan x="375">Cancellation restores ingredients</tspan><tspan x="375" dy="13">only while still scheduled</tspan></text>
+          <rect x="515" y="726" width="220" height="91" rx="7" class="task cloud"/>
+          <text x="625" y="751" class="node-label"><tspan x="625">Update stock and batch</tspan></text>
+          <text x="625" y="770" class="node-small"><tspan x="625">Deduct / restore inputs;</tspan><tspan x="625" dy="13">add finished goods on completion</tspan></text>
+          <path d="M235 771H265" class="connector"/><path d="M485 771H515" class="connector"/>
+
+          <rect x="30" y="855" width="690" height="72" rx="8" fill="#f7fbff" stroke="#698ab4" stroke-dasharray="5 4"/>
+          <text x="375" y="880" class="node-label"><tspan x="375">Important difference</tspan></text>
+          <text x="375" y="901" class="node-small"><tspan x="375">A stock-availability check applies to starting production, not to reviews, receiving goods, or recipe edits.</tspan></text>
+          <path d="M625 817V927" class="connector"/>
+          <circle cx="625" cy="945" r="14" class="end-ring"/><circle cx="625" cy="945" r="9" class="end-dot"/>
+        </svg>
+      </section>
+
+      <section class="slide" data-title="Sales & commitments" aria-label="Activity diagram: cold storage, commitments, and Dairy Box point of sale" hidden>
+        <svg class="activity-diagram" viewBox="0 0 750 990" role="img" aria-labelledby="title4 desc4">
+          <title id="title4">DairySync activity diagram: cold storage, commitments, and Dairy Box POS</title>
+          <desc id="desc4">Separate swimlane paths cover cold-storage adjustments, partner commitments, and POS stock validation at checkout.</desc>
+          <defs>
+            <linearGradient id="headerBlue4" x2="0" y2="1"><stop stop-color="#d9e9ff"/><stop offset="1" stop-color="#93b3df"/></linearGradient>
+            <linearGradient id="headerGreen4" x2="0" y2="1"><stop stop-color="#c5e7bb"/><stop offset="1" stop-color="#91c982"/></linearGradient>
+            <linearGradient id="headerOrange4" x2="0" y2="1"><stop stop-color="#ffdcaa"/><stop offset="1" stop-color="#ffae55"/></linearGradient>
+            <marker id="arrow-4" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 Z" fill="#111"/></marker>
+          </defs>
+          <rect width="750" height="990" fill="#fff"/><rect width="750" height="60" fill="#cfe4fb"/>
+          <text x="375" y="27" class="diagram-title" text-anchor="middle">DAIRYSYNC ACTIVITY DIAGRAM</text>
+          <text x="375" y="46" class="diagram-subtitle" text-anchor="middle">Cold storage, commitments, and Dairy Box POS</text>
+          <rect y="60" width="250" height="20" fill="url(#headerBlue4)"/><rect x="250" y="60" width="250" height="20" fill="url(#headerGreen4)"/><rect x="500" y="60" width="250" height="20" fill="url(#headerOrange4)"/>
+          <rect y="80" width="250" height="910" fill="var(--blue-lane)"/><rect x="250" y="80" width="250" height="910" fill="var(--green-lane)"/><rect x="500" y="80" width="250" height="910" fill="var(--orange-lane)"/>
+          <path d="M250 60V990 M500 60V990" class="dot-separator"/>
+          <text x="125" y="74" class="lane-heading" text-anchor="middle">SYSTEM</text><text x="375" y="74" class="lane-heading" text-anchor="middle">AUTHENTICATED USER</text><text x="625" y="74" class="lane-heading" text-anchor="middle">FIREBASE SERVICES</text>
+
+          <circle cx="125" cy="108" r="10" class="start-dot"/>
+          <path d="M125 118V137" class="connector"/>
+          <rect x="25" y="137" width="200" height="48" rx="7" class="task system"/>
+          <text x="125" y="157" class="node-label"><tspan x="125">Verify role; load finished</tspan><tspan x="125" dy="14">goods and sales data</tspan></text>
+          <path d="M225 161H250V206H375" class="connector"/>
+          <polygon points="375,206 465,249 375,292 285,249" class="decision user"/>
+          <text x="375" y="245" class="node-label"><tspan x="375">Choose storage</tspan><tspan x="375" dy="14">or sales task</tspan></text>
+          <text x="375" y="328" class="path-label" text-anchor="middle">CHOOSE ONE WORKFLOW · VALIDATE ITS OWN RULES</text>
+          <path d="M285 249H5V635" class="connector no-arrow"/>
+          <path d="M5 389H15 M5 512H15 M5 635H15" class="connector"/>
+
+          <rect x="15" y="344" width="220" height="90" rx="7" class="task system"/>
+          <text x="125" y="365" class="node-label"><tspan x="125">COLD STORAGE</tspan></text>
+          <text x="125" y="383" class="node-small"><tspan x="125">Check permission, capacity,</tspan><tspan x="125" dy="14">safety stock, and quantities</tspan></text>
+          <rect x="265" y="344" width="220" height="90" rx="7" class="task user"/>
+          <text x="375" y="372" class="node-label"><tspan x="375">Review goods and allocations</tspan></text>
+          <text x="375" y="393" class="node-small"><tspan x="375">Adjust stock only when permitted</tspan></text>
+          <rect x="515" y="344" width="220" height="90" rx="7" class="task cloud"/>
+          <text x="625" y="372" class="node-label"><tspan x="625">Save authorized changes</tspan></text>
+          <text x="625" y="393" class="node-small"><tspan x="625">Stock transaction + audit entry</tspan></text>
+          <path d="M235 389H265" class="connector"/><path d="M485 389H515" class="connector"/>
+
+          <rect x="15" y="467" width="220" height="90" rx="7" class="task system"/>
+          <text x="125" y="488" class="node-label"><tspan x="125">SUPPLY &amp; DEMAND</tspan></text>
+          <text x="125" y="506" class="node-small"><tspan x="125">Validate commitment edits</tspan><tspan x="125" dy="14">and fulfillment quantities</tspan></text>
+          <rect x="265" y="467" width="220" height="90" rx="7" class="task user"/>
+          <text x="375" y="495" class="node-label"><tspan x="375">Create, update, or fulfill</tspan></text>
+          <text x="375" y="516" class="node-small"><tspan x="375">partner commitment</tspan></text>
+          <rect x="515" y="467" width="220" height="90" rx="7" class="task cloud"/>
+          <text x="625" y="495" class="node-label"><tspan x="625">Save status and event</tspan></text>
+          <text x="625" y="516" class="node-small"><tspan x="625">Update distribution record + audit</tspan></text>
+          <path d="M235 512H265" class="connector"/><path d="M485 512H515" class="connector"/>
+
+          <rect x="15" y="590" width="220" height="91" rx="7" class="task system"/>
+          <text x="125" y="612" class="node-label"><tspan x="125">DAIRY BOX POS</tspan></text>
+          <text x="125" y="631" class="node-small"><tspan x="125">Open POS and prepare</tspan><tspan x="125" dy="14">finished-goods stock data</tspan></text>
+          <rect x="265" y="590" width="220" height="91" rx="7" class="task user"/>
+          <text x="375" y="618" class="node-label"><tspan x="375">Select finished goods</tspan></text>
+          <text x="375" y="639" class="node-small"><tspan x="375">Build cart and quantity</tspan></text>
+          <polygon points="125,713 220,760 125,807 30,760" class="decision system"/>
+          <text x="125" y="756" class="node-label"><tspan x="125">Enough stock</tspan><tspan x="125" dy="15">for sale?</tspan></text>
+          <path d="M265 635H243V760H220" class="connector"/>
+          <text x="227" y="743" class="path-label">YES</text>
+          <path d="M220 760H265V836" class="connector"/>
+          <rect x="265" y="836" width="220" height="68" rx="7" class="task user"/>
+          <text x="375" y="862" class="node-label"><tspan x="375">Complete sale</tspan><tspan x="375" dy="15">and show receipt</tspan></text>
+          <path d="M485 870H515" class="connector"/>
+          <rect x="515" y="836" width="220" height="68" rx="7" class="task cloud"/>
+          <text x="625" y="862" class="node-label"><tspan x="625">Reduce stock</tspan><tspan x="625" dy="15">write sale + audit</tspan></text>
+          <text x="133" y="827" class="path-label">NO</text>
+          <path d="M125 807V839" class="connector"/>
+          <rect x="25" y="839" width="200" height="62" rx="7" class="task alert"/>
+          <text x="125" y="863" class="node-label"><tspan x="125">Show insufficient stock;</tspan><tspan x="125" dy="15">adjust cart or quantity</tspan></text>
+          <path d="M25 870H10V635H265" class="connector"/>
+          <text x="375" y="937" class="annotation" text-anchor="middle">Only a completed sale consumes stock; review and commitment flows have their own rules.</text>
+        </svg>
+      </section>
+
+      <section class="slide" data-title="Oversight & sync" aria-label="Activity diagram: oversight, read-only review, and data synchronization" hidden>
+        <svg class="activity-diagram" viewBox="0 0 750 990" role="img" aria-labelledby="title5 desc5">
+          <title id="title5">DairySync activity diagram: oversight, read-only review, and data synchronization</title>
+          <desc id="desc5">Audit, reports, and documentation are shown as read-only review. A separate write path decides between online sync and local offline queueing.</desc>
+          <defs>
+            <linearGradient id="headerBlue5" x2="0" y2="1"><stop stop-color="#d9e9ff"/><stop offset="1" stop-color="#93b3df"/></linearGradient>
+            <linearGradient id="headerGreen5" x2="0" y2="1"><stop stop-color="#c5e7bb"/><stop offset="1" stop-color="#91c982"/></linearGradient>
+            <linearGradient id="headerOrange5" x2="0" y2="1"><stop stop-color="#ffdcaa"/><stop offset="1" stop-color="#ffae55"/></linearGradient>
+            <marker id="arrow-5" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 Z" fill="#111"/></marker>
+          </defs>
+          <rect width="750" height="990" fill="#fff"/><rect width="750" height="60" fill="#cfe4fb"/>
+          <text x="375" y="27" class="diagram-title" text-anchor="middle">DAIRYSYNC ACTIVITY DIAGRAM</text>
+          <text x="375" y="46" class="diagram-subtitle" text-anchor="middle">Audit, reports, documentation, and data synchronization</text>
+          <rect y="60" width="250" height="20" fill="url(#headerBlue5)"/><rect x="250" y="60" width="250" height="20" fill="url(#headerGreen5)"/><rect x="500" y="60" width="250" height="20" fill="url(#headerOrange5)"/>
+          <rect y="80" width="250" height="910" fill="var(--blue-lane)"/><rect x="250" y="80" width="250" height="910" fill="var(--green-lane)"/><rect x="500" y="80" width="250" height="910" fill="var(--orange-lane)"/>
+          <path d="M250 60V990 M500 60V990" class="dot-separator"/>
+          <text x="125" y="74" class="lane-heading" text-anchor="middle">SYSTEM</text><text x="375" y="74" class="lane-heading" text-anchor="middle">AUTHENTICATED USER</text><text x="625" y="74" class="lane-heading" text-anchor="middle">FIREBASE SERVICES</text>
+
+          <circle cx="125" cy="108" r="10" class="start-dot"/>
+          <path d="M125 118V139" class="connector"/>
+          <rect x="30" y="139" width="190" height="55" rx="7" class="task system"/>
+          <text x="125" y="162" class="node-label"><tspan x="125">Open audit, reports,</tspan><tspan x="125" dy="15">or documentation</tspan></text>
+          <path d="M220 166H255V217H375" class="connector"/>
+          <polygon points="375,217 465,260 375,303 285,260" class="decision user"/>
+          <text x="375" y="256" class="node-label"><tspan x="375">Choose an</tspan><tspan x="375" dy="15">oversight view</tspan></text>
+
+          <path d="M285 260H255V350H265" class="connector"/>
+          <rect x="265" y="326" width="220" height="68" rx="7" class="task user"/>
+          <text x="375" y="352" class="node-label"><tspan x="375">AUDIT TRAIL</tspan></text>
+          <text x="375" y="371" class="node-small"><tspan x="375">Filter, review, or export events</tspan></text>
+          <path d="M465 260H495V445H485" class="connector"/>
+          <rect x="265" y="420" width="220" height="68" rx="7" class="task user"/>
+          <text x="375" y="446" class="node-label"><tspan x="375">REPORTS / ANALYTICS</tspan></text>
+          <text x="375" y="465" class="node-small"><tspan x="375">Review stock, PMO, and sales summaries</tspan></text>
+          <path d="M375 303V520" class="connector"/>
+          <rect x="265" y="514" width="220" height="68" rx="7" class="task user"/>
+          <text x="375" y="540" class="node-label"><tspan x="375">SYSTEM MANUAL</tspan></text>
+          <text x="375" y="559" class="node-small"><tspan x="375">Review SOPs and role guidance</tspan></text>
+
+          <path d="M265 360H230V620H220" class="connector"/>
+          <path d="M265 454H230V620H220" class="connector"/>
+          <path d="M265 548H230V620H220" class="connector"/>
+          <rect x="30" y="600" width="190" height="55" rx="7" class="task system"/>
+          <text x="125" y="623" class="node-label"><tspan x="125">Return to dashboard</tspan><tspan x="125" dy="15">or selected module</tspan></text>
+          <text x="375" y="613" class="annotation" text-anchor="middle">Read-only paths: no operational save or sync.</text>
+          <path d="M125 655V690" class="connector"/>
+          <circle cx="125" cy="707" r="13" class="end-ring"/><circle cx="125" cy="707" r="8" class="end-dot"/>
+
+          <path d="M20 733H730" stroke="#333" stroke-dasharray="6 5" fill="none"/>
+          <text x="375" y="753" class="path-label" text-anchor="middle">SEPARATE WRITE PATH · ENTER ONLY AFTER A SUCCESSFUL OPERATIONAL CHANGE</text>
+          <rect x="30" y="775" width="190" height="58" rx="7" class="task system"/>
+          <text x="125" y="798" class="node-label"><tspan x="125">Validate change</tspan><tspan x="125" dy="15">and prepare save</tspan></text>
+          <path d="M220 804H280" class="connector"/>
+          <polygon points="375,766 465,811 375,856 285,811" class="decision system"/>
+          <text x="375" y="807" class="node-label"><tspan x="375">Cloud sync</tspan><tspan x="375" dy="15">available?</tspan></text>
+
+          <text x="484" y="799" class="path-label">YES</text>
+          <path d="M465 811H530" class="connector"/>
+          <rect x="530" y="775" width="190" height="70" rx="7" class="task cloud"/>
+          <text x="625" y="802" class="node-label"><tspan x="625">Sync through Firebase</tspan><tspan x="625" dy="16">Data Connect</tspan></text>
+          <text x="133" y="876" class="path-label">NO</text>
+          <path d="M375 856V884H220" class="connector"/>
+          <rect x="30" y="858" width="190" height="67" rx="7" class="task system"/>
+          <text x="125" y="882" class="node-label"><tspan x="125">Queue locally;</tspan><tspan x="125" dy="15">retry when online</tspan></text>
+          <path d="M220 892H280" class="connector"/>
+          <rect x="280" y="870" width="205" height="55" rx="7" class="task system"/>
+          <text x="382" y="892" class="node-label"><tspan x="382">Refresh view when</tspan><tspan x="382" dy="15">sync is complete</tspan></text>
+          <path d="M625 845V897H485" class="connector"/>
+          <text x="625" y="943" class="annotation" text-anchor="middle">Firebase is used for online writes and retries.</text>
+        </svg>
+      </section>
+    </div>
+    <nav class="dots" aria-label="Choose an activity diagram"></nav>
+    <p class="footnote">Use the controls or arrow keys to navigate · Print to save all five diagrams as a PDF</p>
+  </main>
+  <script>
+    (() => {
+      const slides = Array.from(document.querySelectorAll(".slide"));
+      const dots = document.querySelector(".dots");
+      const counter = document.getElementById("counter");
+      const previous = document.getElementById("prev");
+      const next = document.getElementById("next");
+      let current = 0;
+
+      slides.forEach((slide, index) => {
+        const dot = document.createElement("button");
+        dot.className = "dot";
+        dot.type = "button";
+        dot.setAttribute("aria-label", `Go to diagram ${index + 1}: ${slide.dataset.title}`);
+        dot.addEventListener("click", () => showSlide(index));
+        dots.append(dot);
+      });
+
+      function showSlide(index) {
+        current = (index + slides.length) % slides.length;
+        slides.forEach((slide, i) => {
+          slide.hidden = i !== current;
+          slide.setAttribute("aria-hidden", String(i !== current));
+        });
+        Array.from(dots.children).forEach((dot, i) => {
+          if (i === current) dot.setAttribute("aria-current", "true");
+          else dot.removeAttribute("aria-current");
+        });
+        counter.textContent = `${current + 1} / ${slides.length}`;
+        previous.disabled = current === 0;
+        next.textContent = current === slides.length - 1 ? "Start over ↺" : "Next →";
+        next.setAttribute("aria-label", current === slides.length - 1 ? "Start presentation over" : "Next diagram");
+      }
+
+      previous.addEventListener("click", () => showSlide(current - 1));
+      next.addEventListener("click", () => showSlide(current + 1));
+      document.getElementById("print").addEventListener("click", () => window.print());
+      document.addEventListener("keydown", event => {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.key === "ArrowRight" || event.key === "PageDown") showSlide(current + 1);
+        if (event.key === "ArrowLeft" || event.key === "PageUp") showSlide(current - 1);
+      });
+
+      showSlide(0);
+    })();
+  </script>
+</body>
+</html>

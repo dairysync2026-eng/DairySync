@@ -1,0 +1,130 @@
+query ListStockRequests
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'plant_manager']")
+  @refresh(onMutationExecuted: { operation: "CreateStockRequest" })
+  @refresh(onMutationExecuted: { operation: "ReviewStockRequest" })
+  @refresh(onMutationExecuted: { operation: "CancelOwnStockRequest" })
+  @refresh(onMutationExecuted: { operation: "DeleteStockRequest" }) {
+  stockRequests(orderBy: [{ requestedAt: DESC }]) {
+    id
+    finishedGoodId
+    finishedGoodName
+    finishedGoodSku
+    quantity
+    unit
+    requestedByEmail
+    requestedByName
+    requestedAt
+    neededBy
+    status
+    notes
+    responseNotes
+    reviewedBy
+    reviewedAt
+    fulfilledAt
+    fulfilledQuantity
+  }
+}
+
+query ListOwnStockRequests
+  @auth(expr: "auth != null && auth.token.role == 'store_outlet'")
+  @refresh(onMutationExecuted: { operation: "CreateStockRequest" })
+  @refresh(onMutationExecuted: { operation: "ReviewStockRequest" })
+  @refresh(onMutationExecuted: { operation: "CancelOwnStockRequest" })
+  @refresh(onMutationExecuted: { operation: "DeleteStockRequest" }) {
+  stockRequests(
+    where: { requestedByEmail: { eq_expr: "auth.token.email" } }
+    orderBy: [{ requestedAt: DESC }]
+  ) {
+    id
+    finishedGoodId
+    finishedGoodName
+    finishedGoodSku
+    quantity
+    unit
+    requestedByEmail
+    requestedByName
+    requestedAt
+    neededBy
+    status
+    notes
+    responseNotes
+    reviewedBy
+    reviewedAt
+    fulfilledAt
+    fulfilledQuantity
+  }
+}
+
+mutation CreateStockRequest(
+  $id: String!
+  $finishedGoodId: String!
+  $finishedGoodName: String!
+  $finishedGoodSku: String!
+  $quantity: Float!
+  $unit: String!
+  $requestedByName: String!
+  $requestedAt: String!
+  $neededBy: String
+  $notes: String
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'store_outlet']") {
+  stockRequest_insert(data: {
+    id: $id
+    finishedGoodId: $finishedGoodId
+    finishedGoodName: $finishedGoodName
+    finishedGoodSku: $finishedGoodSku
+    quantity: $quantity
+    unit: $unit
+    requestedByEmail_expr: "auth.token.email"
+    requestedByName: $requestedByName
+    requestedAt: $requestedAt
+    neededBy: $neededBy
+    status: "pending"
+    notes: $notes
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation ReviewStockRequest(
+  $id: String!
+  $status: String!
+  $responseNotes: String
+  $reviewedAt: String!
+  $fulfilledAt: String
+  $fulfilledQuantity: Float
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager']") {
+  stockRequest_updateMany(
+    where: { id: { eq: $id } }
+    data: {
+      status: $status
+      responseNotes: $responseNotes
+      reviewedBy_expr: "auth.token.email"
+      reviewedAt: $reviewedAt
+      fulfilledAt: $fulfilledAt
+      fulfilledQuantity: $fulfilledQuantity
+      updatedAt_expr: "request.time"
+      updatedBy_expr: "auth.uid"
+    }
+  )
+}
+
+mutation CancelOwnStockRequest($id: String!)
+  @auth(expr: "auth != null && auth.token.role == 'store_outlet'") {
+  stockRequest_updateMany(
+    where: {
+      id: { eq: $id }
+      requestedByEmail: { eq_expr: "auth.token.email" }
+      status: { eq: "pending" }
+    }
+    data: {
+      status: "cancelled"
+      updatedAt_expr: "request.time"
+      updatedBy_expr: "auth.uid"
+    }
+  )
+}
+
+mutation DeleteStockRequest($id: String!)
+  @auth(expr: "auth != null && auth.token.role == 'developer'") {
+  stockRequest_delete(id: $id)
+}

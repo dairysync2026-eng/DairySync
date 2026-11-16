@@ -1,12 +1,53 @@
 import React, { useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
-import { BomIngredientRequirement, FinishedGood } from '../types';
+import { BomIngredientRequirement, BomIngredientSubstitute, FinishedGood } from '../types';
 import { ClipboardList, Plus, Save, Trash2, X } from 'lucide-react';
 import { usePagination } from '../hooks/usePagination';
 import { TablePagination } from './TablePagination';
+import {
+  convertUnitQuantity,
+  getRecipeUnitsPerInventoryUnit,
+  RECIPE_UNIT_OPTIONS,
+} from '../utils/unitConversions';
+import { isRawMaterialCategory } from '../utils/ingredientCategories';
 
-const getRecipeOutputUnitLabel = (unit: FinishedGood['unit']) =>
-  unit === 'bottles' || unit === 'packs' ? 'bottles / packs' : unit;
+const parseSingleRecipeQuantity = (value: string): number | null => {
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  const mixedFraction = normalized.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+  if (mixedFraction) {
+    const [, whole, numerator, denominator] = mixedFraction;
+    const denominatorValue = Number(denominator);
+    if (denominatorValue === 0) return null;
+    return Number(whole) + Number(numerator) / denominatorValue;
+  }
+
+  const fraction = normalized.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (fraction) {
+    const [, numerator, denominator] = fraction;
+    const denominatorValue = Number(denominator);
+    if (denominatorValue === 0) return null;
+    return Number(numerator) / denominatorValue;
+  }
+
+  if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return null;
+  const quantity = Number(normalized);
+  return Number.isFinite(quantity) ? quantity : null;
+};
+
+const parseRecipeQuantity = (value: string): { min: number; max: number } | null => {
+  const range = value.trim().match(/^(.+?)\s*[-–]\s*(.+)$/);
+  if (range) {
+    const min = parseSingleRecipeQuantity(range[1]);
+    const max = parseSingleRecipeQuantity(range[2]);
+    return min !== null && max !== null && min <= max ? { min, max } : null;
+  }
+  const quantity = parseSingleRecipeQuantity(value);
+  return quantity === null ? null : { min: quantity, max: quantity };
+};
+
+const isDropsUnit = (unit: string) => ['drop', 'drops'].includes(unit.trim().toLowerCase());
 
 export const ProductRecipes: React.FC = () => {
   const {
@@ -25,13 +66,26 @@ export const ProductRecipes: React.FC = () => {
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [pickerProductId, setPickerProductId] = useState('');
   const [recipe, setRecipe] = useState<BomIngredientRequirement[]>([]);
+  const [quantityInputs, setQuantityInputs] = useState<string[]>([]);
   const [baseBatch, setBaseBatch] = useState('100');
+  const [outputUnit, setOutputUnit] = useState('');
+  const [containerVolumeMl, setContainerVolumeMl] = useState('');
   const [error, setError] = useState('');
 
   const openEditor = (product: FinishedGood) => {
     setSelectedProduct(product);
-    setRecipe((product.recipe || []).map(item => ({ ...item })));
+    const productRecipe = (product.recipe || []).map(item => ({
+      ...item,
+      unit: item.unit || ingredients.find(ingredient => ingredient.id === item.ingredientId)?.unit || '',
+    }));
+    setRecipe(productRecipe);
+    setQuantityInputs(productRecipe.map(item => item.quantityRequiredMax === undefined
+      ? String(item.quantityRequired)
+      : `${item.quantityRequired}-${item.quantityRequiredMax}`
+    ));
     setBaseBatch(String(product.batchUnitQuantity || 100));
+    setOutputUnit(product.unit);
+    setContainerVolumeMl(product.containerVolumeMl ? String(product.containerVolumeMl) : '');
     setError('');
   };
 
@@ -60,6 +114,16 @@ export const ProductRecipes: React.FC = () => {
     ));
   };
 
+  const updateSubstitute = (
+    rowIndex: number,
+    substituteIndex: number,
+    updates: Partial<BomIngredientSubstitute>
+  ) => {
+    const substitutes = [...(recipe[rowIndex].substitutes || [])];
+    substitutes[substituteIndex] = { ...substitutes[substituteIndex], ...updates };
+    updateRecipeRow(rowIndex, { substitutes });
+  };
+
   const handleSave = (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedProduct) return;
@@ -69,27 +133,88 @@ export const ProductRecipes: React.FC = () => {
       setError('Enter a base batch quantity greater than zero.');
       return;
     }
-    if (recipe.some(item =>
-      !item.ingredientId ||
-      !Number.isFinite(item.quantityRequired) ||
-      item.quantityRequired <= 0
+    if (!outputUnit.trim()) {
+      setError('Enter a unit for the finished product output.');
+      return;
+    }
+    if (outputUnit.trim().toLowerCase() === 'bottles' && !containerVolumeMl) {
+      setError('Choose the volume for each bottle.');
+      return;
+    }
+    const parsedQuantities = quantityInputs.map(parseRecipeQuantity);
+    if (recipe.some((item, index) => {
+      const quantity = parsedQuantities[index];
+      return !item.ingredientId || quantity === null || quantity.min <= 0 || quantity.max <= 0;
+    })) {
+      setError('Enter a valid quantity greater than zero. Use fractions like 1/2 or ranges like 15-20 for drops.');
+      return;
+    }
+    if (recipe.some((item, index) =>
+      parsedQuantities[index]!.min !== parsedQuantities[index]!.max && !isDropsUnit(item.unit)
     )) {
-      setError('Choose an ingredient and enter a quantity greater than zero for each row.');
+      setError('Quantity ranges are supported for drops only.');
       return;
     }
     if (new Set(recipe.map(item => item.ingredientId)).size !== recipe.length) {
       setError('Each ingredient can only appear once in a recipe.');
       return;
     }
-
-    const savedRecipe = recipe.map(item => {
+    if (recipe.some(item => {
       const ingredient = ingredients.find(row => row.id === item.ingredientId);
+      return !ingredient || getRecipeUnitsPerInventoryUnit(
+        ingredient.unit,
+        item.unit,
+        item.recipeUnitsPerInventoryUnit
+      ) === null;
+    })) {
+      setError('Enter the conversion ratio for units that cannot be converted automatically.');
+      return;
+    }
+    if (recipe.some(item => {
+      const substituteIds = (item.substitutes || []).map(substitute => substitute.ingredientId);
+      return substituteIds.some((id, index) =>
+        !id ||
+        id === item.ingredientId ||
+        substituteIds.indexOf(id) !== index ||
+        !ingredients.some(ingredient => ingredient.id === id)
+      );
+    })) {
+      setError('Choose a different available raw ingredient for each substitute.');
+      return;
+    }
+    if (recipe.some(item => (item.substitutes || []).some(substitute => {
+      const ingredient = ingredients.find(row => row.id === substitute.ingredientId);
+      return ingredient && getRecipeUnitsPerInventoryUnit(
+        ingredient.unit,
+        item.unit,
+        substitute.recipeUnitsPerInventoryUnit
+      ) === null;
+    }))) {
+      setError('Enter the conversion ratio for substitute ingredients with incompatible units.');
+      return;
+    }
+    const savedRecipe = recipe.map((item, index) => {
+      const ingredient = ingredients.find(row => row.id === item.ingredientId);
+      const quantity = parsedQuantities[index];
       return ingredient
         ? {
             ingredientId: ingredient.id,
             ingredientName: ingredient.name,
-            quantityRequired: item.quantityRequired,
-            unit: ingredient.unit,
+            quantityRequired: quantity?.min ?? item.quantityRequired,
+            ...(quantity && quantity.min !== quantity.max ? { quantityRequiredMax: quantity.max } : {}),
+            unit: item.unit,
+            recipeUnitsPerInventoryUnit: item.recipeUnitsPerInventoryUnit,
+            optional: Boolean(item.optional),
+            substitutes: (item.substitutes || []).map(substitute => {
+              const substituteIngredient = ingredients.find(row => row.id === substitute.ingredientId);
+              return substituteIngredient
+                ? {
+                    ingredientId: substituteIngredient.id,
+                    ingredientName: substituteIngredient.name,
+                    recipeUnitsPerInventoryUnit: substitute.recipeUnitsPerInventoryUnit,
+                  }
+                : substitute;
+            }),
           }
         : item;
     });
@@ -98,7 +223,16 @@ export const ProductRecipes: React.FC = () => {
       return;
     }
 
-    if (!updateFinishedGoodRecipe(selectedProduct.id, savedRecipe, parsedBaseBatch)) {
+    const parsedContainerVolume = outputUnit.trim().toLowerCase() === 'bottles' && containerVolumeMl
+      ? Number(containerVolumeMl)
+      : undefined;
+    if (!updateFinishedGoodRecipe(
+      selectedProduct.id,
+      savedRecipe,
+      parsedBaseBatch,
+      outputUnit.trim(),
+      parsedContainerVolume,
+    )) {
       setError('Could not save the recipe. Check your permissions, connection, and try again.');
       return;
     }
@@ -133,7 +267,7 @@ export const ProductRecipes: React.FC = () => {
           Define the raw materials and quantities needed for each finished product. Recipe quantities are for the stated base output, and WIP batches scale them to the requested production quantity.
         </p>
         <p className="mt-2 text-xs text-indigo-200">
-          Add materials in Raw Ingredients first. Quantities use each material’s inventory unit.
+          Add materials in Raw Ingredients first. Recipe quantities convert compatible units to match inventory during production.
         </p>
       </header>
 
@@ -164,7 +298,12 @@ export const ProductRecipes: React.FC = () => {
                       <div className="mt-0.5 font-mono text-xs text-slate-500">{product.sku}</div>
                     </td>
                     <td className="px-4 py-4 font-mono text-xs font-semibold text-slate-700">
-                      {product.batchUnitQuantity || 100} {getRecipeOutputUnitLabel(product.unit)}
+                      {product.batchUnitQuantity || 100} {product.unit}
+                      {product.unit.trim().toLowerCase() === 'bottles' && product.containerVolumeMl
+                        ? ` · ${product.containerVolumeMl >= 1000
+                          ? `${product.containerVolumeMl / 1000} L`
+                          : `${product.containerVolumeMl} ml`} each`
+                        : ''}
                     </td>
                     <td className="px-4 py-4 text-xs text-slate-700">
                       {hasRecipe
@@ -309,7 +448,7 @@ export const ProductRecipes: React.FC = () => {
             <form onSubmit={handleSave} className="space-y-4">
               <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
                 <label className="mb-1 block text-xs font-bold text-slate-700">
-                  Formula output (finished product units)
+                  Formula output (quantity and unit)
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-600">This recipe makes</span>
@@ -322,15 +461,59 @@ export const ProductRecipes: React.FC = () => {
                     onChange={event => setBaseBatch(event.target.value)}
                     className="w-28 rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-sm font-mono font-bold focus:border-indigo-500 focus:outline-none"
                   />
-                  <span className="text-xs font-semibold text-slate-700">{getRecipeOutputUnitLabel(selectedProduct.unit)}</span>
+                  <select
+                    required
+                    value={outputUnit}
+                    onChange={event => setOutputUnit(event.target.value)}
+                    aria-label="Finished product output unit"
+                    aria-describedby="recipe-output-unit-hint"
+                    className="w-40 rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
+                  >
+                    {Array.from(new Set([
+                      outputUnit,
+                      'bottles',
+                      'packs',
+                      'cones',
+                      'pcs',
+                      'boxes',
+                      'bags',
+                    ])).map(unit => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                  </select>
+                  {outputUnit.trim().toLowerCase() === 'bottles' && (
+                    <select
+                      required
+                      value={containerVolumeMl}
+                      onChange={event => setContainerVolumeMl(event.target.value)}
+                      aria-label="Bottle volume"
+                      className="w-40 rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
+                    >
+                      <option value="">Bottle size...</option>
+                      {[
+                        // { ml: 100, label: '100 ml' },
+                        // { ml: 150, label: '150 ml' },
+                        { ml: 200, label: '200 ml' },
+                        // { ml: 250, label: '250 ml' },
+                        // { ml: 330, label: '330 ml' },
+                        { ml: 500, label: '500 ml' },
+                        // { ml: 750, label: '750 ml' },
+                        { ml: 1000, label: '1 L (1000 ml)' },
+                        // { ml: 1500, label: '1.5 L (1500 ml)' },
+                        // { ml: 2000, label: '2 L (2000 ml)' },
+                      ].map(option => (
+                        <option key={option.ml} value={option.ml}>{option.label}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
-                <p className="mt-2 text-[11px] text-slate-500">
-                  Enter ingredient quantities for this output amount. WIP production scales them automatically.
+                <p id="recipe-output-unit-hint" className="mt-2 text-[11px] text-slate-500">
+                  Choose the finished product unit. For bottles, select the volume of each bottle. WIP production scales ingredients to the requested output amount.
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <div className="grid grid-cols-[minmax(0,1fr)_9rem_5rem_2.5rem] gap-2 px-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              <div className="space-y-3">
+                <div className="hidden grid-cols-[minmax(0,1fr)_9rem_7rem_2.5rem] gap-2 px-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 sm:grid">
                   <span>Raw material</span>
                   <span>Quantity per recipe</span>
                   <span>Unit</span>
@@ -339,14 +522,20 @@ export const ProductRecipes: React.FC = () => {
                 {recipe.map((item, index) => {
                   const selectedIngredient = ingredients.find(row => row.id === item.ingredientId);
                   return (
-                    <div key={`${item.ingredientId || 'new'}-${index}`} className="grid grid-cols-[minmax(0,1fr)_9rem_5rem_2.5rem] items-center gap-2">
+                    <React.Fragment key={`${item.ingredientId || 'new'}-${index}`}>
+                    <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_7rem_2.5rem]">
                       <select
                         required
                         value={item.ingredientId}
                         onChange={event => {
                           const ingredient = ingredients.find(row => row.id === event.target.value);
                           updateRecipeRow(index, ingredient
-                            ? { ingredientId: ingredient.id, ingredientName: ingredient.name, unit: ingredient.unit }
+                            ? {
+                                ingredientId: ingredient.id,
+                                ingredientName: ingredient.name,
+                                unit: ingredient.unit,
+                                recipeUnitsPerInventoryUnit: undefined,
+                              }
                             : { ingredientId: '', ingredientName: '', unit: '' }
                           );
                         }}
@@ -356,7 +545,12 @@ export const ProductRecipes: React.FC = () => {
                         {item.ingredientId && !selectedIngredient && (
                           <option value={item.ingredientId}>Unavailable: {item.ingredientName || item.ingredientId}</option>
                         )}
-                        {ingredients.map(ingredient => {
+                        {selectedIngredient && !isRawMaterialCategory(selectedIngredient.category) && (
+                          <option value={selectedIngredient.id} disabled>
+                            Not an RM category: {selectedIngredient.name}
+                          </option>
+                        )}
+                        {ingredients.filter(ingredient => isRawMaterialCategory(ingredient.category)).map(ingredient => {
                           const alreadySelected = recipe.some((other, otherIndex) =>
                             otherIndex !== index && other.ingredientId === ingredient.id
                           );
@@ -368,24 +562,58 @@ export const ProductRecipes: React.FC = () => {
                         })}
                       </select>
                       <input
-                        type="number"
-                        min="0.000001"
-                        step="any"
+                        type="text"
+                        inputMode="text"
                         required
-                        value={item.quantityRequired || ''}
-                        onChange={event => updateRecipeRow(index, {
-                          quantityRequired: Number(event.target.value) || 0,
-                        })}
-                        placeholder="Amount"
+                        value={quantityInputs[index] ?? ''}
+                        onChange={event => {
+                          const value = event.target.value;
+                          setQuantityInputs(values => values.map((quantity, rowIndex) =>
+                            rowIndex === index ? value : quantity
+                          ));
+                          const parsedQuantity = parseRecipeQuantity(value);
+                          if (parsedQuantity !== null) {
+                            updateRecipeRow(index, {
+                              quantityRequired: parsedQuantity.min,
+                              quantityRequiredMax: parsedQuantity.max !== parsedQuantity.min
+                                ? parsedQuantity.max
+                                : undefined,
+                            });
+                          }
+                        }}
+                        placeholder={isDropsUnit(item.unit) ? 'e.g. 15-20' : 'e.g. 1/2'}
                         aria-label={`Quantity for recipe ingredient ${index + 1}`}
+                        aria-describedby="recipe-quantity-hint"
                         className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-mono font-bold"
                       />
-                      <span className="text-xs font-semibold text-slate-600">
-                        {selectedIngredient?.unit || item.unit || '—'}
-                      </span>
+                      {selectedIngredient ? (
+                        <select
+                          required
+                          value={item.unit}
+                          onChange={event => updateRecipeRow(index, {
+                            unit: event.target.value,
+                            recipeUnitsPerInventoryUnit: undefined,
+                          })}
+                          aria-label={`Recipe unit for ingredient ${index + 1}`}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-2 py-2.5 text-xs font-semibold text-slate-900"
+                        >
+                          {Array.from(new Map([
+                            ...RECIPE_UNIT_OPTIONS,
+                            { value: selectedIngredient.unit, label: selectedIngredient.unit },
+                            { value: item.unit, label: item.unit },
+                          ].map(option => [option.value.toLowerCase(), option])).values()).map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-600">{item.unit || '—'}</span>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setRecipe(rows => rows.filter((_, rowIndex) => rowIndex !== index))}
+                        onClick={() => {
+                          setRecipe(rows => rows.filter((_, rowIndex) => rowIndex !== index));
+                          setQuantityInputs(values => values.filter((_, rowIndex) => rowIndex !== index));
+                        }}
                         className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-rose-600 hover:bg-rose-50"
                         aria-label={`Remove recipe ingredient ${index + 1}`}
                         title="Remove ingredient"
@@ -393,6 +621,121 @@ export const ProductRecipes: React.FC = () => {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(item.optional)}
+                          onChange={event => updateRecipeRow(index, { optional: event.target.checked })}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        Optional ingredient
+                        <span className="text-[10px] font-normal text-slate-500">
+                          (can be skipped for a production batch)
+                        </span>
+                      </label>
+                      <div className="space-y-2">
+                        {(item.substitutes || []).map((substitute, substituteIndex) => {
+                          const substituteIngredient = ingredients.find(row => row.id === substitute.ingredientId);
+                          return (
+                            <div key={`${substitute.ingredientId}-${substituteIndex}`} className="space-y-2">
+                              <div className="flex gap-2">
+                                <select
+                                  value={substitute.ingredientId}
+                                  onChange={event => {
+                                    const nextIngredient = ingredients.find(row => row.id === event.target.value);
+                                    updateSubstitute(index, substituteIndex, nextIngredient
+                                      ? {
+                                          ingredientId: nextIngredient.id,
+                                          ingredientName: nextIngredient.name,
+                                          recipeUnitsPerInventoryUnit: undefined,
+                                        }
+                                      : { ingredientId: '', ingredientName: '', recipeUnitsPerInventoryUnit: undefined }
+                                    );
+                                  }}
+                                  aria-label={`Substitute ${substituteIndex + 1} for ${item.ingredientName || 'ingredient'}`}
+                                  className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs"
+                                >
+                                  <option value="">Choose substitute raw material...</option>
+                                  {ingredients.filter(ingredient =>
+                                    isRawMaterialCategory(ingredient.category) &&
+                                    ingredient.id !== item.ingredientId &&
+                                    !(item.substitutes || []).some((other, otherIndex) =>
+                                      otherIndex !== substituteIndex && other.ingredientId === ingredient.id
+                                    )
+                                  ).map(ingredient => (
+                                    <option key={ingredient.id} value={ingredient.id}>
+                                      {ingredient.name} ({ingredient.sku})
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => updateRecipeRow(index, {
+                                    substitutes: (item.substitutes || []).filter((_, rowIndex) => rowIndex !== substituteIndex),
+                                  })}
+                                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-100"
+                                  aria-label={`Remove substitute ${substituteIndex + 1}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                              {substituteIngredient && convertUnitQuantity(1, substituteIngredient.unit, item.unit) === null && (
+                                <div className="flex items-center gap-2 pl-1 text-[11px] text-amber-900">
+                                  <span className="shrink-0 font-semibold">1 {substituteIngredient.unit} =</span>
+                                  <input
+                                    type="number"
+                                    min="0.000001"
+                                    step="any"
+                                    required
+                                    value={substitute.recipeUnitsPerInventoryUnit ?? ''}
+                                    onChange={event => updateSubstitute(index, substituteIndex, {
+                                      recipeUnitsPerInventoryUnit: Number(event.target.value) || undefined,
+                                    })}
+                                    aria-label={`Recipe units per ${substituteIngredient.unit} for substitute ${substituteIndex + 1}`}
+                                    className="w-24 rounded-lg border border-amber-300 bg-white px-2 py-1.5 font-mono font-bold"
+                                  />
+                                  <span className="shrink-0 font-semibold">{item.unit}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          disabled={ingredients.length < 2}
+                          onClick={() => updateRecipeRow(index, {
+                            substitutes: [
+                              ...(item.substitutes || []),
+                              { ingredientId: '', ingredientName: '' },
+                            ],
+                          })}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add substitute
+                        </button>
+                      </div>
+                    </div>
+                    {selectedIngredient && convertUnitQuantity(1, selectedIngredient.unit, item.unit) === null && (
+                      <div className="ml-auto mr-12 flex w-fit items-center gap-2 rounded-xl bg-amber-50 px-2.5 py-2 text-[11px] text-amber-900">
+                        <span className="shrink-0 font-semibold">1 {selectedIngredient.unit} =</span>
+                        <input
+                          type="number"
+                          min="0.000001"
+                          step="any"
+                          required
+                          value={item.recipeUnitsPerInventoryUnit ?? ''}
+                          onChange={event => updateRecipeRow(index, {
+                            recipeUnitsPerInventoryUnit: Number(event.target.value) || undefined,
+                          })}
+                          aria-label={`Recipe units per ${selectedIngredient.unit} for ingredient ${index + 1}`}
+                          className="w-24 rounded-lg border border-amber-300 bg-white px-2 py-1.5 font-mono font-bold"
+                        />
+                        <span className="shrink-0 font-semibold">{item.unit}</span>
+                      </div>
+                    )}
+                    </React.Fragment>
                   );
                 })}
 
@@ -404,13 +747,19 @@ export const ProductRecipes: React.FC = () => {
                 {ingredients.length === 0 && (
                   <p className="text-xs text-amber-700">Add raw materials in Raw Ingredients before building this formula.</p>
                 )}
+                <p id="recipe-quantity-hint" className="text-[11px] text-slate-500">
+                  Enter whole numbers, decimals, or fractions (1/2). For drops, enter a range such as 15-20; production deducts the maximum.
+                </p>
                 <button
                   type="button"
                   disabled={ingredients.length === 0 || recipe.length >= ingredients.length}
-                  onClick={() => setRecipe(rows => [
-                    ...rows,
-                    { ingredientId: '', ingredientName: '', quantityRequired: 0, unit: '' },
-                  ])}
+                  onClick={() => {
+                    setRecipe(rows => [
+                      ...rows,
+                      { ingredientId: '', ingredientName: '', quantityRequired: 0, unit: '' },
+                    ]);
+                    setQuantityInputs(values => [...values, '']);
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="h-3.5 w-3.5" />

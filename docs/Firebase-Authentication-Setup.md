@@ -17,13 +17,16 @@ Role claims are written by the Firebase Admin SDK script. It reads an access tok
 gcloud auth application-default revoke
 gcloud auth application-default login --disable-quota-project
 $env:GCLOUD_PROJECT = "dairysync-pcc-94978"
+node scripts/set-firebase-user-role.mjs "system.admin@pcc-mmsu.gov.ph" "system_admin"
 node scripts/set-firebase-user-role.mjs "director.one@pcc-mmsu.gov.ph" "director"
 node scripts/set-firebase-user-role.mjs "director.two@pcc-mmsu.gov.ph" "director"
 node scripts/set-firebase-user-role.mjs "production.one@pcc-mmsu.gov.ph" "production_staff"
 node scripts/set-firebase-user-role.mjs "outlet.one@pcc-mmsu.gov.ph" "store_outlet"
 ```
 
-Supported roles: `developer`, `director`, `procurement`, `plant_manager`, `production_staff`, `store_outlet`.
+Supported roles: `developer`, `system_admin`, `director`, `procurement`, `plant_manager`, `production_staff`, `store_outlet`.
+
+Assigning `developer` or `system_admin` grants privileged access. Run this script only when explicitly authorized, from a trusted administrator workstation using Google Cloud credentials permitted to administer Firebase Authentication for this project. The script does not check the current operator's DairySync role; Google Cloud IAM permissions and workstation access control are the authorization boundary for this CLI operation. For normal account provisioning, prefer the in-app System Administration flow, which restricts System Administrators to operational roles.
 
 Each target Firebase Auth user must already exist. Run one command for every account. The user needs to sign out and back in after a role claim is changed. Never put a service-account key, access token, or Admin SDK credentials in `.env.local`, Vite variables, browser storage, or the repository.
 

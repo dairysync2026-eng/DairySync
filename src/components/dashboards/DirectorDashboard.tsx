@@ -6,10 +6,7 @@ import {
   ShieldCheck, 
   TrendingUp, 
   DollarSign, 
-  Award, 
   Snowflake, 
-  FileText, 
-  ArrowUpRight, 
   BarChart3,
   CheckCircle2,
   ArrowRight,
@@ -21,20 +18,15 @@ import {
 
 interface SubsystemDashboardProps {
   onNavigateTab: (tab: string) => void;
-  onOpenIsoSurvey?: () => void;
-  onOpenReports?: () => void;
 }
 
 export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({ 
-  onNavigateTab, 
-  onOpenIsoSurvey,
-  onOpenReports
+  onNavigateTab
 }) => {
   const { 
     ingredients, 
     finishedGoods, 
     commitments, 
-    isoRatings,
     currentUser
   } = useDairySync();
 
@@ -52,14 +44,6 @@ export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({
     ? Math.min(100, Math.round((feedingCommitment.fulfilledQuantity / (feedingCommitment.targetQuantity || 1)) * 100))
     : 0;
 
-  // Average ISO rating
-  const avgIsoScore = isoRatings.length > 0 
-    ? (isoRatings.reduce((sum, r) => {
-        const itemAvg = (r.functionalSuitability + r.performanceEfficiency + r.compatibility + r.interactionCapability + r.reliability + r.security + r.maintainability + r.flexibility + r.safety) / 9;
-        return sum + itemAvg;
-      }, 0) / isoRatings.length).toFixed(2)
-    : '4.85';
-
   return (
     <div className="space-y-6">
       
@@ -76,19 +60,10 @@ export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({
             </div>
           </div>
           <p className="text-xs text-slate-300 mt-2 font-medium max-w-2xl leading-relaxed">
-            Logged in as <strong>{currentUser.name}</strong> ({currentUser.title}). Institutional executive oversight over raw carabao milk supply chains, DepEd National School Feeding allocations, cold chain storage capacity, and ISO 25010 compliance.
+            Logged in as <strong>{currentUser.name}</strong> ({currentUser.title}). Institutional executive oversight over raw carabao milk supply chains, DepEd National School Feeding allocations, and cold chain storage capacity.
           </p>
         </div>
         
-        <div className="flex items-center space-x-2 shrink-0">
-          <button
-            onClick={onOpenReports}
-            className="flex items-center space-x-1.5 bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold px-4 py-2.5 rounded-2xl shadow-sm transition-all"
-          >
-            <FileText className="w-4 h-4 text-slate-700" />
-            <span>Generate Executive Report</span>
-          </button>
-        </div>
       </div>
 
       {/* Subsystem Direct Jump Links */}
@@ -246,36 +221,13 @@ export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({
           </div>
         </div>
 
-        {/* ISO 25010 Quality Rating */}
-        <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:border-slate-300 transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">ISO 25010 Score Index</span>
-            <div className="p-2.5 bg-purple-50 border border-purple-100 rounded-2xl text-purple-600">
-              <Award className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-baseline space-x-2">
-              <span className="text-3xl font-extrabold text-purple-700">{avgIsoScore}</span>
-              <span className="text-xs text-slate-500 font-bold">/ 5.00 Rating</span>
-            </div>
-            <button 
-              onClick={onOpenIsoSurvey}
-              className="mt-3 text-xs text-purple-700 hover:text-purple-900 font-bold flex items-center space-x-1"
-            >
-              <span>View ISO Scorecard</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-
       </div>
 
       {/* Daily Inventory Consumption Trend Graph (recharts) */}
       <InventoryTrendGraph />
 
       {/* Main Operations Matrix Panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Left 2 Cols: Supply & Demand Sync Matrix */}
         <div className="lg:col-span-2 bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm space-y-5">
@@ -324,46 +276,6 @@ export const DirectorDashboard: React.FC<SubsystemDashboardProps> = ({
                 </div>
               );
             })}
-          </div>
-        </div>
-
-        {/* Right 1 Col: Strategic Quality & System Audit Summary */}
-        <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-base font-extrabold text-slate-900 flex items-center space-x-2">
-              <Award className="w-5 h-5 text-purple-600" />
-              <span>ISO 25010 Quality Summary</span>
-            </h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Software Quality Standard Audit Ratings</p>
-          </div>
-
-          <div className="space-y-3">
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex justify-between items-center text-xs">
-              <span className="font-bold text-slate-700">Functional Suitability</span>
-              <span className="font-mono font-extrabold text-indigo-600">4.92 / 5.0</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex justify-between items-center text-xs">
-              <span className="font-bold text-slate-700">Performance Efficiency</span>
-              <span className="font-mono font-extrabold text-indigo-600">4.88 / 5.0</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex justify-between items-center text-xs">
-              <span className="font-bold text-slate-700">Security & Authorization</span>
-              <span className="font-mono font-extrabold text-indigo-600">5.00 / 5.0</span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex justify-between items-center text-xs">
-              <span className="font-bold text-slate-700">Usability & Role Alignment</span>
-              <span className="font-mono font-extrabold text-indigo-600">4.80 / 5.0</span>
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <button
-              onClick={onOpenIsoSurvey}
-              className="w-full py-3 bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs rounded-2xl shadow-sm flex items-center justify-center space-x-2 transition-all"
-            >
-              <Award className="w-4 h-4" />
-              <span>Submit ISO Evaluation Scorecard</span>
-            </button>
           </div>
         </div>
 

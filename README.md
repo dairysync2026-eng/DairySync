@@ -2,6 +2,10 @@
 
 DairySync is a cloud-enabled inventory, production, supply-demand, and retail management system designed for dairy operations at the Philippine Carabao Center (PCC) in partnership with Mariano Marcos State University (MMSU). The system helps teams monitor raw ingredients, production batches, finished goods, procurement, sales, and compliance workflows from a single dashboard.
 
+## User manual
+
+Open the [DairySync Visual User Manual](docs/DairySync-User-Manual.html) for a task-based guide to sign-in, role access, inventory, production, replenishment, Dairy Box sales, reports, and offline use. The manual is responsive and can be printed or saved as a PDF from a web browser.
+
 ## Overview
 
 This project was developed to support operational planning and monitoring across the full dairy value chain:
@@ -30,11 +34,13 @@ This project was developed to support operational planning and monitoring across
 - Track product production flow through scheduled, pasteurization, cooling, and packaging stages
 - Record assigned staff, raw milk usage, notes, and completion timelines
 - Support batch cancellation, completion, and production adjustments
+- Maintain WIP Inventory production records linked to production batches, including processing temperatures and times, package yields, best-before dates, and remarks (Plant Manager and Developer access)
 
 ### Finished goods and cold storage
 - Track product stock, safety buffers, retail allocation, and feeding program allocation
 - Manage cold storage capacity and overstock warnings
 - Maintain product recipes and batch unit quantities for manufacturing
+- Mark BOM ingredients as optional, configure approved raw-ingredient substitutes, and choose the materials to consume when starting a WIP batch
 
 ### Procurement and supply planning
 - Monitor inventory demand commitments with status and priority tracking
@@ -43,6 +49,7 @@ This project was developed to support operational planning and monitoring across
 
 ### Sales and retail operations
 - Process Dairy Box sales and maintain transaction history
+- Submit finished-goods stock requests from the Store Outlet dashboard; Plant Managers review requests and allocate available retail stock when fulfilling them
 - Review sales performance and product movement across retail channels
 - Map retail activity to stock deductions and inventory updates
 
@@ -135,9 +142,13 @@ npm run build       # build production assets
 npm run start       # run the built app
 npm run lint        # TypeScript validation
 npm run sqlconnect:generate   # generate Data Connect SDK
-npm run sqlconnect:emulator   # run Firebase Data Connect emulator
+npm run sqlconnect:emulator   # run Firebase Auth, Data Connect, and Functions emulators
 npm run sqlconnect:deploy     # deploy Data Connect configuration
+npm run functions:build       # build Firebase account-administration functions
+npm run functions:deploy      # deploy account-administration functions
 ```
+
+The System Administration screen requires the Firebase Functions backend. Deploy Data Connect and Functions before deploying the updated Hosting app. The existing Lead Developer account creates the first System Administrator from the app; administrators can create operational staff accounts and send password-setup emails.
 
 ## Institutional context
 

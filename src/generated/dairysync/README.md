@@ -11,6 +11,8 @@ This README will guide you through the process of using the generated JavaScript
   - [*ListRawIngredients*](#listrawingredients)
   - [*ListStockTransactions*](#liststocktransactions)
   - [*ListPmoInventoryPeriods*](#listpmoinventoryperiods)
+  - [*ListStockRequests*](#liststockrequests)
+  - [*ListOwnStockRequests*](#listownstockrequests)
   - [*ListFinishedGoods*](#listfinishedgoods)
   - [*ListWipBatches*](#listwipbatches)
   - [*ListCommitments*](#listcommitments)
@@ -18,6 +20,8 @@ This README will guide you through the process of using the generated JavaScript
   - [*ListIsoRatings*](#listisoratings)
   - [*ListAuditLogEntries*](#listauditlogentries)
   - [*ListUserProfiles*](#listuserprofiles)
+  - [*GetAppBranding*](#getappbranding)
+  - [*ListWipProductionRecords*](#listwipproductionrecords)
 - [**Mutations**](#mutations)
   - [*SeedStockTransaction*](#seedstocktransaction)
   - [*SeedIsoRating*](#seedisorating)
@@ -29,6 +33,10 @@ This README will guide you through the process of using the generated JavaScript
   - [*UpdateFinishedGoodRecipe*](#updatefinishedgoodrecipe)
   - [*UpsertPmoInventoryPeriod*](#upsertpmoinventoryperiod)
   - [*DeletePmoInventoryPeriod*](#deletepmoinventoryperiod)
+  - [*CreateStockRequest*](#createstockrequest)
+  - [*ReviewStockRequest*](#reviewstockrequest)
+  - [*CancelOwnStockRequest*](#cancelownstockrequest)
+  - [*DeleteStockRequest*](#deletestockrequest)
   - [*UpsertFinishedGood*](#upsertfinishedgood)
   - [*SetRetailFinishedGoodStock*](#setretailfinishedgoodstock)
   - [*DeleteFinishedGood*](#deletefinishedgood)
@@ -45,6 +53,10 @@ This README will guide you through the process of using the generated JavaScript
   - [*UpsertUserProfile*](#upsertuserprofile)
   - [*UpdateOwnUserProfile*](#updateownuserprofile)
   - [*DeleteUserProfile*](#deleteuserprofile)
+  - [*UpsertAppBranding*](#upsertappbranding)
+  - [*DeleteAppBranding*](#deleteappbranding)
+  - [*UpsertWipProductionRecord*](#upsertwipproductionrecord)
+  - [*DeleteWipProductionRecord*](#deletewipproductionrecord)
 
 # Accessing the connector
 A connector is a collection of Queries and Mutations. One SDK is generated for each connector - this SDK is generated for the connector `dairysync`. You can find more information about connectors in the [Data Connect documentation](https://firebase.google.com/docs/data-connect#how-does).
@@ -345,6 +357,7 @@ export interface ListPmoInventoryPeriodsData {
   pmoInventoryPeriods: ({
     id: string;
     title: string;
+    inventoryType?: string | null;
     sourceFileName: string;
     lines: unknown[];
     createdAt: string;
@@ -406,6 +419,224 @@ executeQuery(ref).then((response) => {
 });
 ```
 
+## ListStockRequests
+You can execute the `ListStockRequests` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+listStockRequests(options?: ExecuteQueryOptions): QueryPromise<ListStockRequestsData, undefined>;
+
+interface ListStockRequestsRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListStockRequestsData, undefined>;
+}
+export const listStockRequestsRef: ListStockRequestsRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+listStockRequests(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListStockRequestsData, undefined>;
+
+interface ListStockRequestsRef {
+  ...
+  (dc: DataConnect): QueryRef<ListStockRequestsData, undefined>;
+}
+export const listStockRequestsRef: ListStockRequestsRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the listStockRequestsRef:
+```typescript
+const name = listStockRequestsRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ListStockRequests` query has no variables.
+### Return Type
+Recall that executing the `ListStockRequests` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ListStockRequestsData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ListStockRequestsData {
+  stockRequests: ({
+    id: string;
+    finishedGoodId: string;
+    finishedGoodName: string;
+    finishedGoodSku: string;
+    quantity: number;
+    unit: string;
+    requestedByEmail: string;
+    requestedByName: string;
+    requestedAt: string;
+    neededBy?: string | null;
+    status: string;
+    notes?: string | null;
+    responseNotes?: string | null;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    fulfilledAt?: string | null;
+    fulfilledQuantity?: number | null;
+  } & StockRequest_Key)[];
+}
+```
+### Using `ListStockRequests`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, listStockRequests } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listStockRequests()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await listStockRequests();
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await listStockRequests(dataConnect);
+
+console.log(data.stockRequests);
+
+// Or, you can use the `Promise` API.
+listStockRequests().then((response) => {
+  const data = response.data;
+  console.log(data.stockRequests);
+});
+```
+
+### Using `ListStockRequests`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, listStockRequestsRef } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listStockRequestsRef()` function to get a reference to the query.
+const ref = listStockRequestsRef();
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = listStockRequestsRef(dataConnect);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.stockRequests);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequests);
+});
+```
+
+## ListOwnStockRequests
+You can execute the `ListOwnStockRequests` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+listOwnStockRequests(options?: ExecuteQueryOptions): QueryPromise<ListOwnStockRequestsData, undefined>;
+
+interface ListOwnStockRequestsRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListOwnStockRequestsData, undefined>;
+}
+export const listOwnStockRequestsRef: ListOwnStockRequestsRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+listOwnStockRequests(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListOwnStockRequestsData, undefined>;
+
+interface ListOwnStockRequestsRef {
+  ...
+  (dc: DataConnect): QueryRef<ListOwnStockRequestsData, undefined>;
+}
+export const listOwnStockRequestsRef: ListOwnStockRequestsRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the listOwnStockRequestsRef:
+```typescript
+const name = listOwnStockRequestsRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ListOwnStockRequests` query has no variables.
+### Return Type
+Recall that executing the `ListOwnStockRequests` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ListOwnStockRequestsData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ListOwnStockRequestsData {
+  stockRequests: ({
+    id: string;
+    finishedGoodId: string;
+    finishedGoodName: string;
+    finishedGoodSku: string;
+    quantity: number;
+    unit: string;
+    requestedByEmail: string;
+    requestedByName: string;
+    requestedAt: string;
+    neededBy?: string | null;
+    status: string;
+    notes?: string | null;
+    responseNotes?: string | null;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    fulfilledAt?: string | null;
+    fulfilledQuantity?: number | null;
+  } & StockRequest_Key)[];
+}
+```
+### Using `ListOwnStockRequests`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, listOwnStockRequests } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listOwnStockRequests()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await listOwnStockRequests();
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await listOwnStockRequests(dataConnect);
+
+console.log(data.stockRequests);
+
+// Or, you can use the `Promise` API.
+listOwnStockRequests().then((response) => {
+  const data = response.data;
+  console.log(data.stockRequests);
+});
+```
+
+### Using `ListOwnStockRequests`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, listOwnStockRequestsRef } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listOwnStockRequestsRef()` function to get a reference to the query.
+const ref = listOwnStockRequestsRef();
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = listOwnStockRequestsRef(dataConnect);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.stockRequests);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequests);
+});
+```
+
 ## ListFinishedGoods
 You can execute the `ListFinishedGoods` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
 ```typescript
@@ -450,6 +681,7 @@ export interface ListFinishedGoodsData {
     category: string;
     currentStock: number;
     unit: string;
+    containerVolumeMl?: number | null;
     coldStorageCapacity: number;
     maxThreshold: number;
     safetyStock: number;
@@ -1139,6 +1371,200 @@ executeQuery(ref).then((response) => {
 });
 ```
 
+## GetAppBranding
+You can execute the `GetAppBranding` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+getAppBranding(options?: ExecuteQueryOptions): QueryPromise<GetAppBrandingData, undefined>;
+
+interface GetAppBrandingRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<GetAppBrandingData, undefined>;
+}
+export const getAppBrandingRef: GetAppBrandingRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+getAppBranding(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<GetAppBrandingData, undefined>;
+
+interface GetAppBrandingRef {
+  ...
+  (dc: DataConnect): QueryRef<GetAppBrandingData, undefined>;
+}
+export const getAppBrandingRef: GetAppBrandingRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the getAppBrandingRef:
+```typescript
+const name = getAppBrandingRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `GetAppBranding` query has no variables.
+### Return Type
+Recall that executing the `GetAppBranding` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `GetAppBrandingData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface GetAppBrandingData {
+  appBrandings: ({
+    logoDataUrl: string;
+  })[];
+}
+```
+### Using `GetAppBranding`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, getAppBranding } from '@dataconnect/dairysync-generated';
+
+
+// Call the `getAppBranding()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await getAppBranding();
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await getAppBranding(dataConnect);
+
+console.log(data.appBrandings);
+
+// Or, you can use the `Promise` API.
+getAppBranding().then((response) => {
+  const data = response.data;
+  console.log(data.appBrandings);
+});
+```
+
+### Using `GetAppBranding`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, getAppBrandingRef } from '@dataconnect/dairysync-generated';
+
+
+// Call the `getAppBrandingRef()` function to get a reference to the query.
+const ref = getAppBrandingRef();
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = getAppBrandingRef(dataConnect);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.appBrandings);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.appBrandings);
+});
+```
+
+## ListWipProductionRecords
+You can execute the `ListWipProductionRecords` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+listWipProductionRecords(options?: ExecuteQueryOptions): QueryPromise<ListWipProductionRecordsData, undefined>;
+
+interface ListWipProductionRecordsRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListWipProductionRecordsData, undefined>;
+}
+export const listWipProductionRecordsRef: ListWipProductionRecordsRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+listWipProductionRecords(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListWipProductionRecordsData, undefined>;
+
+interface ListWipProductionRecordsRef {
+  ...
+  (dc: DataConnect): QueryRef<ListWipProductionRecordsData, undefined>;
+}
+export const listWipProductionRecordsRef: ListWipProductionRecordsRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the listWipProductionRecordsRef:
+```typescript
+const name = listWipProductionRecordsRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ListWipProductionRecords` query has no variables.
+### Return Type
+Recall that executing the `ListWipProductionRecords` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ListWipProductionRecordsData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ListWipProductionRecordsData {
+  wipProductionRecords: ({
+    id: string;
+    batchId: string;
+    pasteurizationTempC?: number | null;
+    pasteurizationTimeMinutes?: number | null;
+    coolingTempC?: number | null;
+    coolingTimeMinutes?: number | null;
+    yieldPackages: unknown[];
+    bestBeforeDate?: DateString | null;
+    remarks?: string | null;
+  } & WipProductionRecord_Key)[];
+}
+```
+### Using `ListWipProductionRecords`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, listWipProductionRecords } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listWipProductionRecords()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await listWipProductionRecords();
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await listWipProductionRecords(dataConnect);
+
+console.log(data.wipProductionRecords);
+
+// Or, you can use the `Promise` API.
+listWipProductionRecords().then((response) => {
+  const data = response.data;
+  console.log(data.wipProductionRecords);
+});
+```
+
+### Using `ListWipProductionRecords`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, listWipProductionRecordsRef } from '@dataconnect/dairysync-generated';
+
+
+// Call the `listWipProductionRecordsRef()` function to get a reference to the query.
+const ref = listWipProductionRecordsRef();
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = listWipProductionRecordsRef(dataConnect);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.wipProductionRecords);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.wipProductionRecords);
+});
+```
+
 # Mutations
 
 There are two ways to execute a Data Connect Mutation using the generated Web SDK:
@@ -1221,19 +1647,19 @@ import { connectorConfig, seedStockTransaction, SeedStockTransactionVariables } 
 
 // The `SeedStockTransaction` mutation requires an argument of type `SeedStockTransactionVariables`:
 const seedStockTransactionVars: SeedStockTransactionVariables = {
-  id: ..., 
-  timestamp: ..., 
-  itemId: ..., 
-  itemName: ..., 
-  itemType: ..., 
-  action: ..., 
-  quantity: ..., 
-  unit: ..., 
-  previousStock: ..., 
-  newStock: ..., 
+  id: ...,
+  timestamp: ...,
+  itemId: ...,
+  itemName: ...,
+  itemType: ...,
+  action: ...,
+  quantity: ...,
+  unit: ...,
+  previousStock: ...,
+  newStock: ...,
   referenceId: ..., // optional
   unitPrice: ..., // optional
-  performedBy: ..., 
+  performedBy: ...,
   notes: ..., // optional
 };
 
@@ -1264,19 +1690,19 @@ import { connectorConfig, seedStockTransactionRef, SeedStockTransactionVariables
 
 // The `SeedStockTransaction` mutation requires an argument of type `SeedStockTransactionVariables`:
 const seedStockTransactionVars: SeedStockTransactionVariables = {
-  id: ..., 
-  timestamp: ..., 
-  itemId: ..., 
-  itemName: ..., 
-  itemType: ..., 
-  action: ..., 
-  quantity: ..., 
-  unit: ..., 
-  previousStock: ..., 
-  newStock: ..., 
+  id: ...,
+  timestamp: ...,
+  itemId: ...,
+  itemName: ...,
+  itemType: ...,
+  action: ...,
+  quantity: ...,
+  unit: ...,
+  previousStock: ...,
+  newStock: ...,
   referenceId: ..., // optional
   unitPrice: ..., // optional
-  performedBy: ..., 
+  performedBy: ...,
   notes: ..., // optional
 };
 
@@ -1368,19 +1794,19 @@ import { connectorConfig, seedIsoRating, SeedIsoRatingVariables } from '@datacon
 
 // The `SeedIsoRating` mutation requires an argument of type `SeedIsoRatingVariables`:
 const seedIsoRatingVars: SeedIsoRatingVariables = {
-  id: ..., 
-  functionalSuitability: ..., 
-  performanceEfficiency: ..., 
-  compatibility: ..., 
-  interactionCapability: ..., 
-  reliability: ..., 
-  security: ..., 
-  maintainability: ..., 
-  flexibility: ..., 
-  safety: ..., 
-  evaluatorRole: ..., 
-  comments: ..., 
-  date: ..., 
+  id: ...,
+  functionalSuitability: ...,
+  performanceEfficiency: ...,
+  compatibility: ...,
+  interactionCapability: ...,
+  reliability: ...,
+  security: ...,
+  maintainability: ...,
+  flexibility: ...,
+  safety: ...,
+  evaluatorRole: ...,
+  comments: ...,
+  date: ...,
 };
 
 // Call the `seedIsoRating()` function to execute the mutation.
@@ -1410,19 +1836,19 @@ import { connectorConfig, seedIsoRatingRef, SeedIsoRatingVariables } from '@data
 
 // The `SeedIsoRating` mutation requires an argument of type `SeedIsoRatingVariables`:
 const seedIsoRatingVars: SeedIsoRatingVariables = {
-  id: ..., 
-  functionalSuitability: ..., 
-  performanceEfficiency: ..., 
-  compatibility: ..., 
-  interactionCapability: ..., 
-  reliability: ..., 
-  security: ..., 
-  maintainability: ..., 
-  flexibility: ..., 
-  safety: ..., 
-  evaluatorRole: ..., 
-  comments: ..., 
-  date: ..., 
+  id: ...,
+  functionalSuitability: ...,
+  performanceEfficiency: ...,
+  compatibility: ...,
+  interactionCapability: ...,
+  reliability: ...,
+  security: ...,
+  maintainability: ...,
+  flexibility: ...,
+  safety: ...,
+  evaluatorRole: ...,
+  comments: ...,
+  date: ...,
 };
 
 // Call the `seedIsoRatingRef()` function to get a reference to the mutation.
@@ -1513,19 +1939,19 @@ import { connectorConfig, seedAuditLogEntry, SeedAuditLogEntryVariables } from '
 
 // The `SeedAuditLogEntry` mutation requires an argument of type `SeedAuditLogEntryVariables`:
 const seedAuditLogEntryVars: SeedAuditLogEntryVariables = {
-  id: ..., 
-  timestamp: ..., 
-  category: ..., 
-  subsystem: ..., 
-  action: ..., 
-  description: ..., 
+  id: ...,
+  timestamp: ...,
+  category: ...,
+  subsystem: ...,
+  action: ...,
+  description: ...,
   details: ..., // optional
-  userId: ..., 
-  userName: ..., 
-  userRole: ..., 
-  userTitle: ..., 
+  userId: ...,
+  userName: ...,
+  userRole: ...,
+  userTitle: ...,
   terminalOrStation: ..., // optional
-  severity: ..., 
+  severity: ...,
 };
 
 // Call the `seedAuditLogEntry()` function to execute the mutation.
@@ -1555,19 +1981,19 @@ import { connectorConfig, seedAuditLogEntryRef, SeedAuditLogEntryVariables } fro
 
 // The `SeedAuditLogEntry` mutation requires an argument of type `SeedAuditLogEntryVariables`:
 const seedAuditLogEntryVars: SeedAuditLogEntryVariables = {
-  id: ..., 
-  timestamp: ..., 
-  category: ..., 
-  subsystem: ..., 
-  action: ..., 
-  description: ..., 
+  id: ...,
+  timestamp: ...,
+  category: ...,
+  subsystem: ...,
+  action: ...,
+  description: ...,
   details: ..., // optional
-  userId: ..., 
-  userName: ..., 
-  userRole: ..., 
-  userTitle: ..., 
+  userId: ...,
+  userName: ...,
+  userRole: ...,
+  userTitle: ...,
   terminalOrStation: ..., // optional
-  severity: ..., 
+  severity: ...,
 };
 
 // Call the `seedAuditLogEntryRef()` function to get a reference to the mutation.
@@ -1661,21 +2087,21 @@ import { connectorConfig, upsertRawIngredient, UpsertRawIngredientVariables } fr
 
 // The `UpsertRawIngredient` mutation requires an argument of type `UpsertRawIngredientVariables`:
 const upsertRawIngredientVars: UpsertRawIngredientVariables = {
-  id: ..., 
-  sku: ..., 
-  name: ..., 
-  category: ..., 
-  currentStock: ..., 
-  unit: ..., 
-  reorderPoint: ..., 
-  safetyStock: ..., 
-  maxStock: ..., 
-  avgDailyConsumption: ..., 
-  leadTimeDays: ..., 
-  costPerUnit: ..., 
-  supplier: ..., 
-  lastRestocked: ..., 
-  location: ..., 
+  id: ...,
+  sku: ...,
+  name: ...,
+  category: ...,
+  currentStock: ...,
+  unit: ...,
+  reorderPoint: ...,
+  safetyStock: ...,
+  maxStock: ...,
+  avgDailyConsumption: ...,
+  leadTimeDays: ...,
+  costPerUnit: ...,
+  supplier: ...,
+  lastRestocked: ...,
+  location: ...,
   expiryDate: ..., // optional
 };
 
@@ -1706,21 +2132,21 @@ import { connectorConfig, upsertRawIngredientRef, UpsertRawIngredientVariables }
 
 // The `UpsertRawIngredient` mutation requires an argument of type `UpsertRawIngredientVariables`:
 const upsertRawIngredientVars: UpsertRawIngredientVariables = {
-  id: ..., 
-  sku: ..., 
-  name: ..., 
-  category: ..., 
-  currentStock: ..., 
-  unit: ..., 
-  reorderPoint: ..., 
-  safetyStock: ..., 
-  maxStock: ..., 
-  avgDailyConsumption: ..., 
-  leadTimeDays: ..., 
-  costPerUnit: ..., 
-  supplier: ..., 
-  lastRestocked: ..., 
-  location: ..., 
+  id: ...,
+  sku: ...,
+  name: ...,
+  category: ...,
+  currentStock: ...,
+  unit: ...,
+  reorderPoint: ...,
+  safetyStock: ...,
+  maxStock: ...,
+  avgDailyConsumption: ...,
+  leadTimeDays: ...,
+  costPerUnit: ...,
+  supplier: ...,
+  lastRestocked: ...,
+  location: ...,
   expiryDate: ..., // optional
 };
 
@@ -1800,7 +2226,7 @@ import { connectorConfig, deleteRawIngredient, DeleteRawIngredientVariables } fr
 
 // The `DeleteRawIngredient` mutation requires an argument of type `DeleteRawIngredientVariables`:
 const deleteRawIngredientVars: DeleteRawIngredientVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteRawIngredient()` function to execute the mutation.
@@ -1830,7 +2256,7 @@ import { connectorConfig, deleteRawIngredientRef, DeleteRawIngredientVariables }
 
 // The `DeleteRawIngredient` mutation requires an argument of type `DeleteRawIngredientVariables`:
 const deleteRawIngredientVars: DeleteRawIngredientVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteRawIngredientRef()` function to get a reference to the mutation.
@@ -1921,16 +2347,16 @@ import { connectorConfig, upsertStockTransaction, UpsertStockTransactionVariable
 
 // The `UpsertStockTransaction` mutation requires an argument of type `UpsertStockTransactionVariables`:
 const upsertStockTransactionVars: UpsertStockTransactionVariables = {
-  id: ..., 
-  timestamp: ..., 
-  itemId: ..., 
-  itemName: ..., 
-  itemType: ..., 
-  action: ..., 
-  quantity: ..., 
-  unit: ..., 
-  previousStock: ..., 
-  newStock: ..., 
+  id: ...,
+  timestamp: ...,
+  itemId: ...,
+  itemName: ...,
+  itemType: ...,
+  action: ...,
+  quantity: ...,
+  unit: ...,
+  previousStock: ...,
+  newStock: ...,
   referenceId: ..., // optional
   unitPrice: ..., // optional
   notes: ..., // optional
@@ -1963,16 +2389,16 @@ import { connectorConfig, upsertStockTransactionRef, UpsertStockTransactionVaria
 
 // The `UpsertStockTransaction` mutation requires an argument of type `UpsertStockTransactionVariables`:
 const upsertStockTransactionVars: UpsertStockTransactionVariables = {
-  id: ..., 
-  timestamp: ..., 
-  itemId: ..., 
-  itemName: ..., 
-  itemType: ..., 
-  action: ..., 
-  quantity: ..., 
-  unit: ..., 
-  previousStock: ..., 
-  newStock: ..., 
+  id: ...,
+  timestamp: ...,
+  itemId: ...,
+  itemName: ...,
+  itemType: ...,
+  action: ...,
+  quantity: ...,
+  unit: ...,
+  previousStock: ...,
+  newStock: ...,
   referenceId: ..., // optional
   unitPrice: ..., // optional
   notes: ..., // optional
@@ -2054,7 +2480,7 @@ import { connectorConfig, deleteStockTransaction, DeleteStockTransactionVariable
 
 // The `DeleteStockTransaction` mutation requires an argument of type `DeleteStockTransactionVariables`:
 const deleteStockTransactionVars: DeleteStockTransactionVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteStockTransaction()` function to execute the mutation.
@@ -2084,7 +2510,7 @@ import { connectorConfig, deleteStockTransactionRef, DeleteStockTransactionVaria
 
 // The `DeleteStockTransaction` mutation requires an argument of type `DeleteStockTransactionVariables`:
 const deleteStockTransactionVars: DeleteStockTransactionVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteStockTransactionRef()` function to get a reference to the mutation.
@@ -2146,6 +2572,7 @@ export interface UpdateFinishedGoodRecipeVariables {
   id: string;
   recipe: unknown[];
   batchUnitQuantity: number;
+  containerVolumeMl?: number | null;
 }
 ```
 ### Return Type
@@ -2165,16 +2592,17 @@ import { connectorConfig, updateFinishedGoodRecipe, UpdateFinishedGoodRecipeVari
 
 // The `UpdateFinishedGoodRecipe` mutation requires an argument of type `UpdateFinishedGoodRecipeVariables`:
 const updateFinishedGoodRecipeVars: UpdateFinishedGoodRecipeVariables = {
-  id: ..., 
-  recipe: ..., 
-  batchUnitQuantity: ..., 
+  id: ...,
+  recipe: ...,
+  batchUnitQuantity: ...,
+  containerVolumeMl: ..., // optional
 };
 
 // Call the `updateFinishedGoodRecipe()` function to execute the mutation.
 // You can use the `await` keyword to wait for the promise to resolve.
 const { data } = await updateFinishedGoodRecipe(updateFinishedGoodRecipeVars);
 // Variables can be defined inline as well.
-const { data } = await updateFinishedGoodRecipe({ id: ..., recipe: ..., batchUnitQuantity: ..., });
+const { data } = await updateFinishedGoodRecipe({ id: ..., recipe: ..., batchUnitQuantity: ..., containerVolumeMl: ..., });
 
 // You can also pass in a `DataConnect` instance to the action shortcut function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -2197,15 +2625,16 @@ import { connectorConfig, updateFinishedGoodRecipeRef, UpdateFinishedGoodRecipeV
 
 // The `UpdateFinishedGoodRecipe` mutation requires an argument of type `UpdateFinishedGoodRecipeVariables`:
 const updateFinishedGoodRecipeVars: UpdateFinishedGoodRecipeVariables = {
-  id: ..., 
-  recipe: ..., 
-  batchUnitQuantity: ..., 
+  id: ...,
+  recipe: ...,
+  batchUnitQuantity: ...,
+  containerVolumeMl: ..., // optional
 };
 
 // Call the `updateFinishedGoodRecipeRef()` function to get a reference to the mutation.
 const ref = updateFinishedGoodRecipeRef(updateFinishedGoodRecipeVars);
 // Variables can be defined inline as well.
-const ref = updateFinishedGoodRecipeRef({ id: ..., recipe: ..., batchUnitQuantity: ..., });
+const ref = updateFinishedGoodRecipeRef({ id: ..., recipe: ..., batchUnitQuantity: ..., containerVolumeMl: ..., });
 
 // You can also pass in a `DataConnect` instance to the `MutationRef` function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -2260,6 +2689,7 @@ The `UpsertPmoInventoryPeriod` mutation requires an argument of type `UpsertPmoI
 export interface UpsertPmoInventoryPeriodVariables {
   id: string;
   title: string;
+  inventoryType?: string | null;
   sourceFileName: string;
   lines: unknown[];
   createdAt: string;
@@ -2286,13 +2716,14 @@ import { connectorConfig, upsertPmoInventoryPeriod, UpsertPmoInventoryPeriodVari
 
 // The `UpsertPmoInventoryPeriod` mutation requires an argument of type `UpsertPmoInventoryPeriodVariables`:
 const upsertPmoInventoryPeriodVars: UpsertPmoInventoryPeriodVariables = {
-  id: ..., 
-  title: ..., 
-  sourceFileName: ..., 
-  lines: ..., 
-  createdAt: ..., 
-  createdBy: ..., 
-  status: ..., 
+  id: ...,
+  title: ...,
+  inventoryType: ..., // optional
+  sourceFileName: ...,
+  lines: ...,
+  createdAt: ...,
+  createdBy: ...,
+  status: ...,
   postedAt: ..., // optional
   postedBy: ..., // optional
 };
@@ -2301,7 +2732,7 @@ const upsertPmoInventoryPeriodVars: UpsertPmoInventoryPeriodVariables = {
 // You can use the `await` keyword to wait for the promise to resolve.
 const { data } = await upsertPmoInventoryPeriod(upsertPmoInventoryPeriodVars);
 // Variables can be defined inline as well.
-const { data } = await upsertPmoInventoryPeriod({ id: ..., title: ..., sourceFileName: ..., lines: ..., createdAt: ..., createdBy: ..., status: ..., postedAt: ..., postedBy: ..., });
+const { data } = await upsertPmoInventoryPeriod({ id: ..., title: ..., inventoryType: ..., sourceFileName: ..., lines: ..., createdAt: ..., createdBy: ..., status: ..., postedAt: ..., postedBy: ..., });
 
 // You can also pass in a `DataConnect` instance to the action shortcut function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -2324,13 +2755,14 @@ import { connectorConfig, upsertPmoInventoryPeriodRef, UpsertPmoInventoryPeriodV
 
 // The `UpsertPmoInventoryPeriod` mutation requires an argument of type `UpsertPmoInventoryPeriodVariables`:
 const upsertPmoInventoryPeriodVars: UpsertPmoInventoryPeriodVariables = {
-  id: ..., 
-  title: ..., 
-  sourceFileName: ..., 
-  lines: ..., 
-  createdAt: ..., 
-  createdBy: ..., 
-  status: ..., 
+  id: ...,
+  title: ...,
+  inventoryType: ..., // optional
+  sourceFileName: ...,
+  lines: ...,
+  createdAt: ...,
+  createdBy: ...,
+  status: ...,
   postedAt: ..., // optional
   postedBy: ..., // optional
 };
@@ -2338,7 +2770,7 @@ const upsertPmoInventoryPeriodVars: UpsertPmoInventoryPeriodVariables = {
 // Call the `upsertPmoInventoryPeriodRef()` function to get a reference to the mutation.
 const ref = upsertPmoInventoryPeriodRef(upsertPmoInventoryPeriodVars);
 // Variables can be defined inline as well.
-const ref = upsertPmoInventoryPeriodRef({ id: ..., title: ..., sourceFileName: ..., lines: ..., createdAt: ..., createdBy: ..., status: ..., postedAt: ..., postedBy: ..., });
+const ref = upsertPmoInventoryPeriodRef({ id: ..., title: ..., inventoryType: ..., sourceFileName: ..., lines: ..., createdAt: ..., createdBy: ..., status: ..., postedAt: ..., postedBy: ..., });
 
 // You can also pass in a `DataConnect` instance to the `MutationRef` function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -2466,6 +2898,484 @@ executeMutation(ref).then((response) => {
 });
 ```
 
+## CreateStockRequest
+You can execute the `CreateStockRequest` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+createStockRequest(vars: CreateStockRequestVariables): MutationPromise<CreateStockRequestData, CreateStockRequestVariables>;
+
+interface CreateStockRequestRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateStockRequestVariables): MutationRef<CreateStockRequestData, CreateStockRequestVariables>;
+}
+export const createStockRequestRef: CreateStockRequestRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+createStockRequest(dc: DataConnect, vars: CreateStockRequestVariables): MutationPromise<CreateStockRequestData, CreateStockRequestVariables>;
+
+interface CreateStockRequestRef {
+  ...
+  (dc: DataConnect, vars: CreateStockRequestVariables): MutationRef<CreateStockRequestData, CreateStockRequestVariables>;
+}
+export const createStockRequestRef: CreateStockRequestRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the createStockRequestRef:
+```typescript
+const name = createStockRequestRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `CreateStockRequest` mutation requires an argument of type `CreateStockRequestVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface CreateStockRequestVariables {
+  id: string;
+  finishedGoodId: string;
+  finishedGoodName: string;
+  finishedGoodSku: string;
+  quantity: number;
+  unit: string;
+  requestedByName: string;
+  requestedAt: string;
+  neededBy?: string | null;
+  notes?: string | null;
+}
+```
+### Return Type
+Recall that executing the `CreateStockRequest` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `CreateStockRequestData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface CreateStockRequestData {
+  stockRequest_insert: StockRequest_Key;
+}
+```
+### Using `CreateStockRequest`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, createStockRequest, CreateStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `CreateStockRequest` mutation requires an argument of type `CreateStockRequestVariables`:
+const createStockRequestVars: CreateStockRequestVariables = {
+  id: ...,
+  finishedGoodId: ...,
+  finishedGoodName: ...,
+  finishedGoodSku: ...,
+  quantity: ...,
+  unit: ...,
+  requestedByName: ...,
+  requestedAt: ...,
+  neededBy: ..., // optional
+  notes: ..., // optional
+};
+
+// Call the `createStockRequest()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await createStockRequest(createStockRequestVars);
+// Variables can be defined inline as well.
+const { data } = await createStockRequest({ id: ..., finishedGoodId: ..., finishedGoodName: ..., finishedGoodSku: ..., quantity: ..., unit: ..., requestedByName: ..., requestedAt: ..., neededBy: ..., notes: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await createStockRequest(dataConnect, createStockRequestVars);
+
+console.log(data.stockRequest_insert);
+
+// Or, you can use the `Promise` API.
+createStockRequest(createStockRequestVars).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_insert);
+});
+```
+
+### Using `CreateStockRequest`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, createStockRequestRef, CreateStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `CreateStockRequest` mutation requires an argument of type `CreateStockRequestVariables`:
+const createStockRequestVars: CreateStockRequestVariables = {
+  id: ...,
+  finishedGoodId: ...,
+  finishedGoodName: ...,
+  finishedGoodSku: ...,
+  quantity: ...,
+  unit: ...,
+  requestedByName: ...,
+  requestedAt: ...,
+  neededBy: ..., // optional
+  notes: ..., // optional
+};
+
+// Call the `createStockRequestRef()` function to get a reference to the mutation.
+const ref = createStockRequestRef(createStockRequestVars);
+// Variables can be defined inline as well.
+const ref = createStockRequestRef({ id: ..., finishedGoodId: ..., finishedGoodName: ..., finishedGoodSku: ..., quantity: ..., unit: ..., requestedByName: ..., requestedAt: ..., neededBy: ..., notes: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = createStockRequestRef(dataConnect, createStockRequestVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.stockRequest_insert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_insert);
+});
+```
+
+## ReviewStockRequest
+You can execute the `ReviewStockRequest` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+reviewStockRequest(vars: ReviewStockRequestVariables): MutationPromise<ReviewStockRequestData, ReviewStockRequestVariables>;
+
+interface ReviewStockRequestRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ReviewStockRequestVariables): MutationRef<ReviewStockRequestData, ReviewStockRequestVariables>;
+}
+export const reviewStockRequestRef: ReviewStockRequestRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+reviewStockRequest(dc: DataConnect, vars: ReviewStockRequestVariables): MutationPromise<ReviewStockRequestData, ReviewStockRequestVariables>;
+
+interface ReviewStockRequestRef {
+  ...
+  (dc: DataConnect, vars: ReviewStockRequestVariables): MutationRef<ReviewStockRequestData, ReviewStockRequestVariables>;
+}
+export const reviewStockRequestRef: ReviewStockRequestRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the reviewStockRequestRef:
+```typescript
+const name = reviewStockRequestRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ReviewStockRequest` mutation requires an argument of type `ReviewStockRequestVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface ReviewStockRequestVariables {
+  id: string;
+  status: string;
+  responseNotes?: string | null;
+  reviewedAt: string;
+  fulfilledAt?: string | null;
+  fulfilledQuantity?: number | null;
+}
+```
+### Return Type
+Recall that executing the `ReviewStockRequest` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ReviewStockRequestData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ReviewStockRequestData {
+  stockRequest_updateMany: number;
+}
+```
+### Using `ReviewStockRequest`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, reviewStockRequest, ReviewStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `ReviewStockRequest` mutation requires an argument of type `ReviewStockRequestVariables`:
+const reviewStockRequestVars: ReviewStockRequestVariables = {
+  id: ...,
+  status: ...,
+  responseNotes: ..., // optional
+  reviewedAt: ...,
+  fulfilledAt: ..., // optional
+  fulfilledQuantity: ..., // optional
+};
+
+// Call the `reviewStockRequest()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await reviewStockRequest(reviewStockRequestVars);
+// Variables can be defined inline as well.
+const { data } = await reviewStockRequest({ id: ..., status: ..., responseNotes: ..., reviewedAt: ..., fulfilledAt: ..., fulfilledQuantity: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await reviewStockRequest(dataConnect, reviewStockRequestVars);
+
+console.log(data.stockRequest_updateMany);
+
+// Or, you can use the `Promise` API.
+reviewStockRequest(reviewStockRequestVars).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_updateMany);
+});
+```
+
+### Using `ReviewStockRequest`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, reviewStockRequestRef, ReviewStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `ReviewStockRequest` mutation requires an argument of type `ReviewStockRequestVariables`:
+const reviewStockRequestVars: ReviewStockRequestVariables = {
+  id: ...,
+  status: ...,
+  responseNotes: ..., // optional
+  reviewedAt: ...,
+  fulfilledAt: ..., // optional
+  fulfilledQuantity: ..., // optional
+};
+
+// Call the `reviewStockRequestRef()` function to get a reference to the mutation.
+const ref = reviewStockRequestRef(reviewStockRequestVars);
+// Variables can be defined inline as well.
+const ref = reviewStockRequestRef({ id: ..., status: ..., responseNotes: ..., reviewedAt: ..., fulfilledAt: ..., fulfilledQuantity: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = reviewStockRequestRef(dataConnect, reviewStockRequestVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.stockRequest_updateMany);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_updateMany);
+});
+```
+
+## CancelOwnStockRequest
+You can execute the `CancelOwnStockRequest` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+cancelOwnStockRequest(vars: CancelOwnStockRequestVariables): MutationPromise<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+
+interface CancelOwnStockRequestRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CancelOwnStockRequestVariables): MutationRef<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+}
+export const cancelOwnStockRequestRef: CancelOwnStockRequestRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+cancelOwnStockRequest(dc: DataConnect, vars: CancelOwnStockRequestVariables): MutationPromise<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+
+interface CancelOwnStockRequestRef {
+  ...
+  (dc: DataConnect, vars: CancelOwnStockRequestVariables): MutationRef<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+}
+export const cancelOwnStockRequestRef: CancelOwnStockRequestRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the cancelOwnStockRequestRef:
+```typescript
+const name = cancelOwnStockRequestRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `CancelOwnStockRequest` mutation requires an argument of type `CancelOwnStockRequestVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface CancelOwnStockRequestVariables {
+  id: string;
+}
+```
+### Return Type
+Recall that executing the `CancelOwnStockRequest` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `CancelOwnStockRequestData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface CancelOwnStockRequestData {
+  stockRequest_updateMany: number;
+}
+```
+### Using `CancelOwnStockRequest`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, cancelOwnStockRequest, CancelOwnStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `CancelOwnStockRequest` mutation requires an argument of type `CancelOwnStockRequestVariables`:
+const cancelOwnStockRequestVars: CancelOwnStockRequestVariables = {
+  id: ...,
+};
+
+// Call the `cancelOwnStockRequest()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await cancelOwnStockRequest(cancelOwnStockRequestVars);
+// Variables can be defined inline as well.
+const { data } = await cancelOwnStockRequest({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await cancelOwnStockRequest(dataConnect, cancelOwnStockRequestVars);
+
+console.log(data.stockRequest_updateMany);
+
+// Or, you can use the `Promise` API.
+cancelOwnStockRequest(cancelOwnStockRequestVars).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_updateMany);
+});
+```
+
+### Using `CancelOwnStockRequest`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, cancelOwnStockRequestRef, CancelOwnStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `CancelOwnStockRequest` mutation requires an argument of type `CancelOwnStockRequestVariables`:
+const cancelOwnStockRequestVars: CancelOwnStockRequestVariables = {
+  id: ...,
+};
+
+// Call the `cancelOwnStockRequestRef()` function to get a reference to the mutation.
+const ref = cancelOwnStockRequestRef(cancelOwnStockRequestVars);
+// Variables can be defined inline as well.
+const ref = cancelOwnStockRequestRef({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = cancelOwnStockRequestRef(dataConnect, cancelOwnStockRequestVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.stockRequest_updateMany);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_updateMany);
+});
+```
+
+## DeleteStockRequest
+You can execute the `DeleteStockRequest` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+deleteStockRequest(vars: DeleteStockRequestVariables): MutationPromise<DeleteStockRequestData, DeleteStockRequestVariables>;
+
+interface DeleteStockRequestRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeleteStockRequestVariables): MutationRef<DeleteStockRequestData, DeleteStockRequestVariables>;
+}
+export const deleteStockRequestRef: DeleteStockRequestRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+deleteStockRequest(dc: DataConnect, vars: DeleteStockRequestVariables): MutationPromise<DeleteStockRequestData, DeleteStockRequestVariables>;
+
+interface DeleteStockRequestRef {
+  ...
+  (dc: DataConnect, vars: DeleteStockRequestVariables): MutationRef<DeleteStockRequestData, DeleteStockRequestVariables>;
+}
+export const deleteStockRequestRef: DeleteStockRequestRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the deleteStockRequestRef:
+```typescript
+const name = deleteStockRequestRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `DeleteStockRequest` mutation requires an argument of type `DeleteStockRequestVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface DeleteStockRequestVariables {
+  id: string;
+}
+```
+### Return Type
+Recall that executing the `DeleteStockRequest` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `DeleteStockRequestData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface DeleteStockRequestData {
+  stockRequest_delete?: StockRequest_Key | null;
+}
+```
+### Using `DeleteStockRequest`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, deleteStockRequest, DeleteStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `DeleteStockRequest` mutation requires an argument of type `DeleteStockRequestVariables`:
+const deleteStockRequestVars: DeleteStockRequestVariables = {
+  id: ...,
+};
+
+// Call the `deleteStockRequest()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await deleteStockRequest(deleteStockRequestVars);
+// Variables can be defined inline as well.
+const { data } = await deleteStockRequest({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await deleteStockRequest(dataConnect, deleteStockRequestVars);
+
+console.log(data.stockRequest_delete);
+
+// Or, you can use the `Promise` API.
+deleteStockRequest(deleteStockRequestVars).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_delete);
+});
+```
+
+### Using `DeleteStockRequest`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, deleteStockRequestRef, DeleteStockRequestVariables } from '@dataconnect/dairysync-generated';
+
+// The `DeleteStockRequest` mutation requires an argument of type `DeleteStockRequestVariables`:
+const deleteStockRequestVars: DeleteStockRequestVariables = {
+  id: ...,
+};
+
+// Call the `deleteStockRequestRef()` function to get a reference to the mutation.
+const ref = deleteStockRequestRef(deleteStockRequestVars);
+// Variables can be defined inline as well.
+const ref = deleteStockRequestRef({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = deleteStockRequestRef(dataConnect, deleteStockRequestVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.stockRequest_delete);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.stockRequest_delete);
+});
+```
+
 ## UpsertFinishedGood
 You can execute the `UpsertFinishedGood` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
 ```typescript
@@ -2506,6 +3416,7 @@ export interface UpsertFinishedGoodVariables {
   category: string;
   currentStock: number;
   unit: string;
+  containerVolumeMl?: number | null;
   coldStorageCapacity: number;
   maxThreshold: number;
   safetyStock: number;
@@ -2535,29 +3446,30 @@ import { connectorConfig, upsertFinishedGood, UpsertFinishedGoodVariables } from
 
 // The `UpsertFinishedGood` mutation requires an argument of type `UpsertFinishedGoodVariables`:
 const upsertFinishedGoodVars: UpsertFinishedGoodVariables = {
-  id: ..., 
-  sku: ..., 
-  name: ..., 
-  category: ..., 
-  currentStock: ..., 
-  unit: ..., 
-  coldStorageCapacity: ..., 
-  maxThreshold: ..., 
-  safetyStock: ..., 
-  unitPrice: ..., 
-  allocatedFeedingProgram: ..., 
-  allocatedRetail: ..., 
-  recipe: ..., 
-  batchUnitQuantity: ..., 
-  shelfLifeDays: ..., 
-  location: ..., 
+  id: ...,
+  sku: ...,
+  name: ...,
+  category: ...,
+  currentStock: ...,
+  unit: ...,
+  containerVolumeMl: ..., // optional
+  coldStorageCapacity: ...,
+  maxThreshold: ...,
+  safetyStock: ...,
+  unitPrice: ...,
+  allocatedFeedingProgram: ...,
+  allocatedRetail: ...,
+  recipe: ...,
+  batchUnitQuantity: ...,
+  shelfLifeDays: ...,
+  location: ...,
 };
 
 // Call the `upsertFinishedGood()` function to execute the mutation.
 // You can use the `await` keyword to wait for the promise to resolve.
 const { data } = await upsertFinishedGood(upsertFinishedGoodVars);
 // Variables can be defined inline as well.
-const { data } = await upsertFinishedGood({ id: ..., sku: ..., name: ..., category: ..., currentStock: ..., unit: ..., coldStorageCapacity: ..., maxThreshold: ..., safetyStock: ..., unitPrice: ..., allocatedFeedingProgram: ..., allocatedRetail: ..., recipe: ..., batchUnitQuantity: ..., shelfLifeDays: ..., location: ..., });
+const { data } = await upsertFinishedGood({ id: ..., sku: ..., name: ..., category: ..., currentStock: ..., unit: ..., containerVolumeMl: ..., coldStorageCapacity: ..., maxThreshold: ..., safetyStock: ..., unitPrice: ..., allocatedFeedingProgram: ..., allocatedRetail: ..., recipe: ..., batchUnitQuantity: ..., shelfLifeDays: ..., location: ..., });
 
 // You can also pass in a `DataConnect` instance to the action shortcut function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -2580,28 +3492,29 @@ import { connectorConfig, upsertFinishedGoodRef, UpsertFinishedGoodVariables } f
 
 // The `UpsertFinishedGood` mutation requires an argument of type `UpsertFinishedGoodVariables`:
 const upsertFinishedGoodVars: UpsertFinishedGoodVariables = {
-  id: ..., 
-  sku: ..., 
-  name: ..., 
-  category: ..., 
-  currentStock: ..., 
-  unit: ..., 
-  coldStorageCapacity: ..., 
-  maxThreshold: ..., 
-  safetyStock: ..., 
-  unitPrice: ..., 
-  allocatedFeedingProgram: ..., 
-  allocatedRetail: ..., 
-  recipe: ..., 
-  batchUnitQuantity: ..., 
-  shelfLifeDays: ..., 
-  location: ..., 
+  id: ...,
+  sku: ...,
+  name: ...,
+  category: ...,
+  currentStock: ...,
+  unit: ...,
+  containerVolumeMl: ..., // optional
+  coldStorageCapacity: ...,
+  maxThreshold: ...,
+  safetyStock: ...,
+  unitPrice: ...,
+  allocatedFeedingProgram: ...,
+  allocatedRetail: ...,
+  recipe: ...,
+  batchUnitQuantity: ...,
+  shelfLifeDays: ...,
+  location: ...,
 };
 
 // Call the `upsertFinishedGoodRef()` function to get a reference to the mutation.
 const ref = upsertFinishedGoodRef(upsertFinishedGoodVars);
 // Variables can be defined inline as well.
-const ref = upsertFinishedGoodRef({ id: ..., sku: ..., name: ..., category: ..., currentStock: ..., unit: ..., coldStorageCapacity: ..., maxThreshold: ..., safetyStock: ..., unitPrice: ..., allocatedFeedingProgram: ..., allocatedRetail: ..., recipe: ..., batchUnitQuantity: ..., shelfLifeDays: ..., location: ..., });
+const ref = upsertFinishedGoodRef({ id: ..., sku: ..., name: ..., category: ..., currentStock: ..., unit: ..., containerVolumeMl: ..., coldStorageCapacity: ..., maxThreshold: ..., safetyStock: ..., unitPrice: ..., allocatedFeedingProgram: ..., allocatedRetail: ..., recipe: ..., batchUnitQuantity: ..., shelfLifeDays: ..., location: ..., });
 
 // You can also pass in a `DataConnect` instance to the `MutationRef` function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -2676,9 +3589,9 @@ import { connectorConfig, setRetailFinishedGoodStock, SetRetailFinishedGoodStock
 
 // The `SetRetailFinishedGoodStock` mutation requires an argument of type `SetRetailFinishedGoodStockVariables`:
 const setRetailFinishedGoodStockVars: SetRetailFinishedGoodStockVariables = {
-  id: ..., 
-  currentStock: ..., 
-  allocatedRetail: ..., 
+  id: ...,
+  currentStock: ...,
+  allocatedRetail: ...,
 };
 
 // Call the `setRetailFinishedGoodStock()` function to execute the mutation.
@@ -2708,9 +3621,9 @@ import { connectorConfig, setRetailFinishedGoodStockRef, SetRetailFinishedGoodSt
 
 // The `SetRetailFinishedGoodStock` mutation requires an argument of type `SetRetailFinishedGoodStockVariables`:
 const setRetailFinishedGoodStockVars: SetRetailFinishedGoodStockVariables = {
-  id: ..., 
-  currentStock: ..., 
-  allocatedRetail: ..., 
+  id: ...,
+  currentStock: ...,
+  allocatedRetail: ...,
 };
 
 // Call the `setRetailFinishedGoodStockRef()` function to get a reference to the mutation.
@@ -2789,7 +3702,7 @@ import { connectorConfig, deleteFinishedGood, DeleteFinishedGoodVariables } from
 
 // The `DeleteFinishedGood` mutation requires an argument of type `DeleteFinishedGoodVariables`:
 const deleteFinishedGoodVars: DeleteFinishedGoodVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteFinishedGood()` function to execute the mutation.
@@ -2819,7 +3732,7 @@ import { connectorConfig, deleteFinishedGoodRef, DeleteFinishedGoodVariables } f
 
 // The `DeleteFinishedGood` mutation requires an argument of type `DeleteFinishedGoodVariables`:
 const deleteFinishedGoodVars: DeleteFinishedGoodVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteFinishedGoodRef()` function to get a reference to the mutation.
@@ -2913,22 +3826,22 @@ import { connectorConfig, upsertWipBatch, UpsertWipBatchVariables } from '@datac
 
 // The `UpsertWipBatch` mutation requires an argument of type `UpsertWipBatchVariables`:
 const upsertWipBatchVars: UpsertWipBatchVariables = {
-  id: ..., 
-  batchNumber: ..., 
-  productId: ..., 
-  productName: ..., 
-  targetQuantity: ..., 
-  rawMilkVolumeUsed: ..., 
-  ingredientsUsed: ..., 
-  status: ..., 
-  assignedStaff: ..., 
-  startDate: ..., 
-  estimatedCompletion: ..., 
+  id: ...,
+  batchNumber: ...,
+  productId: ...,
+  productName: ...,
+  targetQuantity: ...,
+  rawMilkVolumeUsed: ...,
+  ingredientsUsed: ...,
+  status: ...,
+  assignedStaff: ...,
+  startDate: ...,
+  estimatedCompletion: ...,
   completedAt: ..., // optional
   cancellationReason: ..., // optional
   cancelledAt: ..., // optional
   notes: ..., // optional
-  coldStorageTemp: ..., 
+  coldStorageTemp: ...,
 };
 
 // Call the `upsertWipBatch()` function to execute the mutation.
@@ -2958,22 +3871,22 @@ import { connectorConfig, upsertWipBatchRef, UpsertWipBatchVariables } from '@da
 
 // The `UpsertWipBatch` mutation requires an argument of type `UpsertWipBatchVariables`:
 const upsertWipBatchVars: UpsertWipBatchVariables = {
-  id: ..., 
-  batchNumber: ..., 
-  productId: ..., 
-  productName: ..., 
-  targetQuantity: ..., 
-  rawMilkVolumeUsed: ..., 
-  ingredientsUsed: ..., 
-  status: ..., 
-  assignedStaff: ..., 
-  startDate: ..., 
-  estimatedCompletion: ..., 
+  id: ...,
+  batchNumber: ...,
+  productId: ...,
+  productName: ...,
+  targetQuantity: ...,
+  rawMilkVolumeUsed: ...,
+  ingredientsUsed: ...,
+  status: ...,
+  assignedStaff: ...,
+  startDate: ...,
+  estimatedCompletion: ...,
   completedAt: ..., // optional
   cancellationReason: ..., // optional
   cancelledAt: ..., // optional
   notes: ..., // optional
-  coldStorageTemp: ..., 
+  coldStorageTemp: ...,
 };
 
 // Call the `upsertWipBatchRef()` function to get a reference to the mutation.
@@ -3052,7 +3965,7 @@ import { connectorConfig, deleteWipBatch, DeleteWipBatchVariables } from '@datac
 
 // The `DeleteWipBatch` mutation requires an argument of type `DeleteWipBatchVariables`:
 const deleteWipBatchVars: DeleteWipBatchVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteWipBatch()` function to execute the mutation.
@@ -3082,7 +3995,7 @@ import { connectorConfig, deleteWipBatchRef, DeleteWipBatchVariables } from '@da
 
 // The `DeleteWipBatch` mutation requires an argument of type `DeleteWipBatchVariables`:
 const deleteWipBatchVars: DeleteWipBatchVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteWipBatchRef()` function to get a reference to the mutation.
@@ -3173,17 +4086,17 @@ import { connectorConfig, upsertCommitment, UpsertCommitmentVariables } from '@d
 
 // The `UpsertCommitment` mutation requires an argument of type `UpsertCommitmentVariables`:
 const upsertCommitmentVars: UpsertCommitmentVariables = {
-  id: ..., 
-  type: ..., 
-  partnerName: ..., 
+  id: ...,
+  type: ...,
+  partnerName: ...,
   contactPerson: ..., // optional
-  scheduledDate: ..., 
-  itemOrMilk: ..., 
-  targetQuantity: ..., 
-  fulfilledQuantity: ..., 
-  unit: ..., 
-  status: ..., 
-  priority: ..., 
+  scheduledDate: ...,
+  itemOrMilk: ...,
+  targetQuantity: ...,
+  fulfilledQuantity: ...,
+  unit: ...,
+  status: ...,
+  priority: ...,
   cancellationReason: ..., // optional
   cancelledAt: ..., // optional
 };
@@ -3215,17 +4128,17 @@ import { connectorConfig, upsertCommitmentRef, UpsertCommitmentVariables } from 
 
 // The `UpsertCommitment` mutation requires an argument of type `UpsertCommitmentVariables`:
 const upsertCommitmentVars: UpsertCommitmentVariables = {
-  id: ..., 
-  type: ..., 
-  partnerName: ..., 
+  id: ...,
+  type: ...,
+  partnerName: ...,
   contactPerson: ..., // optional
-  scheduledDate: ..., 
-  itemOrMilk: ..., 
-  targetQuantity: ..., 
-  fulfilledQuantity: ..., 
-  unit: ..., 
-  status: ..., 
-  priority: ..., 
+  scheduledDate: ...,
+  itemOrMilk: ...,
+  targetQuantity: ...,
+  fulfilledQuantity: ...,
+  unit: ...,
+  status: ...,
+  priority: ...,
   cancellationReason: ..., // optional
   cancelledAt: ..., // optional
 };
@@ -3306,7 +4219,7 @@ import { connectorConfig, deleteCommitment, DeleteCommitmentVariables } from '@d
 
 // The `DeleteCommitment` mutation requires an argument of type `DeleteCommitmentVariables`:
 const deleteCommitmentVars: DeleteCommitmentVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteCommitment()` function to execute the mutation.
@@ -3336,7 +4249,7 @@ import { connectorConfig, deleteCommitmentRef, DeleteCommitmentVariables } from 
 
 // The `DeleteCommitment` mutation requires an argument of type `DeleteCommitmentVariables`:
 const deleteCommitmentVars: DeleteCommitmentVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteCommitmentRef()` function to get a reference to the mutation.
@@ -3422,13 +4335,13 @@ import { connectorConfig, upsertSystemAlert, UpsertSystemAlertVariables } from '
 
 // The `UpsertSystemAlert` mutation requires an argument of type `UpsertSystemAlertVariables`:
 const upsertSystemAlertVars: UpsertSystemAlertVariables = {
-  id: ..., 
-  timestamp: ..., 
-  type: ..., 
-  title: ..., 
-  message: ..., 
-  severity: ..., 
-  read: ..., 
+  id: ...,
+  timestamp: ...,
+  type: ...,
+  title: ...,
+  message: ...,
+  severity: ...,
+  read: ...,
   targetRole: ..., // optional
 };
 
@@ -3459,13 +4372,13 @@ import { connectorConfig, upsertSystemAlertRef, UpsertSystemAlertVariables } fro
 
 // The `UpsertSystemAlert` mutation requires an argument of type `UpsertSystemAlertVariables`:
 const upsertSystemAlertVars: UpsertSystemAlertVariables = {
-  id: ..., 
-  timestamp: ..., 
-  type: ..., 
-  title: ..., 
-  message: ..., 
-  severity: ..., 
-  read: ..., 
+  id: ...,
+  timestamp: ...,
+  type: ...,
+  title: ...,
+  message: ...,
+  severity: ...,
+  read: ...,
   targetRole: ..., // optional
 };
 
@@ -3545,7 +4458,7 @@ import { connectorConfig, deleteSystemAlert, DeleteSystemAlertVariables } from '
 
 // The `DeleteSystemAlert` mutation requires an argument of type `DeleteSystemAlertVariables`:
 const deleteSystemAlertVars: DeleteSystemAlertVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteSystemAlert()` function to execute the mutation.
@@ -3575,7 +4488,7 @@ import { connectorConfig, deleteSystemAlertRef, DeleteSystemAlertVariables } fro
 
 // The `DeleteSystemAlert` mutation requires an argument of type `DeleteSystemAlertVariables`:
 const deleteSystemAlertVars: DeleteSystemAlertVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteSystemAlertRef()` function to get a reference to the mutation.
@@ -3665,18 +4578,18 @@ import { connectorConfig, upsertIsoRating, UpsertIsoRatingVariables } from '@dat
 
 // The `UpsertIsoRating` mutation requires an argument of type `UpsertIsoRatingVariables`:
 const upsertIsoRatingVars: UpsertIsoRatingVariables = {
-  id: ..., 
-  functionalSuitability: ..., 
-  performanceEfficiency: ..., 
-  compatibility: ..., 
-  interactionCapability: ..., 
-  reliability: ..., 
-  security: ..., 
-  maintainability: ..., 
-  flexibility: ..., 
-  safety: ..., 
-  comments: ..., 
-  date: ..., 
+  id: ...,
+  functionalSuitability: ...,
+  performanceEfficiency: ...,
+  compatibility: ...,
+  interactionCapability: ...,
+  reliability: ...,
+  security: ...,
+  maintainability: ...,
+  flexibility: ...,
+  safety: ...,
+  comments: ...,
+  date: ...,
 };
 
 // Call the `upsertIsoRating()` function to execute the mutation.
@@ -3706,18 +4619,18 @@ import { connectorConfig, upsertIsoRatingRef, UpsertIsoRatingVariables } from '@
 
 // The `UpsertIsoRating` mutation requires an argument of type `UpsertIsoRatingVariables`:
 const upsertIsoRatingVars: UpsertIsoRatingVariables = {
-  id: ..., 
-  functionalSuitability: ..., 
-  performanceEfficiency: ..., 
-  compatibility: ..., 
-  interactionCapability: ..., 
-  reliability: ..., 
-  security: ..., 
-  maintainability: ..., 
-  flexibility: ..., 
-  safety: ..., 
-  comments: ..., 
-  date: ..., 
+  id: ...,
+  functionalSuitability: ...,
+  performanceEfficiency: ...,
+  compatibility: ...,
+  interactionCapability: ...,
+  reliability: ...,
+  security: ...,
+  maintainability: ...,
+  flexibility: ...,
+  safety: ...,
+  comments: ...,
+  date: ...,
 };
 
 // Call the `upsertIsoRatingRef()` function to get a reference to the mutation.
@@ -3796,7 +4709,7 @@ import { connectorConfig, deleteIsoRating, DeleteIsoRatingVariables } from '@dat
 
 // The `DeleteIsoRating` mutation requires an argument of type `DeleteIsoRatingVariables`:
 const deleteIsoRatingVars: DeleteIsoRatingVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteIsoRating()` function to execute the mutation.
@@ -3826,7 +4739,7 @@ import { connectorConfig, deleteIsoRatingRef, DeleteIsoRatingVariables } from '@
 
 // The `DeleteIsoRating` mutation requires an argument of type `DeleteIsoRatingVariables`:
 const deleteIsoRatingVars: DeleteIsoRatingVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteIsoRatingRef()` function to get a reference to the mutation.
@@ -3915,17 +4828,17 @@ import { connectorConfig, upsertAuditLogEntry, UpsertAuditLogEntryVariables } fr
 
 // The `UpsertAuditLogEntry` mutation requires an argument of type `UpsertAuditLogEntryVariables`:
 const upsertAuditLogEntryVars: UpsertAuditLogEntryVariables = {
-  id: ..., 
-  timestamp: ..., 
-  category: ..., 
-  subsystem: ..., 
-  action: ..., 
-  description: ..., 
+  id: ...,
+  timestamp: ...,
+  category: ...,
+  subsystem: ...,
+  action: ...,
+  description: ...,
   details: ..., // optional
-  userName: ..., 
-  userTitle: ..., 
+  userName: ...,
+  userTitle: ...,
   terminalOrStation: ..., // optional
-  severity: ..., 
+  severity: ...,
 };
 
 // Call the `upsertAuditLogEntry()` function to execute the mutation.
@@ -3955,17 +4868,17 @@ import { connectorConfig, upsertAuditLogEntryRef, UpsertAuditLogEntryVariables }
 
 // The `UpsertAuditLogEntry` mutation requires an argument of type `UpsertAuditLogEntryVariables`:
 const upsertAuditLogEntryVars: UpsertAuditLogEntryVariables = {
-  id: ..., 
-  timestamp: ..., 
-  category: ..., 
-  subsystem: ..., 
-  action: ..., 
-  description: ..., 
+  id: ...,
+  timestamp: ...,
+  category: ...,
+  subsystem: ...,
+  action: ...,
+  description: ...,
   details: ..., // optional
-  userName: ..., 
-  userTitle: ..., 
+  userName: ...,
+  userTitle: ...,
   terminalOrStation: ..., // optional
-  severity: ..., 
+  severity: ...,
 };
 
 // Call the `upsertAuditLogEntryRef()` function to get a reference to the mutation.
@@ -4044,7 +4957,7 @@ import { connectorConfig, deleteAuditLogEntry, DeleteAuditLogEntryVariables } fr
 
 // The `DeleteAuditLogEntry` mutation requires an argument of type `DeleteAuditLogEntryVariables`:
 const deleteAuditLogEntryVars: DeleteAuditLogEntryVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteAuditLogEntry()` function to execute the mutation.
@@ -4074,7 +4987,7 @@ import { connectorConfig, deleteAuditLogEntryRef, DeleteAuditLogEntryVariables }
 
 // The `DeleteAuditLogEntry` mutation requires an argument of type `DeleteAuditLogEntryVariables`:
 const deleteAuditLogEntryVars: DeleteAuditLogEntryVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteAuditLogEntryRef()` function to get a reference to the mutation.
@@ -4161,14 +5074,14 @@ import { connectorConfig, upsertUserProfile, UpsertUserProfileVariables } from '
 
 // The `UpsertUserProfile` mutation requires an argument of type `UpsertUserProfileVariables`:
 const upsertUserProfileVars: UpsertUserProfileVariables = {
-  id: ..., 
-  name: ..., 
-  role: ..., 
-  title: ..., 
-  department: ..., 
-  avatar: ..., 
-  email: ..., 
-  username: ..., 
+  id: ...,
+  name: ...,
+  role: ...,
+  title: ...,
+  department: ...,
+  avatar: ...,
+  email: ...,
+  username: ...,
   nickname: ..., // optional
 };
 
@@ -4199,14 +5112,14 @@ import { connectorConfig, upsertUserProfileRef, UpsertUserProfileVariables } fro
 
 // The `UpsertUserProfile` mutation requires an argument of type `UpsertUserProfileVariables`:
 const upsertUserProfileVars: UpsertUserProfileVariables = {
-  id: ..., 
-  name: ..., 
-  role: ..., 
-  title: ..., 
-  department: ..., 
-  avatar: ..., 
-  email: ..., 
-  username: ..., 
+  id: ...,
+  name: ...,
+  role: ...,
+  title: ...,
+  department: ...,
+  avatar: ...,
+  email: ...,
+  username: ...,
   nickname: ..., // optional
 };
 
@@ -4292,12 +5205,12 @@ import { connectorConfig, updateOwnUserProfile, UpdateOwnUserProfileVariables } 
 
 // The `UpdateOwnUserProfile` mutation requires an argument of type `UpdateOwnUserProfileVariables`:
 const updateOwnUserProfileVars: UpdateOwnUserProfileVariables = {
-  id: ..., 
-  name: ..., 
-  title: ..., 
-  department: ..., 
-  avatar: ..., 
-  username: ..., 
+  id: ...,
+  name: ...,
+  title: ...,
+  department: ...,
+  avatar: ...,
+  username: ...,
   nickname: ..., // optional
 };
 
@@ -4328,12 +5241,12 @@ import { connectorConfig, updateOwnUserProfileRef, UpdateOwnUserProfileVariables
 
 // The `UpdateOwnUserProfile` mutation requires an argument of type `UpdateOwnUserProfileVariables`:
 const updateOwnUserProfileVars: UpdateOwnUserProfileVariables = {
-  id: ..., 
-  name: ..., 
-  title: ..., 
-  department: ..., 
-  avatar: ..., 
-  username: ..., 
+  id: ...,
+  name: ...,
+  title: ...,
+  department: ...,
+  avatar: ...,
+  username: ...,
   nickname: ..., // optional
 };
 
@@ -4413,7 +5326,7 @@ import { connectorConfig, deleteUserProfile, DeleteUserProfileVariables } from '
 
 // The `DeleteUserProfile` mutation requires an argument of type `DeleteUserProfileVariables`:
 const deleteUserProfileVars: DeleteUserProfileVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteUserProfile()` function to execute the mutation.
@@ -4443,7 +5356,7 @@ import { connectorConfig, deleteUserProfileRef, DeleteUserProfileVariables } fro
 
 // The `DeleteUserProfile` mutation requires an argument of type `DeleteUserProfileVariables`:
 const deleteUserProfileVars: DeleteUserProfileVariables = {
-  id: ..., 
+  id: ...,
 };
 
 // Call the `deleteUserProfileRef()` function to get a reference to the mutation.
@@ -4465,5 +5378,447 @@ console.log(data.userProfile_delete);
 executeMutation(ref).then((response) => {
   const data = response.data;
   console.log(data.userProfile_delete);
+});
+```
+
+## UpsertAppBranding
+You can execute the `UpsertAppBranding` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+upsertAppBranding(vars: UpsertAppBrandingVariables): MutationPromise<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+
+interface UpsertAppBrandingRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertAppBrandingVariables): MutationRef<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+}
+export const upsertAppBrandingRef: UpsertAppBrandingRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+upsertAppBranding(dc: DataConnect, vars: UpsertAppBrandingVariables): MutationPromise<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+
+interface UpsertAppBrandingRef {
+  ...
+  (dc: DataConnect, vars: UpsertAppBrandingVariables): MutationRef<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+}
+export const upsertAppBrandingRef: UpsertAppBrandingRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the upsertAppBrandingRef:
+```typescript
+const name = upsertAppBrandingRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `UpsertAppBranding` mutation requires an argument of type `UpsertAppBrandingVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface UpsertAppBrandingVariables {
+  logoDataUrl: string;
+}
+```
+### Return Type
+Recall that executing the `UpsertAppBranding` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `UpsertAppBrandingData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface UpsertAppBrandingData {
+  appBranding_upsert: AppBranding_Key;
+}
+```
+### Using `UpsertAppBranding`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, upsertAppBranding, UpsertAppBrandingVariables } from '@dataconnect/dairysync-generated';
+
+// The `UpsertAppBranding` mutation requires an argument of type `UpsertAppBrandingVariables`:
+const upsertAppBrandingVars: UpsertAppBrandingVariables = {
+  logoDataUrl: ...,
+};
+
+// Call the `upsertAppBranding()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await upsertAppBranding(upsertAppBrandingVars);
+// Variables can be defined inline as well.
+const { data } = await upsertAppBranding({ logoDataUrl: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await upsertAppBranding(dataConnect, upsertAppBrandingVars);
+
+console.log(data.appBranding_upsert);
+
+// Or, you can use the `Promise` API.
+upsertAppBranding(upsertAppBrandingVars).then((response) => {
+  const data = response.data;
+  console.log(data.appBranding_upsert);
+});
+```
+
+### Using `UpsertAppBranding`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, upsertAppBrandingRef, UpsertAppBrandingVariables } from '@dataconnect/dairysync-generated';
+
+// The `UpsertAppBranding` mutation requires an argument of type `UpsertAppBrandingVariables`:
+const upsertAppBrandingVars: UpsertAppBrandingVariables = {
+  logoDataUrl: ...,
+};
+
+// Call the `upsertAppBrandingRef()` function to get a reference to the mutation.
+const ref = upsertAppBrandingRef(upsertAppBrandingVars);
+// Variables can be defined inline as well.
+const ref = upsertAppBrandingRef({ logoDataUrl: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = upsertAppBrandingRef(dataConnect, upsertAppBrandingVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.appBranding_upsert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.appBranding_upsert);
+});
+```
+
+## DeleteAppBranding
+You can execute the `DeleteAppBranding` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+deleteAppBranding(): MutationPromise<DeleteAppBrandingData, undefined>;
+
+interface DeleteAppBrandingRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (): MutationRef<DeleteAppBrandingData, undefined>;
+}
+export const deleteAppBrandingRef: DeleteAppBrandingRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+deleteAppBranding(dc: DataConnect): MutationPromise<DeleteAppBrandingData, undefined>;
+
+interface DeleteAppBrandingRef {
+  ...
+  (dc: DataConnect): MutationRef<DeleteAppBrandingData, undefined>;
+}
+export const deleteAppBrandingRef: DeleteAppBrandingRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the deleteAppBrandingRef:
+```typescript
+const name = deleteAppBrandingRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `DeleteAppBranding` mutation has no variables.
+### Return Type
+Recall that executing the `DeleteAppBranding` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `DeleteAppBrandingData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface DeleteAppBrandingData {
+  appBranding_delete?: AppBranding_Key | null;
+}
+```
+### Using `DeleteAppBranding`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, deleteAppBranding } from '@dataconnect/dairysync-generated';
+
+
+// Call the `deleteAppBranding()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await deleteAppBranding();
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await deleteAppBranding(dataConnect);
+
+console.log(data.appBranding_delete);
+
+// Or, you can use the `Promise` API.
+deleteAppBranding().then((response) => {
+  const data = response.data;
+  console.log(data.appBranding_delete);
+});
+```
+
+### Using `DeleteAppBranding`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, deleteAppBrandingRef } from '@dataconnect/dairysync-generated';
+
+
+// Call the `deleteAppBrandingRef()` function to get a reference to the mutation.
+const ref = deleteAppBrandingRef();
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = deleteAppBrandingRef(dataConnect);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.appBranding_delete);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.appBranding_delete);
+});
+```
+
+## UpsertWipProductionRecord
+You can execute the `UpsertWipProductionRecord` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+upsertWipProductionRecord(vars: UpsertWipProductionRecordVariables): MutationPromise<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+
+interface UpsertWipProductionRecordRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertWipProductionRecordVariables): MutationRef<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+}
+export const upsertWipProductionRecordRef: UpsertWipProductionRecordRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+upsertWipProductionRecord(dc: DataConnect, vars: UpsertWipProductionRecordVariables): MutationPromise<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+
+interface UpsertWipProductionRecordRef {
+  ...
+  (dc: DataConnect, vars: UpsertWipProductionRecordVariables): MutationRef<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+}
+export const upsertWipProductionRecordRef: UpsertWipProductionRecordRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the upsertWipProductionRecordRef:
+```typescript
+const name = upsertWipProductionRecordRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `UpsertWipProductionRecord` mutation requires an argument of type `UpsertWipProductionRecordVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface UpsertWipProductionRecordVariables {
+  id: string;
+  batchId: string;
+  pasteurizationTempC?: number | null;
+  pasteurizationTimeMinutes?: number | null;
+  coolingTempC?: number | null;
+  coolingTimeMinutes?: number | null;
+  yieldPackages: unknown[];
+  bestBeforeDate?: DateString | null;
+  remarks?: string | null;
+}
+```
+### Return Type
+Recall that executing the `UpsertWipProductionRecord` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `UpsertWipProductionRecordData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface UpsertWipProductionRecordData {
+  wipProductionRecord_upsert: WipProductionRecord_Key;
+}
+```
+### Using `UpsertWipProductionRecord`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, upsertWipProductionRecord, UpsertWipProductionRecordVariables } from '@dataconnect/dairysync-generated';
+
+// The `UpsertWipProductionRecord` mutation requires an argument of type `UpsertWipProductionRecordVariables`:
+const upsertWipProductionRecordVars: UpsertWipProductionRecordVariables = {
+  id: ...,
+  batchId: ...,
+  pasteurizationTempC: ..., // optional
+  pasteurizationTimeMinutes: ..., // optional
+  coolingTempC: ..., // optional
+  coolingTimeMinutes: ..., // optional
+  yieldPackages: ...,
+  bestBeforeDate: ..., // optional
+  remarks: ..., // optional
+};
+
+// Call the `upsertWipProductionRecord()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await upsertWipProductionRecord(upsertWipProductionRecordVars);
+// Variables can be defined inline as well.
+const { data } = await upsertWipProductionRecord({ id: ..., batchId: ..., pasteurizationTempC: ..., pasteurizationTimeMinutes: ..., coolingTempC: ..., coolingTimeMinutes: ..., yieldPackages: ..., bestBeforeDate: ..., remarks: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await upsertWipProductionRecord(dataConnect, upsertWipProductionRecordVars);
+
+console.log(data.wipProductionRecord_upsert);
+
+// Or, you can use the `Promise` API.
+upsertWipProductionRecord(upsertWipProductionRecordVars).then((response) => {
+  const data = response.data;
+  console.log(data.wipProductionRecord_upsert);
+});
+```
+
+### Using `UpsertWipProductionRecord`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, upsertWipProductionRecordRef, UpsertWipProductionRecordVariables } from '@dataconnect/dairysync-generated';
+
+// The `UpsertWipProductionRecord` mutation requires an argument of type `UpsertWipProductionRecordVariables`:
+const upsertWipProductionRecordVars: UpsertWipProductionRecordVariables = {
+  id: ...,
+  batchId: ...,
+  pasteurizationTempC: ..., // optional
+  pasteurizationTimeMinutes: ..., // optional
+  coolingTempC: ..., // optional
+  coolingTimeMinutes: ..., // optional
+  yieldPackages: ...,
+  bestBeforeDate: ..., // optional
+  remarks: ..., // optional
+};
+
+// Call the `upsertWipProductionRecordRef()` function to get a reference to the mutation.
+const ref = upsertWipProductionRecordRef(upsertWipProductionRecordVars);
+// Variables can be defined inline as well.
+const ref = upsertWipProductionRecordRef({ id: ..., batchId: ..., pasteurizationTempC: ..., pasteurizationTimeMinutes: ..., coolingTempC: ..., coolingTimeMinutes: ..., yieldPackages: ..., bestBeforeDate: ..., remarks: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = upsertWipProductionRecordRef(dataConnect, upsertWipProductionRecordVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.wipProductionRecord_upsert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.wipProductionRecord_upsert);
+});
+```
+
+## DeleteWipProductionRecord
+You can execute the `DeleteWipProductionRecord` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dairysync/index.d.ts](./index.d.ts):
+```typescript
+deleteWipProductionRecord(vars: DeleteWipProductionRecordVariables): MutationPromise<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
+
+interface DeleteWipProductionRecordRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeleteWipProductionRecordVariables): MutationRef<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
+}
+export const deleteWipProductionRecordRef: DeleteWipProductionRecordRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+deleteWipProductionRecord(dc: DataConnect, vars: DeleteWipProductionRecordVariables): MutationPromise<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
+
+interface DeleteWipProductionRecordRef {
+  ...
+  (dc: DataConnect, vars: DeleteWipProductionRecordVariables): MutationRef<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
+}
+export const deleteWipProductionRecordRef: DeleteWipProductionRecordRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the deleteWipProductionRecordRef:
+```typescript
+const name = deleteWipProductionRecordRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `DeleteWipProductionRecord` mutation requires an argument of type `DeleteWipProductionRecordVariables`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface DeleteWipProductionRecordVariables {
+  id: string;
+}
+```
+### Return Type
+Recall that executing the `DeleteWipProductionRecord` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `DeleteWipProductionRecordData`, which is defined in [dairysync/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface DeleteWipProductionRecordData {
+  wipProductionRecord_delete?: WipProductionRecord_Key | null;
+}
+```
+### Using `DeleteWipProductionRecord`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, deleteWipProductionRecord, DeleteWipProductionRecordVariables } from '@dataconnect/dairysync-generated';
+
+// The `DeleteWipProductionRecord` mutation requires an argument of type `DeleteWipProductionRecordVariables`:
+const deleteWipProductionRecordVars: DeleteWipProductionRecordVariables = {
+  id: ...,
+};
+
+// Call the `deleteWipProductionRecord()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await deleteWipProductionRecord(deleteWipProductionRecordVars);
+// Variables can be defined inline as well.
+const { data } = await deleteWipProductionRecord({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await deleteWipProductionRecord(dataConnect, deleteWipProductionRecordVars);
+
+console.log(data.wipProductionRecord_delete);
+
+// Or, you can use the `Promise` API.
+deleteWipProductionRecord(deleteWipProductionRecordVars).then((response) => {
+  const data = response.data;
+  console.log(data.wipProductionRecord_delete);
+});
+```
+
+### Using `DeleteWipProductionRecord`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, deleteWipProductionRecordRef, DeleteWipProductionRecordVariables } from '@dataconnect/dairysync-generated';
+
+// The `DeleteWipProductionRecord` mutation requires an argument of type `DeleteWipProductionRecordVariables`:
+const deleteWipProductionRecordVars: DeleteWipProductionRecordVariables = {
+  id: ...,
+};
+
+// Call the `deleteWipProductionRecordRef()` function to get a reference to the mutation.
+const ref = deleteWipProductionRecordRef(deleteWipProductionRecordVars);
+// Variables can be defined inline as well.
+const ref = deleteWipProductionRecordRef({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = deleteWipProductionRecordRef(dataConnect, deleteWipProductionRecordVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.wipProductionRecord_delete);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.wipProductionRecord_delete);
 });
 ```

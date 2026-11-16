@@ -1,5 +1,6 @@
 import React from 'react';
 import { useDairySync } from '../../context/DairySyncContext';
+import { StockRequestsPanel } from './StockRequestsPanel';
 import { 
   ShoppingCart, 
   Snowflake, 
@@ -7,8 +8,6 @@ import {
   DollarSign, 
   ArrowRight, 
   CheckCircle2, 
-  Lock, 
-  Package, 
   Store,
   CreditCard,
   Receipt,
@@ -20,7 +19,7 @@ interface SubsystemDashboardProps {
 }
 
 export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavigateTab }) => {
-  const { finishedGoods, transactions, currentUser, canAccessTab } = useDairySync();
+  const { finishedGoods, transactions, stockRequests, currentUser, canAccessTab } = useDairySync();
 
   // Calculate POS sales and metrics
   const posSalesTransactions = transactions.filter(t => t.action === 'out_sale' && t.itemType === 'finished_good');
@@ -31,6 +30,13 @@ export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
 
   const totalFinishedUnits = finishedGoods.reduce((sum, fg) => sum + fg.currentStock, 0);
   const totalRetailValuation = finishedGoods.reduce((sum, fg) => sum + (fg.currentStock * fg.unitPrice), 0);
+  const myStockRequests = stockRequests.filter(request =>
+    request.requestedByEmail.toLowerCase() === currentUser.email.toLowerCase() ||
+    request.requestedByName === currentUser.name
+  );
+  const openStockRequests = myStockRequests.filter(request =>
+    request.status === 'pending' || request.status === 'approved'
+  ).length;
   const authorizedSubsystems = [
     {
       id: 'pos',
@@ -42,6 +48,15 @@ export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
       metaClass: 'text-emerald-600 font-bold'
     },
     {
+      id: 'stock_requests',
+      label: 'Dairy Box Stock Requests',
+      title: 'Request & Track Stock',
+      meta: `${openStockRequests} open request${openStockRequests === 1 ? '' : 's'}`,
+      className: 'bg-white hover:bg-emerald-50/50 border-2 border-emerald-200 rounded-2xl',
+      labelClass: 'text-emerald-700',
+      metaClass: 'text-emerald-600 font-medium'
+    },
+    {
       id: 'finished',
       label: 'Cold Storage',
       title: 'Finished Goods Chiller',
@@ -50,7 +65,7 @@ export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
       labelClass: 'text-slate-600',
       metaClass: 'text-slate-500 font-medium'
     }
-  ].filter(card => canAccessTab(card.id));
+  ].filter(card => card.id === 'stock_requests' || canAccessTab(card.id));
 
   // Fast moving products
   const topProducts = [...finishedGoods].sort((a, b) => b.currentStock - a.currentStock).slice(0, 5);
@@ -95,10 +110,10 @@ export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>Your Authorized Subsystems</span>
           </span>
-          <span className="text-[11px] text-slate-500 font-medium">2 Active Subsystems</span>
+          <span className="text-[11px] text-slate-500 font-medium">{authorizedSubsystems.length + 1} Active Subsystems</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="p-3 bg-emerald-50/80 border-2 border-emerald-300 rounded-2xl flex flex-col justify-between">
             <span className="text-[10px] font-bold text-emerald-800 uppercase">Command Center</span>
             <span className="text-xs font-black text-emerald-950 mt-1">Retail Hub (Active)</span>
@@ -108,18 +123,24 @@ export const StoreOutletDashboard: React.FC<SubsystemDashboardProps> = ({ onNavi
           {authorizedSubsystems.map(card => (
             <button
               key={card.id}
-              onClick={() => onNavigateTab(card.id)}
+              onClick={() => card.id === 'stock_requests'
+                ? document.getElementById('dairy-box-stock-requests')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                : onNavigateTab(card.id)}
               className={`p-3 flex flex-col justify-between text-left transition-all group ${card.className}`}
             >
               <div className="flex items-center justify-between w-full">
                 <span className={`text-[10px] font-bold uppercase ${card.labelClass}`}>{card.label}</span>
-                <ArrowRight className={`w-3.5 h-3.5 ${card.id === 'pos' ? 'text-emerald-600' : 'text-slate-500'} group-hover:translate-x-0.5 transition-transform`} />
+                <ArrowRight className={`w-3.5 h-3.5 ${card.id === 'pos' || card.id === 'stock_requests' ? 'text-emerald-600' : 'text-slate-500'} group-hover:translate-x-0.5 transition-transform`} />
               </div>
               <span className="text-xs font-black text-slate-900 mt-1">{card.title}</span>
               <span className={`text-[10px] mt-1 ${card.metaClass}`}>{card.meta}</span>
             </button>
           ))}
         </div>
+      </div>
+
+      <div id="dairy-box-stock-requests" className="scroll-mt-6">
+        <StockRequestsPanel mode="request" />
       </div>
 
       {/* Retail KPIs */}

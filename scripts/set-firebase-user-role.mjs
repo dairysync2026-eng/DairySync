@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 
 const allowedRoles = new Set([
   'developer',
+  'system_admin',
   'director',
   'procurement',
   'plant_manager',

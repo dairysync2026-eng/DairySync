@@ -10,6 +10,7 @@ query ListFinishedGoods
     category
     currentStock
     unit
+    containerVolumeMl
     coldStorageCapacity
     maxThreshold
     safetyStock
@@ -30,6 +31,7 @@ mutation UpsertFinishedGood(
   $category: String!
   $currentStock: Float!
   $unit: String!
+  $containerVolumeMl: Float
   $coldStorageCapacity: Float!
   $maxThreshold: Float!
   $safetyStock: Float!
@@ -48,6 +50,7 @@ mutation UpsertFinishedGood(
     category: $category
     currentStock: $currentStock
     unit: $unit
+    containerVolumeMl: $containerVolumeMl
     coldStorageCapacity: $coldStorageCapacity
     maxThreshold: $maxThreshold
     safetyStock: $safetyStock
@@ -313,7 +316,7 @@ mutation DeleteIsoRating($id: String!)
 }
 
 query ListAuditLogEntries
-  @auth(expr: "auth != null && auth.token.role in ['developer', 'director']")
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'system_admin', 'director']")
   @refresh(onMutationExecuted: { operation: "UpsertAuditLogEntry" })
   @refresh(onMutationExecuted: { operation: "DeleteAuditLogEntry" }) {
   auditLogEntries(orderBy: [{ timestamp: DESC }]) {
@@ -345,7 +348,7 @@ mutation UpsertAuditLogEntry(
   $userTitle: String!
   $terminalOrStation: String
   $severity: String!
-) @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'system_admin', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
   auditLogEntry_upsert(data: {
     id: $id
     timestamp: $timestamp
@@ -369,7 +372,7 @@ mutation DeleteAuditLogEntry($id: String!)
 }
 
 query ListUserProfiles
-  @auth(expr: "auth != null && auth.token.role in ['developer', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'system_admin', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
   @refresh(onMutationExecuted: { operation: "UpsertUserProfile" })
   @refresh(onMutationExecuted: { operation: "UpdateOwnUserProfile" })
   @refresh(onMutationExecuted: { operation: "DeleteUserProfile" }) {
@@ -396,7 +399,7 @@ mutation UpsertUserProfile(
   $email: String!
   $username: String!
   $nickname: String
-) @auth(expr: "auth != null && auth.token.role == 'developer'") {
+) @auth(expr: "auth != null && (auth.token.role == 'developer' || (auth.token.role == 'system_admin' && vars.role in ['director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']))") {
   userProfile_upsert(data: {
     id: $id
     name: $name
@@ -420,7 +423,7 @@ mutation UpdateOwnUserProfile(
   $avatar: String!
   $username: String!
   $nickname: String
-) @auth(expr: "auth != null && auth.token.role in ['director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
+) @auth(expr: "auth != null && auth.token.role in ['system_admin', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']") {
   userProfile_updateMany(
     where: {
       id: { eq: $id }
@@ -442,4 +445,28 @@ mutation UpdateOwnUserProfile(
 mutation DeleteUserProfile($id: String!)
   @auth(expr: "auth != null && auth.token.role == 'developer'") {
   userProfile_delete(id: $id)
+}
+
+query GetAppBranding
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'system_admin', 'director', 'procurement', 'plant_manager', 'production_staff', 'store_outlet']")
+  @refresh(onMutationExecuted: { operation: "UpsertAppBranding" })
+  @refresh(onMutationExecuted: { operation: "DeleteAppBranding" }) {
+  appBrandings(where: { id: { eq: "shared" } }, limit: 1) {
+    logoDataUrl
+  }
+}
+
+mutation UpsertAppBranding($logoDataUrl: String!)
+  @auth(expr: "auth != null && auth.token.role == 'system_admin'") {
+  appBranding_upsert(data: {
+    id: "shared"
+    logoDataUrl: $logoDataUrl
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation DeleteAppBranding
+  @auth(expr: "auth != null && auth.token.role == 'system_admin'") {
+  appBranding_delete(id: "shared")
 }

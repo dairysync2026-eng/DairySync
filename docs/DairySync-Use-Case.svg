@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2140" height="1660" viewBox="0 0 2140 1660" role="img" aria-labelledby="title description">
+  <title id="title">DairySync Use Case Diagram — Current Application Access</title>
+  <desc id="description">UML use case diagram based on DairySync role-gated application modules and implemented account administration. The application's seventh role is Store Outlet, not Marketing Specialist.</desc>
+  <defs>
+    <style>
+      text { font-family: "Segoe UI", Arial, sans-serif; fill: #183044; }
+      .title { font-size: 30px; font-weight: 700; }
+      .subtitle { font-size: 15px; fill: #526879; }
+      .boundary { fill: #fff; stroke: #52748b; stroke-width: 2; }
+      .boundary-title { font-size: 20px; font-weight: 700; }
+      .package { fill: #f3f8fb; stroke: #bed0dc; stroke-width: 1.5; }
+      .package-title { font-size: 17px; font-weight: 700; fill: #36586e; }
+      .oval { fill: #eaf4fb; stroke: #39799c; stroke-width: 1.7; }
+      .oval-text { font-size: 14px; text-anchor: middle; }
+      .actor-line { stroke: #274c63; stroke-width: 2.2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+      .actor-text { font-size: 13px; font-weight: 600; text-anchor: middle; }
+      .association { fill: none; stroke: #778b98; stroke-width: 1.15; opacity: .72; }
+      .generalization { fill: none; stroke: #52748b; stroke-width: 1.5; }
+      .note { fill: #fff8df; stroke: #d3b75b; stroke-width: 1.5; }
+      .note-text { font-size: 13px; }
+      .hint { font-size: 12px; fill: #526879; }
+    </style>
+    <marker id="inheritance" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L11,6 L1,11 Z" fill="#fff" stroke="#52748b" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <rect width="2140" height="1660" fill="#f6f9fb"/>
+  <text class="title" x="48" y="52">DairySync Use Case Diagram</text>
+  <text class="subtitle" x="48" y="80">Current application role access · based on role-gated tabs and implemented functionality</text>
+  <rect class="boundary" x="400" y="105" width="1700" height="1485" rx="8"/>
+  <text class="boundary-title" x="430" y="142">DairySync Application</text>
+
+  <rect class="package" x="430" y="165" width="390" height="390" rx="5"/>
+  <text class="package-title" x="450" y="193">Common functions</text>
+  <rect class="package" x="840" y="165" width="420" height="690" rx="5"/>
+  <text class="package-title" x="860" y="193">Administration</text>
+  <rect class="package" x="1280" y="165" width="790" height="1385" rx="5"/>
+  <text class="package-title" x="1300" y="193">Role-gated business modules</text>
+
+  <!-- Associations are drawn behind actors and use cases. -->
+  <g class="association">
+    <!-- Common use cases inherited by every role -->
+    <path d="M275 160 C400 160 440 250 565 250"/>
+    <path d="M275 160 C410 160 440 350 565 350"/>
+    <path d="M275 160 C420 160 440 450 565 450"/>
+    <path d="M275 245 C420 245 445 510 565 510"/>
+
+    <!-- System administration actions -->
+    <path d="M185 455 C400 455 430 280 910 280"/>
+    <path d="M185 455 C400 455 430 370 910 370"/>
+    <path d="M185 455 C400 455 430 460 910 460"/>
+    <path d="M185 455 C400 455 430 550 910 550"/>
+    <path d="M185 455 C400 455 430 640 910 640"/>
+    <!-- Developer-only administration -->
+    <path d="M185 285 C400 285 430 730 910 730"/>
+    <path d="M185 285 C400 285 430 790 910 790"/>
+    <path d="M185 285 C400 285 430 835 910 835"/>
+
+    <!-- Developer has access to every business-module use case. -->
+    <path d="M185 285 L1480 270"/>
+    <path d="M185 285 L1480 360"/>
+    <path d="M185 285 L1480 450"/>
+    <path d="M185 285 L1480 540"/>
+    <path d="M185 285 L1480 630"/>
+    <path d="M185 285 L1480 720"/>
+    <path d="M185 285 L1480 810"/>
+    <path d="M185 285 L1480 900"/>
+    <path d="M185 285 L1480 990"/>
+    <path d="M185 285 L1480 1080"/>
+    <path d="M185 285 L1480 1170"/>
+    <path d="M185 285 L1480 1260"/>
+    <!-- Director: read-only access in several modules and sales-history-only POS. -->
+    <path d="M185 625 L1480 270"/>
+    <path d="M185 625 L1480 360"/>
+    <path d="M185 625 L1480 450"/>
+    <path d="M185 625 L1480 630"/>
+    <path d="M185 625 L1480 720"/>
+    <path d="M185 625 L1480 810"/>
+    <path d="M185 625 L1480 900"/>
+    <path d="M185 625 L1480 1080"/>
+    <path d="M185 625 L895 460"/>
+    <path d="M185 625 L895 730"/>
+    <!-- Procurement -->
+    <path d="M185 795 L1480 270"/>
+    <path d="M185 795 L1480 360"/>
+    <path d="M185 795 L1480 900"/>
+    <!-- Production Staff -->
+    <path d="M185 965 L1480 270"/>
+    <path d="M185 965 L1480 450"/>
+    <!-- Plant Manager -->
+    <path d="M185 1135 L1480 270"/>
+    <path d="M185 1135 L1480 360"/>
+    <path d="M185 1135 L1480 450"/>
+    <path d="M185 1135 L1480 540"/>
+    <path d="M185 1135 L1480 630"/>
+    <path d="M185 1135 L1480 720"/>
+    <path d="M185 1135 L1480 810"/>
+    <path d="M185 1135 L1480 900"/>
+    <path d="M185 1135 L1480 1080"/>
+    <path d="M185 1135 L1480 1260"/>
+    <path d="M185 1135 L895 460"/>
+    <!-- Store Outlet -->
+    <path d="M185 1310 L1480 630"/>
+    <path d="M185 1310 L1480 990"/>
+    <path d="M185 1310 L1480 1170"/>
+  </g>
+
+  <!-- Abstract actors and seven actual application roles -->
+  <g class="actor-line">
+    <circle cx="250" cy="112" r="11"/><path d="M250 123 L250 150 M235 133 L265 133 M250 150 L237 168 M250 150 L263 168"/>
+    <circle cx="250" cy="198" r="11"/><path d="M250 209 L250 236 M235 219 L265 219 M250 236 L237 254 M250 236 L263 254"/>
+    <circle cx="155" cy="265" r="10"/><path d="M155 275 L155 300 M141 285 L169 285 M155 300 L143 317 M155 300 L167 317"/>
+    <circle cx="155" cy="435" r="10"/><path d="M155 445 L155 470 M141 455 L169 455 M155 470 L143 487 M155 470 L167 487"/>
+    <circle cx="155" cy="605" r="10"/><path d="M155 615 L155 640 M141 625 L169 625 M155 640 L143 657 M155 640 L167 657"/>
+    <circle cx="155" cy="775" r="10"/><path d="M155 785 L155 810 M141 795 L169 795 M155 810 L143 827 M155 810 L167 827"/>
+    <circle cx="155" cy="945" r="10"/><path d="M155 955 L155 980 M141 965 L169 965 M155 980 L143 997 M155 980 L167 997"/>
+    <circle cx="155" cy="1115" r="10"/><path d="M155 1125 L155 1150 M141 1135 L169 1135 M155 1150 L143 1167 M155 1150 L167 1167"/>
+    <circle cx="155" cy="1290" r="10"/><path d="M155 1300 L155 1325 M141 1310 L169 1310 M155 1325 L143 1342 M155 1325 L167 1342"/>
+    <circle cx="155" cy="1460" r="10"/><path d="M155 1470 L155 1495 M141 1480 L169 1480 M155 1495 L143 1512 M155 1495 L167 1512"/>
+  </g>
+  <text class="actor-text" x="250" y="184">Authenticated User</text>
+  <text class="hint" x="250" y="194" text-anchor="middle">(abstract)</text>
+  <text class="actor-text" x="250" y="270">Operational User</text>
+  <text class="hint" x="250" y="280" text-anchor="middle">(abstract)</text>
+  <text class="actor-text" x="155" y="339">Developer</text>
+  <text class="actor-text" x="155" y="509">System Administrator</text>
+  <text class="actor-text" x="155" y="679">Director / PMO Supervisor</text>
+  <text class="actor-text" x="155" y="849">Administrative Assistant IV</text><text class="actor-text" x="155" y="866">(Procurement)</text>
+  <text class="actor-text" x="155" y="1019">Production Staff</text>
+  <text class="actor-text" x="155" y="1189">Internal Custodian</text><text class="actor-text" x="155" y="1206">(Plant Manager)</text>
+  <text class="actor-text" x="155" y="1361">Store Outlet / Dairy Box</text>
+
+  <!-- Generalization arrows -->
+  <g class="generalization">
+    <path d="M250 198 L250 170" marker-end="url(#inheritance)"/>
+    <path d="M185 265 C210 265 220 245 235 238" marker-end="url(#inheritance)"/>
+    <path d="M185 435 C215 435 220 255 238 251" marker-end="url(#inheritance)"/>
+    <path d="M185 605 C220 605 224 260 240 251" marker-end="url(#inheritance)"/>
+    <path d="M185 775 C225 775 228 260 242 251" marker-end="url(#inheritance)"/>
+    <path d="M185 945 C230 945 232 260 244 251" marker-end="url(#inheritance)"/>
+    <path d="M185 1115 C235 1115 236 260 246 251" marker-end="url(#inheritance)"/>
+    <path d="M185 1290 C240 1290 240 260 248 251" marker-end="url(#inheritance)"/>
+    <path d="M185 1460 C245 1460 244 260 250 251" marker-end="url(#inheritance)"/>
+    <path d="M155 327 C85 327 85 460 155 460" marker-end="url(#inheritance)"/>
+  </g>
+
+  <!-- Common use cases -->
+  <g>
+    <ellipse class="oval" cx="670" cy="250" rx="105" ry="27"/><text class="oval-text" x="670" y="255">Sign in / log out</text>
+    <ellipse class="oval" cx="670" cy="350" rx="105" ry="27"/><text class="oval-text" x="670" y="355">View role dashboard</text>
+    <ellipse class="oval" cx="670" cy="450" rx="105" ry="27"/><text class="oval-text" x="670" y="455">Update own profile</text>
+    <ellipse class="oval" cx="670" cy="510" rx="105" ry="27"/><text class="oval-text" x="670" y="515">View and manage alerts</text>
+  </g>
+
+  <!-- Administration use cases -->
+  <g>
+    <ellipse class="oval" cx="1050" cy="280" rx="155" ry="30"/><text class="oval-text" x="1050" y="276"><tspan x="1050">Manage operational accounts</tspan><tspan x="1050" dy="17">(create, edit, disable, reset)</tspan></text>
+    <ellipse class="oval" cx="1050" cy="370" rx="155" ry="30"/><text class="oval-text" x="1050" y="366"><tspan x="1050">Assign operational</tspan><tspan x="1050" dy="17">user roles</tspan></text>
+    <ellipse class="oval" cx="1050" cy="460" rx="155" ry="30"/><text class="oval-text" x="1050" y="466">Review audit trail</text>
+    <ellipse class="oval" cx="1050" cy="550" rx="155" ry="30"/><text class="oval-text" x="1050" y="556">Read System Manual</text>
+    <ellipse class="oval" cx="1050" cy="640" rx="155" ry="30"/><text class="oval-text" x="1050" y="636"><tspan x="1050">View network and</tspan><tspan x="1050" dy="17">cloud-sync status</tspan></text>
+    <ellipse class="oval" cx="1050" cy="730" rx="155" ry="30"/><text class="oval-text" x="1050" y="736">Manage audit records</text>
+    <ellipse class="oval" cx="1050" cy="790" rx="155" ry="25"/><text class="oval-text" x="1050" y="795">Manage privileged roles</text>
+    <ellipse class="oval" cx="1050" cy="835" rx="155" ry="20"/><text class="oval-text" x="1050" y="840">Switch developer role view</text>
+  </g>
+
+  <!-- Business-module use cases -->
+  <g>
+    <ellipse class="oval" cx="1660" cy="270" rx="180" ry="26"/><text class="oval-text" x="1660" y="275">Access Raw Ingredients</text>
+    <ellipse class="oval" cx="1660" cy="360" rx="180" ry="26"/><text class="oval-text" x="1660" y="365">Access PMO Inventory</text>
+    <ellipse class="oval" cx="1660" cy="450" rx="180" ry="26"/><text class="oval-text" x="1660" y="455">Access WIP Batches</text>
+    <ellipse class="oval" cx="1660" cy="540" rx="180" ry="26"/><text class="oval-text" x="1660" y="545">Access WIP Inventory</text>
+    <ellipse class="oval" cx="1660" cy="630" rx="180" ry="26"/><text class="oval-text" x="1660" y="635">Access Cold Storage</text>
+    <ellipse class="oval" cx="1660" cy="720" rx="180" ry="26"/><text class="oval-text" x="1660" y="725">Access Product Recipes</text>
+    <ellipse class="oval" cx="1660" cy="810" rx="180" ry="26"/><text class="oval-text" x="1660" y="815">Access Supply &amp; Demand</text>
+    <ellipse class="oval" cx="1660" cy="900" rx="180" ry="26"/><text class="oval-text" x="1660" y="905">Access ROP Procurement</text>
+    <ellipse class="oval" cx="1660" cy="990" rx="180" ry="26"/><text class="oval-text" x="1660" y="995">Use Dairy Box POS</text>
+    <ellipse class="oval" cx="1660" cy="1080" rx="180" ry="26"/><text class="oval-text" x="1660" y="1085">Review Dairy Box sales history</text>
+    <ellipse class="oval" cx="1660" cy="1170" rx="180" ry="26"/><text class="oval-text" x="1660" y="1166"><tspan x="1660">Submit / cancel</tspan><tspan x="1660" dy="17">stock requests</tspan></text>
+    <ellipse class="oval" cx="1660" cy="1260" rx="180" ry="26"/><text class="oval-text" x="1660" y="1256"><tspan x="1660">Review / fulfill</tspan><tspan x="1660" dy="17">stock requests</tspan></text>
+  </g>
+
+  <rect class="note" x="1295" y="1320" width="745" height="200" rx="5"/>
+  <text class="note-text" x="1315" y="1348" font-weight="700">Interpretation and current-system limits</text>
+  <text class="note-text" x="1315" y="1376">• Developer inherits System Administrator use cases and can access every app module.</text>
+  <text class="note-text" x="1315" y="1402">• Admin role assignment is limited to operational roles; audit access is read-only.</text>
+  <text class="note-text" x="1315" y="1428">• Director is read-only in Raw Ingredients, PMO, WIP, and Cold Storage; POS is history-only.</text>
+  <text class="note-text" x="1315" y="1454">• Plant Manager POS and System Administrator Audit Trail access are read-only.</text>
+  <text class="note-text" x="1315" y="1480">• The app has Store Outlet, not Marketing Specialist; no server-log or repair feature is shown.</text>
+  <text class="hint" x="430" y="1625">Abstract actors group shared functions; role inheritance does not add an extra user role.</text>
+</svg>

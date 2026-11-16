@@ -6,14 +6,13 @@ import { Dashboard } from './components/Dashboard';
 import { RawIngredients } from './components/RawIngredients';
 import { PmoInventory } from './components/PmoInventory';
 import { WipProduction } from './components/WipProduction';
+import { WipInventory } from './components/WipInventory';
 import { FinishedGoods } from './components/FinishedGoods';
 import { ProductRecipes } from './components/ProductRecipes';
 import { SupplyDemandSync } from './components/SupplyDemandSync';
 import { Procurement } from './components/Procurement';
 import { DairyBoxPos } from './components/DairyBoxPos';
 import { AuditTrail } from './components/AuditTrail';
-import { IsoEvaluationModal } from './components/IsoEvaluationModal';
-import { ReportsModal } from './components/ReportsModal';
 import { LoginPage } from './components/LoginPage';
 import { AccessRestricted } from './components/AccessRestricted';
 import { ScrollableTabBar } from './components/ScrollableTabBar';
@@ -22,26 +21,24 @@ import {
   Package, 
   Archive,
   Layers, 
+  ClipboardCheck,
   Snowflake, 
   ClipboardList,
   TrendingUp, 
   Truck, 
   ShoppingCart,
-  Award,
   Lock,
   ShieldCheck,
-  BookOpen
+  BookOpen,
+  UserCog
 } from 'lucide-react';
 import { SystemDocumentation } from './components/SystemDocumentation.tsx';
+import { SystemAdministration } from './components/SystemAdministration';
 
 const MainLayout: React.FC = () => {
   const { isAuthenticated, isAuthReady, canAccessTab, currentRole } = useDairySync();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   
-  // Modal states
-  const [showIsoSurvey, setShowIsoSurvey] = useState(false);
-  const [showReports, setShowReports] = useState(false);
-
   // Auto-redirect if current tab becomes unauthorized on role switch
   useEffect(() => {
     if (!canAccessTab(activeTab)) {
@@ -59,16 +56,18 @@ const MainLayout: React.FC = () => {
 
   const tabs = [
     { id: 'dashboard', label: 'Command Center', icon: LayoutDashboard },
-    { id: 'ingredients', label: 'Raw Ingredients', icon: Package },
+    { id: 'ingredients', label: currentRole === 'plant_manager' ? 'Raw Materials' : 'Raw Ingredients', icon: Package },
     { id: 'pmo_inventory', label: 'PMO Inventory', icon: Archive },
     { id: 'wip', label: 'WIP Batches', icon: Layers },
-    { id: 'finished', label: 'Cold Storage', icon: Snowflake },
+    { id: 'wip_inventory', label: 'WIP Inventory', icon: ClipboardCheck },
+    { id: 'finished', label: currentRole === 'plant_manager' ? 'Finished Goods' : 'Cold Storage', icon: Snowflake },
     { id: 'recipes', label: 'Product Recipes', icon: ClipboardList },
-    { id: 'sync', label: 'Supply & Demand', icon: TrendingUp },
+    { id: 'sync', label: 'Supply and demand', icon: TrendingUp },
     { id: 'procurement', label: 'ROP Procurement', icon: Truck },
     { id: 'pos', label: currentRole === 'plant_manager' ? 'Sales History' : 'Dairy Box POS', icon: ShoppingCart },
     { id: 'audit', label: 'Audit Trail', icon: ShieldCheck },
-    { id: 'documentation', label: 'System Manual', icon: BookOpen }
+    { id: 'documentation', label: 'User Manual', icon: BookOpen },
+    { id: 'administration', label: 'System Administration', icon: UserCog }
   ];
 
   return (
@@ -76,9 +75,7 @@ const MainLayout: React.FC = () => {
         
         {/* Top Navbar */}
         <div className="print:hidden">
-          <Header 
-            onOpenReports={() => setShowReports(true)}
-          />
+          <Header />
         </div>
 
         {/* Primary Container */}
@@ -109,8 +106,6 @@ const MainLayout: React.FC = () => {
                 {activeTab === 'dashboard' && (
                   <Dashboard 
                     onNavigateTab={setActiveTab}
-                    onOpenIsoSurvey={() => setShowIsoSurvey(true)}
-                    onOpenReports={() => setShowReports(true)}
                   />
                 )}
 
@@ -119,6 +114,8 @@ const MainLayout: React.FC = () => {
                 {activeTab === 'pmo_inventory' && <PmoInventory />}
 
                 {activeTab === 'wip' && <WipProduction />}
+
+                {activeTab === 'wip_inventory' && <WipInventory />}
 
                 {activeTab === 'finished' && <FinishedGoods onNavigateTab={setActiveTab} />}
 
@@ -137,6 +134,8 @@ const MainLayout: React.FC = () => {
                 {activeTab === 'audit' && <AuditTrail />}
 
                 {activeTab === 'documentation' && <SystemDocumentation />}
+
+                {activeTab === 'administration' && <SystemAdministration />}
               </>
             )}
           </div>
@@ -157,19 +156,10 @@ const MainLayout: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-4 text-[11px]">
-              <button onClick={() => setShowIsoSurvey(true)} className="hover:text-indigo-600 font-semibold flex items-center space-x-1 transition-colors">
-                <Award className="w-3.5 h-3.5 text-indigo-500" />
-                <span>ISO 25010 Evaluation</span>
-              </button>
-              <span>•</span>
               <span className="text-slate-400 font-mono">Build v2026.8.9</span>
             </div>
           </div>
         </footer>
-
-        {/* Active Modals */}
-        {showIsoSurvey && <IsoEvaluationModal onClose={() => setShowIsoSurvey(false)} />}
-        {showReports && <ReportsModal onClose={() => setShowReports(false)} />}
 
       </div>
   );

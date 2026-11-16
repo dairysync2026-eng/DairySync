@@ -36,6 +36,7 @@ Authentication uses Firebase Authentication Email/Password with a trusted Fireba
 | Role | Authorized areas |
 |---|---|
 | Developer / Super Administrator | All dashboards, inventory, PMO Inventory, WIP, product recipes, cold storage, supply-demand, procurement, POS, audit, user administration, reset, and system tools |
+| System Administrator | Dashboard, account administration, shared app branding, read-only audit trail, and system manual; no inventory or production data |
 | Director / PMO Supervisor | Oversight and reporting; Raw Ingredients, PMO Inventory, WIP, and Cold Storage are read-only; Product Recipes can be managed; POS shows Sales History only |
 | Administrative Assistant IV / Procurement | Dashboard, ROP Procurement, Raw Ingredients, PMO Inventory |
 | Internal Custodian / Plant Manager | Dashboard, Cold Storage, WIP, Raw Ingredients, PMO Inventory, Procurement |
@@ -48,14 +49,17 @@ Authentication uses Firebase Authentication Email/Password with a trusted Fireba
 - User role is read from a Firebase ID token custom claim; client-selected roles do not grant access.
 - Password reset email through Firebase Authentication.
 - Auth state restoration through Firebase's persisted session listener.
-- Role claims provisioned by a trusted Firebase Admin SDK script; public account creation is not offered.
+- System Administrators create, update, disable/reactivate, and send password-reset emails for operational staff accounts through role-checked Firebase Functions using the Admin SDK.
+- System Administrators can replace or restore the shared DairySync logo. The image is resized before it is stored in Data Connect and appears in the application header and browser tab; installed home-screen icons are not changed by this setting.
+- Only the Lead Developer can grant Developer or System Administrator roles; use the existing Lead Developer account to create the first System Administrator after deploying Functions.
+- New accounts receive a random temporary password on the server and an email to set their own password; passwords are never displayed or stored by the client.
 - Login handshake animation with success and error states.
 - Logout.
 - Firebase session restoration on app startup; sign-in is required when no valid session exists.
 - Developer session switching between role accounts.
 - Return to the developer account.
 - Role-based tab access enforcement.
-- Audit Trail access limited to Developer and Director / PMO; System Manual access limited to Developer.
+- Audit Trail is read-only for System Administrators; Developer and Director / PMO retain their existing audit controls. System Manual access is available to Developer and System Administrator.
 - Audit search by user ID and action type, with quick ranges and exact timestamp bounds.
 - Automatic return to the dashboard when a selected tab becomes unauthorized.
 - Profile display metadata editing; Firebase credentials are not stored or displayed in the client.
@@ -63,7 +67,7 @@ Authentication uses Firebase Authentication Email/Password with a trusted Fireba
 
 ### Security behavior
 
-The interface hides unauthorized tabs and displays an access-restricted view when a role attempts to reach a protected subsystem. Audit entries record security-related operations, profile updates, cloud sync activity, and reset actions.
+The interface hides unauthorized tabs and displays an access-restricted view when a role attempts to reach a protected subsystem. System Administrators cannot read business inventory collections or grant elevated roles. Firebase Functions validate administrator claims, prevent self-lockout and removal of the last active administrator, and write administrative events to Firebase Cloud Logging. Role changes revoke refresh tokens, but an already-issued ID token can remain valid until its expiry (up to one hour); affected users should sign in again. Disabling an account blocks future sign-ins and refreshes, but an already-issued ID token can also remain valid until expiry. Audit entries also record security-related operations, profile updates, cloud sync activity, and reset actions.
 
 ---
 
@@ -96,7 +100,7 @@ The main layout provides:
 8. ROP Procurement
 9. Dairy Box POS
 10. Audit Trail
-11. System Manual (Developer only)
+11. System Manual (Developer and System Administrator)
 
 ---
 
@@ -147,6 +151,7 @@ Provides plant custody and cold-chain oversight, including:
 - Ingredient availability.
 - WIP batches.
 - Facility and inventory navigation.
+- Review Dairy Box requests, approve or reject them, and allocate available finished goods when fulfilling approved requests.
 
 ### Production Staff Dashboard
 
@@ -168,6 +173,7 @@ Provides Dairy Box retail operations, including:
 - School feeding reserve visibility.
 - Finished-goods valuation.
 - Navigation to POS and Cold Storage.
+- Submit finished-goods replenishment requests, track status, and cancel pending requests.
 
 ---
 
@@ -218,15 +224,15 @@ When stock reaches or falls below the reorder point, the system creates a reorde
 
 ## 5.1 PMO Inventory and Stock Reconciliation
 
-The PMO Inventory register records period-based physical counts against the shared Raw Ingredients ledger. For linked items in a new live-ledger period, purchases, WIP production issues/restores, losses, returns, and stock adjustments are derived from shared stock transactions rather than entered a second time. Opening balances are calculated from current shared stock and period movements, and update as cloud transactions arrive while the period remains a draft. Imported legacy reports retain their entered movement quantities.
+The PMO Inventory register records period-based physical counts against either the shared Raw Ingredients or Finished Goods ledger. For linked items in a new live-ledger period, purchases, production, WIP issues/restores, sales, losses, returns, and stock adjustments are derived from shared stock transactions rather than entered a second time. Finished Goods periods use the daily sales-area columns: Product, Beginning Inv (previous day ending), IN, Sales (Cash and Credit), Product Promo, Total Released (sales + promo), Ending Inventory, numeric Remarks deduction, and a separate descriptive Note. Expected ending is Beginning + IN − Cash − Credit − Product Promo − Remarks deduction. Cash, credit, and promo quantities are entered separately; Total Released is calculated from those values, or falls back to recorded finished-good stock-out transactions until a breakdown is entered. Opening balances are calculated from current shared stock and period movements, and update as cloud transactions arrive while the period remains a draft. Imported legacy reports retain their entered movement quantities and default to Raw Ingredients.
 
-- Create a draft period and add existing Raw Ingredients items.
+- Choose Raw Ingredients or Finished Goods, create a draft period, and add existing inventory items.
 - Record losses or returns with their type; each movement updates shared stock and creates a transaction used by the expected balance.
 - Record an outside purchase for an item not yet in Raw Ingredients. The workflow creates the shared ingredient entry, records the purchase stock transaction, and adds the item to the period.
 - Review each expected closing balance against its physical ending count.
-- Post a period once. Posting applies the difference between expected close and physical count to the current shared Raw Ingredients balance, records that reconciliation as a stock transaction, and adds an audit entry. Posted periods are locked to prevent duplicate posting.
+- Post a period once. Posting applies the difference between expected close and physical count to the current shared inventory balance, records that reconciliation as a stock transaction, and adds an audit entry. Posted periods are locked to prevent duplicate posting.
 - Developers can delete a period; this removes only the period report. Shared stock movements and posted reconciliations remain in the inventory ledger and are not reversed. Deletions are recorded in the audit trail.
-- WIP, Procurement, Raw Ingredients, and reports continue to use the shared ingredient records. The Director can view PMO periods but cannot edit or post them; Developers, Plant Managers, and Procurement users can manage periods.
+- WIP, Procurement, Raw Ingredients, Cold Storage, POS, and reports continue to use the shared inventory records. Finished-good production, sales, and physical counts therefore reconcile to the same Cold Storage stock. The Director can view PMO periods but cannot edit or post them; Developers, Plant Managers, and Procurement users can manage periods.
 
 ---
 
@@ -543,13 +549,17 @@ Collection persistence is not the same as a business transaction. POS sales, WIP
 ### Deployment commands
 
 ```powershell
+npm install --prefix functions
 npm run lint
 npm run build
-firebase.cmd deploy --only hosting --project dairysync-pcc-94978
+npm run functions:build
+firebase.cmd deploy --only dataconnect,functions,hosting --project dairysync-pcc-94978
 git add .
 git commit -m "Describe the update"
 git push origin main
 ```
+
+Cloud Functions deployment requires an eligible Firebase billing plan and permission to deploy Functions. After deployment, the existing Lead Developer signs in and creates the first System Administrator in **System Administration**. Enable Firebase Authentication Email/Password sign-in and configure the project's password-reset email template before inviting users. Local Functions testing can be enabled with `VITE_USE_FIREBASE_FUNCTIONS_EMULATOR=true` alongside the Auth emulator.
 
 ### Environment configuration
 

@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { useDairySync } from '../context/DairySyncContext';
 import { WipStep, WipBatch } from '../types';
 import { HistoricalBatchesTable } from './HistoricalBatchesTable';
+import {
+  convertInventoryQuantityToRecipe,
+  convertRecipeQuantityToInventory,
+  convertUnitQuantity,
+} from '../utils/unitConversions';
+import { isRawMaterialCategory } from '../utils/ingredientCategories';
 import { 
   Layers, 
   Plus, 
@@ -39,6 +45,12 @@ export const WipProduction: React.FC = () => {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string>(finishedGoods[0]?.id || '');
+  const [ingredientSelections, setIngredientSelections] = useState<Record<string, string>>(() =>
+    Object.fromEntries((finishedGoods[0]?.recipe || []).map(item => [
+      item.ingredientId,
+      item.optional ? '' : item.ingredientId,
+    ]))
+  );
   const [targetQtyStr, setTargetQtyStr] = useState<string>('300');
   const [assignedStaff, setAssignedStaff] = useState<string>(currentUser.name);
   const [batchNotes, setBatchNotes] = useState<string>('');
@@ -59,35 +71,93 @@ export const WipProduction: React.FC = () => {
 
   const handleProductSelect = (prodId: string) => {
     setSelectedProductId(prodId);
+    const product = finishedGoods.find(item => item.id === prodId);
+    setIngredientSelections(Object.fromEntries((product?.recipe || []).map(item => [
+      item.ingredientId,
+      item.optional ? '' : item.ingredientId,
+    ])));
   };
 
   const targetQty = Math.max(1, parseFloat(targetQtyStr) || 1);
   const recipeScale = targetQty / baseBatch;
 
   // Calculate BOM requirements dynamically
+  const remainingByIngredient = new Map(ingredients.map(ingredient => [ingredient.id, ingredient.currentStock]));
   const computedBom = selectedProduct ? selectedProduct.recipe.map(r => {
-    const ing = ingredients.find(i => i.id === r.ingredientId);
-    const needed = r.quantityRequired * recipeScale;
-    const available = ing ? ing.currentStock : 0;
-    const isSufficient = available >= needed;
+    const selectedIngredientId = Object.prototype.hasOwnProperty.call(ingredientSelections, r.ingredientId)
+      ? ingredientSelections[r.ingredientId]
+      : r.optional ? '' : r.ingredientId;
+    const selectedSubstitute = r.substitutes?.find(item => item.ingredientId === selectedIngredientId);
+    const ing = selectedIngredientId
+      ? ingredients.find(i => i.id === selectedIngredientId)
+      : undefined;
+    const conversionRatio = selectedSubstitute
+      ? selectedSubstitute.recipeUnitsPerInventoryUnit
+      : r.recipeUnitsPerInventoryUnit;
+    const needed = (r.quantityRequiredMax ?? r.quantityRequired) * recipeScale;
+    const inventoryNeeded = ing
+      ? convertRecipeQuantityToInventory(needed, ing.unit, r.unit, conversionRatio)
+      : null;
+    const remainingStock = ing ? remainingByIngredient.get(ing.id) ?? ing.currentStock : 0;
+    const available = ing
+      ? convertInventoryQuantityToRecipe(
+          remainingStock,
+          ing.unit,
+          r.unit,
+          conversionRatio
+        )
+      : null;
+    const skipped = !selectedIngredientId && Boolean(r.optional);
+    const isSufficient = skipped || (
+      inventoryNeeded !== null && ing !== undefined && remainingStock >= inventoryNeeded
+    );
+    if (ing && inventoryNeeded !== null) {
+      remainingByIngredient.set(ing.id, Math.max(0, remainingStock - inventoryNeeded));
+    }
     return {
       ...r,
+      unit: r.unit,
+      selectedIngredientId,
+      selectedIngredient: ing,
+      selectedIngredientName: ing?.name || selectedSubstitute?.ingredientName || r.ingredientName,
+      selectedSubstitute,
+      skipped,
       needed,
+      inventoryNeeded,
       available,
+      unitsCompatible: inventoryNeeded !== null,
       isSufficient
     };
   }) : [];
 
-  const rawMilkRequirement = computedBom
+  const rawMilkRequirements = computedBom
     .filter(requirement => {
-      const ingredient = ingredients.find(item => item.id === requirement.ingredientId);
-      return ingredient?.category === 'milk' && ingredient.unit === 'L';
+      return requirement.selectedIngredient?.category === 'milk' &&
+        !requirement.skipped &&
+        convertUnitQuantity(1, requirement.unit, 'L') !== null;
     })
-    .reduce((total, requirement) => total + requirement.needed, 0);
+    .map(requirement => convertUnitQuantity(requirement.needed, requirement.unit, 'L') ?? 0);
+  const rawMilkRequirement = rawMilkRequirements.reduce((total, quantity) => total + quantity, 0);
+  const hasSelectedIngredient = computedBom.some(requirement => Boolean(requirement.selectedIngredient));
+  const hasBlockingShortage = computedBom.some(requirement => !requirement.isSufficient);
+  const canStartBatch = Boolean(
+    selectedProduct &&
+    selectedProduct.recipe.length > 0 &&
+    hasSelectedIngredient &&
+    !hasBlockingShortage
+  );
 
   const handleCreateBatch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProduct) return;
+    const requestedQuantity = Number(targetQtyStr);
+    if (!Number.isInteger(requestedQuantity) || requestedQuantity < 1) {
+      setFeedbackMessage({
+        type: 'error',
+        text: 'Enter a whole-number target batch quantity greater than zero.',
+      });
+      return;
+    }
     if (selectedProduct.recipe.length === 0) {
       setFeedbackMessage({
         type: 'error',
@@ -102,7 +172,8 @@ export const WipProduction: React.FC = () => {
       targetQuantity: targetQty,
       rawMilkVolumeUsed: rawMilkRequirement,
       assignedStaff: assignedStaff || currentUser.name,
-      notes: batchNotes
+      notes: batchNotes,
+      ingredientSelections,
     });
 
     if (result.success) {
@@ -485,9 +556,9 @@ export const WipProduction: React.FC = () => {
                       Target Batch Quantity ({selectedProduct?.unit || 'bottles'})
                     </label>
                     <input 
-                      type="number" 
-                      step="1"
-                      min="1"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       required
                       value={targetQtyStr}
                       onChange={e => handleTargetQtyChange(e.target.value)}
@@ -548,28 +619,89 @@ export const WipProduction: React.FC = () => {
 
                 <div className="divide-y divide-slate-200 text-xs">
                   {computedBom.map((req, idx) => (
-                    <div key={idx} className="py-2.5 flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="font-bold text-slate-900">{req.ingredientName}</p>
-                        <p className="text-[11px] text-slate-500 font-medium">
-                          Need: <strong className="text-slate-900 font-bold">{req.needed.toFixed(1)} {req.unit}</strong> | Available: <strong className={req.isSufficient ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}>{req.available} {req.unit}</strong>
-                        </p>
+                    <div key={req.ingredientId} className="space-y-2 py-2.5">
+                      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-slate-900">
+                            {req.ingredientName}
+                            {req.optional && <span className="ml-1.5 rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-600">Optional</span>}
+                          </p>
+                          {req.skipped ? (
+                            <p className="text-[11px] font-medium text-slate-500">Optional ingredient skipped for this batch.</p>
+                          ) : (
+                            <p className="text-[11px] font-medium text-slate-500">
+                              Use: <strong className="text-slate-900">{req.selectedIngredientName}</strong> ·
+                              Need: <strong className="text-slate-900">{req.needed.toFixed(2)} {req.unit}</strong> ·
+                              Available: <strong className={req.isSufficient ? 'text-emerald-600' : 'text-rose-600'}>
+                                {req.unitsCompatible ? `${req.available?.toFixed(2)} ${req.unit}` : 'Incompatible unit'}
+                              </strong>
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          {req.skipped ? (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
+                              Optional · Skipped
+                            </span>
+                          ) : req.isSufficient ? (
+                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                              ✓ Ready
+                            </span>
+                          ) : !req.unitsCompatible ? (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
+                              Unit mismatch
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700">
+                              ✕ Shortage
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <div>
-                        {req.isSufficient ? (
-                          <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                            ✓ Ready
-                          </span>
+                      <select
+                        value={req.selectedIngredientId}
+                        onChange={event => setIngredientSelections(previous => ({
+                          ...previous,
+                          [req.ingredientId]: event.target.value,
+                        }))}
+                        aria-label={`Ingredient to use for ${req.ingredientName}`}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-semibold text-slate-800 sm:max-w-md"
+                      >
+                        {req.optional && <option value="">Skip optional ingredient</option>}
+                        {ingredients.some(ingredient =>
+                          ingredient.id === req.ingredientId && isRawMaterialCategory(ingredient.category)
+                        ) ? (
+                          <option value={req.ingredientId}>
+                            Recipe ingredient: {ingredients.find(ingredient => ingredient.id === req.ingredientId)?.name}
+                          </option>
                         ) : (
-                          <span className="inline-flex items-center text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
-                            ✕ Shortage
-                          </span>
+                          <option value={req.ingredientId} disabled>
+                            Unavailable (not RM): {req.ingredientName}
+                          </option>
                         )}
-                      </div>
+                        {(req.substitutes || []).map(substitute => {
+                          const ingredient = ingredients.find(item => item.id === substitute.ingredientId);
+                          const isRawMaterial = ingredient && isRawMaterialCategory(ingredient.category);
+                          return isRawMaterial ? (
+                            <option key={substitute.ingredientId} value={substitute.ingredientId}>
+                              Substitute: {ingredient.name} · Stock: {ingredient.currentStock.toLocaleString()} {ingredient.unit}
+                            </option>
+                          ) : substitute.ingredientId === req.selectedIngredientId ? (
+                            <option key={substitute.ingredientId} value={substitute.ingredientId} disabled>
+                              Unavailable (not RM): {ingredient?.name || substitute.ingredientName}
+                            </option>
+                          ) : null;
+                        })}
+                      </select>
                     </div>
                   ))}
                 </div>
+                {!hasSelectedIngredient && selectedProduct?.recipe.length > 0 && (
+                  <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                    Select at least one ingredient to include in this batch.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -593,16 +725,18 @@ export const WipProduction: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedProduct || selectedProduct.recipe.length === 0 || computedBom.some(b => !b.isSufficient)}
+                  disabled={!canStartBatch}
                   className={`px-5 py-2.5 rounded-2xl text-xs font-bold shadow-md transition-all ${
-                    !selectedProduct || selectedProduct.recipe.length === 0 || computedBom.some(b => !b.isSufficient)
+                    !selectedProduct || selectedProduct.recipe.length === 0 || !hasSelectedIngredient || hasBlockingShortage
                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
                       : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100'
                   }`}
                 >
                   {!selectedProduct || selectedProduct.recipe.length === 0
                     ? 'Halted: Recipe Required'
-                    : computedBom.some(b => !b.isSufficient)
+                    : !hasSelectedIngredient
+                      ? 'Halted: Select Ingredients'
+                      : hasBlockingShortage
                       ? 'Halted: Ingredient Shortage'
                       : 'Deduct BOM & Start Batch'}
                 </button>

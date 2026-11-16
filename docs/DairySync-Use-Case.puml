@@ -1,0 +1,153 @@
+@startuml
+title DairySync Use Case Diagram — Current Application Access
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Authenticated User" as AuthenticatedUser <<abstract>>
+actor "Operational User" as OperationalUser <<abstract>>
+actor Developer
+actor "System Administrator" as SystemAdmin
+actor "Director / PMO Supervisor" as Director
+actor "Administrative Assistant IV\n(Procurement)" as Procurement
+actor "Production Staff" as ProductionStaff
+actor "Internal Custodian\n(Plant Manager)" as PlantManager
+actor "Store Outlet / Dairy Box" as StoreOutlet
+
+OperationalUser --|> AuthenticatedUser
+SystemAdmin --|> AuthenticatedUser
+Developer --|> SystemAdmin
+Developer --|> OperationalUser
+Director --|> OperationalUser
+Procurement --|> OperationalUser
+ProductionStaff --|> OperationalUser
+PlantManager --|> OperationalUser
+StoreOutlet --|> OperationalUser
+
+rectangle "DairySync Application" {
+  package "Common signed-in functions" {
+    usecase "Sign in / log out" as Auth
+    usecase "View role dashboard" as Dashboard
+    usecase "Update own profile" as Profile
+    usecase "View and manage alerts" as Alerts
+  }
+
+  package "Administration" {
+    usecase "Manage operational accounts\n(create, edit, disable, reset)" as ManageAccounts
+    usecase "Assign operational user roles" as AssignRoles
+    usecase "Review audit trail" as ReviewAudit
+    usecase "Manage audit records" as ManageAudit
+    usecase "Read System Manual" as Manual
+    usecase "View network and cloud-sync status" as SystemHealth
+    usecase "Manage privileged roles" as ManagePrivilegedRoles
+    usecase "Switch developer role view" as RoleSimulation
+  }
+
+  package "Business modules" {
+    usecase "Access Raw Ingredients" as RawIngredients
+    usecase "Access PMO Inventory" as PmoInventory
+    usecase "Access WIP Batches" as WipBatches
+    usecase "Access WIP Inventory" as WipInventory
+    usecase "Access Cold Storage" as ColdStorage
+    usecase "Access Product Recipes" as Recipes
+    usecase "Access Supply & Demand" as SupplyDemand
+    usecase "Access ROP Procurement" as ProcurementModule
+    usecase "Use Dairy Box POS" as Pos
+    usecase "Review Dairy Box sales history" as SalesHistory
+    usecase "Submit / cancel stock requests" as StoreRequests
+    usecase "Review / fulfill stock requests" as ReviewRequests
+  }
+}
+
+AuthenticatedUser -- Auth
+AuthenticatedUser -- Dashboard
+AuthenticatedUser -- Profile
+OperationalUser -- Alerts
+
+SystemAdmin -- ManageAccounts
+SystemAdmin -- AssignRoles
+SystemAdmin -- ReviewAudit
+SystemAdmin -- Manual
+SystemAdmin -- SystemHealth
+
+Developer -- ManagePrivilegedRoles
+Developer -- ManageAudit
+Developer -- RoleSimulation
+Developer -- RawIngredients
+Developer -- PmoInventory
+Developer -- WipBatches
+Developer -- WipInventory
+Developer -- ColdStorage
+Developer -- Recipes
+Developer -- SupplyDemand
+Developer -- ProcurementModule
+Developer -- Pos
+Developer -- SalesHistory
+Developer -- StoreRequests
+Developer -- ReviewRequests
+
+Director -- RawIngredients
+Director -- PmoInventory
+Director -- WipBatches
+Director -- ColdStorage
+Director -- Recipes
+Director -- SupplyDemand
+Director -- ProcurementModule
+Director -- SalesHistory
+Director -- ReviewAudit
+Director -- ManageAudit
+
+Procurement -- RawIngredients
+Procurement -- PmoInventory
+Procurement -- ProcurementModule
+
+ProductionStaff -- RawIngredients
+ProductionStaff -- WipBatches
+
+PlantManager -- RawIngredients
+PlantManager -- PmoInventory
+PlantManager -- WipBatches
+PlantManager -- WipInventory
+PlantManager -- ColdStorage
+PlantManager -- Recipes
+PlantManager -- SupplyDemand
+PlantManager -- ProcurementModule
+PlantManager -- SalesHistory
+PlantManager -- ReviewAudit
+PlantManager -- ReviewRequests
+
+StoreOutlet -- ColdStorage
+StoreOutlet -- Pos
+StoreOutlet -- StoreRequests
+
+note right of SystemAdmin
+  Account role assignment is limited to
+  operational roles. System Administrators
+  cannot grant Developer or System Admin access.
+  Audit Trail access is read-only.
+end note
+
+note right of Developer
+  Developer has access to every application module,
+  including System Administration. Developer can
+  assign privileged roles and manage audit records.
+  Role switching is a UI simulation, not another
+  authenticated account.
+end note
+
+note bottom of Director
+  Director access is read-only in Raw Ingredients,
+  PMO Inventory, WIP Batches, Cold Storage, and POS
+  (sales history only). Plant Manager POS is also
+  sales-history-only; Plant Manager audit is read-only.
+end note
+
+note bottom of StoreOutlet
+  Store Outlet is the application's actual role.
+  The current role list does not contain Marketing Specialist.
+end note
+
+note bottom of RawIngredients
+  Module associations show the application's role-based tab access.
+  Write permissions within each module are more specific.
+end note
+@enduml

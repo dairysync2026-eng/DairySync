@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f6fb">
+  <meta name="description" content="A visual, task-based user manual for the DairySync inventory and production management system.">
+  <title>DairySync | User Manual</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172338;
+      --muted: #627087;
+      --line: #e2e8f0;
+      --paper: #fff;
+      --canvas: #f3f6fb;
+      --blue: #315fd5;
+      --blue-dark: #193d9a;
+      --blue-pale: #eaf0ff;
+      --green: #157c60;
+      --green-pale: #e5f6ef;
+      --amber: #9a5d07;
+      --amber-pale: #fff3d8;
+      --red: #b54747;
+      --shadow: 0 16px 42px rgba(30, 48, 80, .08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--canvas);
+      font: 15px/1.65 "Segoe UI", Arial, sans-serif;
+    }
+    a { color: var(--blue-dark); }
+    button { font: inherit; }
+    .topbar {
+      position: sticky;
+      z-index: 5;
+      top: 0;
+      display: flex;
+      min-height: 68px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 10px max(20px, calc((100vw - 1180px) / 2));
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(12px);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; color: var(--ink); text-decoration: none; }
+    .brand img { width: 42px; height: 42px; border-radius: 13px; object-fit: cover; }
+    .brand strong { display: block; font-size: 15px; line-height: 1.25; letter-spacing: .01em; }
+    .brand span { display: block; color: var(--muted); font-size: 11px; }
+    .toolbar { display: flex; align-items: center; gap: 9px; }
+    .toolbar-note { color: var(--muted); font-size: 12px; }
+    .button {
+      display: inline-flex;
+      min-height: 38px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 7px 13px;
+      border: 1px solid #d5deeb;
+      border-radius: 10px;
+      background: var(--paper);
+      color: var(--ink);
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .button:hover { background: #f6f8fc; }
+    .button:focus-visible, a:focus-visible { outline: 3px solid #8eafff; outline-offset: 3px; }
+    .button.primary { border-color: var(--blue); background: var(--blue); color: white; }
+
+    .layout { display: grid; width: min(1180px, 100% - 40px); grid-template-columns: 220px minmax(0, 1fr); gap: 34px; margin: 30px auto 80px; }
+    .sidebar { position: sticky; top: 92px; align-self: start; max-height: calc(100vh - 112px); overflow: auto; padding: 17px 12px; border: 1px solid var(--line); border-radius: 17px; background: var(--paper); }
+    .sidebar-label { margin: 0 10px 9px; color: #8591a3; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .sidebar nav { display: grid; gap: 3px; }
+    .sidebar a { padding: 8px 10px; border-radius: 8px; color: #56647a; font-size: 12px; line-height: 1.45; text-decoration: none; }
+    .sidebar a:hover { background: #f2f5fb; color: var(--blue-dark); }
+    main { min-width: 0; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      min-height: 310px;
+      padding: 42px 44px;
+      border-radius: 23px;
+      background:
+        radial-gradient(ellipse at 87% 16%, rgba(107, 145, 255, .36), transparent 31%),
+        linear-gradient(125deg, #10275f, #214caf 63%, #3987bd);
+      color: white;
+      box-shadow: var(--shadow);
+    }
+    .hero:after { position: absolute; right: -78px; bottom: -155px; width: 390px; height: 390px; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; content: ""; }
+    .eyebrow { margin: 0 0 12px; color: #c9d8ff; font-size: 11px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+    h1 { max-width: 650px; margin: 0; font-size: clamp(36px, 5vw, 56px); letter-spacing: -.045em; line-height: 1.07; }
+    .hero p:not(.eyebrow) { max-width: 590px; margin: 17px 0 24px; color: #e1eaff; font-size: 16px; }
+    .intro-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0 32px; }
+    .intro-item { display: flex; align-items: center; gap: 11px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: white; }
+    .intro-icon { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: var(--blue-pale); font-size: 17px; }
+    .intro-item strong { display: block; font-size: 12px; }
+    .intro-item small { color: var(--muted); font-size: 11px; }
+
+    .section { margin-top: 48px; }
+    .section-heading { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 17px; }
+    .section-number { display: grid; width: 39px; height: 39px; flex: 0 0 auto; place-items: center; border: 1px solid #dbe5ff; border-radius: 12px; background: var(--blue-pale); color: var(--blue-dark); font-size: 12px; font-weight: 900; }
+    h2 { margin: 0; font-size: clamp(22px, 3vw, 29px); letter-spacing: -.03em; line-height: 1.22; }
+    h3 { margin: 0 0 9px; font-size: 16px; letter-spacing: -.015em; }
+    .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .card { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); box-shadow: 0 5px 20px rgba(30,48,80,.035); }
+    .card p:first-child { margin-top: 0; }
+    .card p:last-child { margin-bottom: 0; }
+    .card p, .card li { color: #536178; font-size: 13px; }
+    .card ul, .card ol { margin: 8px 0 0; padding-left: 20px; }
+    .card li + li { margin-top: 6px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .tag { display: inline-block; padding: 3px 8px; border-radius: 20px; background: var(--blue-pale); color: var(--blue-dark); font-size: 10px; font-weight: 800; letter-spacing: .03em; }
+    .callout { display: flex; gap: 12px; margin-top: 14px; padding: 15px 16px; border: 1px solid #f1dfb6; border-radius: 13px; background: var(--amber-pale); color: #68460f; font-size: 12px; }
+    .callout.info { border-color: #d7e3ff; background: #f0f4ff; color: #304c86; }
+    .callout.good { border-color: #c9e8d8; background: var(--green-pale); color: #21644e; }
+    .callout strong { display: block; margin-bottom: 2px; }
+
+    .mock-window { overflow: hidden; border: 1px solid #d5deeb; border-radius: 15px; background: white; box-shadow: 0 11px 28px rgba(30,48,80,.08); }
+    .mock-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 51px; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+    .mock-brand { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; }
+    .mock-brand img { width: 25px; height: 25px; border-radius: 7px; }
+    .mock-user { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; }
+    .avatar { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 50%; background: #e8edfa; color: #435b9c; font-weight: 800; }
+    .mock-body { padding: 14px; background: #f7f9fc; }
+    .mock-role { margin: 0 0 11px; color: #79869a; font-size: 9px; }
+    .mock-tabs { display: flex; gap: 5px; overflow: hidden; padding: 5px; border: 1px solid #e3e8f0; border-radius: 12px; background: white; white-space: nowrap; }
+    .mock-tab { padding: 7px 9px; border-radius: 8px; color: #66748b; font-size: 9px; }
+    .mock-tab.active { background: var(--blue); color: white; font-weight: 800; }
+    .mock-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 11px; }
+    .mock-heading strong { font-size: 16px; }
+    .mock-heading span { color: var(--muted); font-size: 9px; }
+    .mock-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .metric { padding: 11px; border: 1px solid #e6ebf2; border-radius: 11px; background: white; }
+    .metric small { display: block; color: #7a8799; font-size: 8px; }
+    .metric b { display: block; margin-top: 4px; font-size: 17px; }
+    .mock-bottom { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; margin-top: 8px; }
+    .mock-panel { min-height: 85px; padding: 11px; border: 1px solid #e6ebf2; border-radius: 11px; background: white; }
+    .mock-panel strong { font-size: 9px; }
+    .mock-chart { display: flex; height: 42px; align-items: end; gap: 6px; margin-top: 8px; border-bottom: 1px solid #e6ebf2; }
+    .mock-chart i { width: 11%; border-radius: 4px 4px 0 0; background: linear-gradient(#85a8ff, #3e68d4); }
+    .mock-chart i:nth-child(1) { height: 45%; }
+    .mock-chart i:nth-child(2) { height: 72%; }
+    .mock-chart i:nth-child(3) { height: 56%; }
+    .mock-chart i:nth-child(4) { height: 91%; }
+    .mock-chart i:nth-child(5) { height: 65%; }
+    .mock-list { margin-top: 9px; }
+    .mock-list span { display: block; height: 6px; margin: 7px 0; border-radius: 5px; background: #edf1f7; }
+    .mock-list span:nth-child(2) { width: 80%; }
+    .mock-list span:nth-child(3) { width: 63%; }
+    .caption { margin: 9px 0 0; color: #7b8799; font-size: 10px; text-align: center; }
+
+    .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; }
+    .flow-step { position: relative; min-height: 114px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+    .flow-step:not(:last-child):after { position: absolute; top: 42%; right: -12px; z-index: 2; color: #8fa0b8; content: "›"; font-size: 24px; font-weight: 700; }
+    .flow-step .step-icon { display: block; margin-bottom: 10px; font-size: 20px; }
+    .flow-step strong { display: block; font-size: 12px; }
+    .flow-step small { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .step-index { color: #8895a8; font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+
+    .role-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: white; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid #edf0f5; vertical-align: top; }
+    th { background: #f8f9fc; color: #647188; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+    td { color: #536178; font-size: 11px; }
+    td:first-child { min-width: 175px; color: var(--ink); font-weight: 800; }
+    tr:last-child td { border-bottom: 0; }
+
+    .wip-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 13px 0; }
+    .wip-steps span { padding: 7px 10px; border: 1px solid #dfe6f2; border-radius: 9px; background: #f8faff; color: #41516d; font-size: 10px; font-weight: 700; }
+    .wip-steps b { color: #96a2b3; font-size: 15px; }
+    .mini-label { display: block; margin-bottom: 8px; color: #8b97a8; font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .checklist { display: grid; gap: 9px; margin: 11px 0 0; padding: 0; list-style: none; }
+    .checklist li { display: flex; gap: 9px; margin: 0 !important; color: #536178; font-size: 12px; }
+    .checklist li:before { display: grid; width: 18px; height: 18px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--green-pale); color: var(--green); content: "✓"; font-size: 10px; font-weight: 900; }
+    .faq { display: grid; gap: 9px; }
+    details { padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+    summary { color: var(--ink); font-size: 12px; font-weight: 800; cursor: pointer; }
+    details p { margin: 9px 0 0; color: var(--muted); font-size: 12px; }
+    .footer { margin-top: 38px; padding: 20px 4px; border-top: 1px solid var(--line); color: #7b8799; font-size: 10px; }
+    .footer strong { color: #49566b; }
+    .backtop { float: right; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; max-height: none; }
+      .sidebar nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .sidebar a { font-size: 11px; }
+    }
+    @media (max-width: 640px) {
+      .topbar { position: static; flex-wrap: wrap; padding: 10px 14px; }
+      .toolbar { width: 100%; justify-content: space-between; }
+      .toolbar-note { display: none; }
+      .layout { width: calc(100% - 24px); gap: 16px; margin-top: 12px; }
+      .sidebar nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hero { min-height: auto; padding: 29px 23px; border-radius: 17px; }
+      .intro-strip, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow-step:nth-child(2):after { display: none; }
+      .card { padding: 17px; }
+      .mock-tabs { overflow-x: auto; }
+      .mock-bottom { grid-template-columns: 1fr; }
+    }
+    @media print {
+      @page { margin: 14mm 12mm; }
+      body { background: white; font-size: 11pt; }
+      .topbar { position: static; padding: 0 0 10px; border-bottom: 1px solid #bbb; }
+      .toolbar, .sidebar, .backtop { display: none !important; }
+      .layout { display: block; width: 100%; margin: 14px auto; }
+      .hero { min-height: 0; padding: 24px; box-shadow: none; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .intro-strip { margin-bottom: 22px; }
+      .section { margin-top: 25px; break-inside: avoid; }
+      .card, .mock-window, .role-table-wrap, .flow-step { break-inside: avoid; box-shadow: none; }
+      .mock-window, .flow-step, .intro-item, .tag, .callout, th { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      a { color: inherit; text-decoration: none; }
+      details:not([open]) > *:not(summary) { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="DairySync user manual home">
+      <img src="../public/dairysync-app-icon.png" alt="">
+      <span><strong>DairySync</strong><span>Visual user manual</span></span>
+    </a>
+    <div class="toolbar">
+      <span class="toolbar-note">PCC-MMSU · Inventory, production &amp; retail</span>
+      <button class="button" type="button" onclick="window.print()" aria-label="Print or save this manual as PDF">⇩ &nbsp; Print / Save PDF</button>
+    </div>
+  </header>
+
+  <div class="layout" id="top">
+    <aside class="sidebar" aria-label="Manual contents">
+      <p class="sidebar-label">In this guide</p>
+      <nav>
+        <a href="#start">Start here</a>
+        <a href="#navigation">Find your way</a>
+        <a href="#roles">Roles &amp; access</a>
+        <a href="#administration">System administration</a>
+        <a href="#ingredients">Ingredients &amp; counts</a>
+        <a href="#production">Recipes &amp; production</a>
+        <a href="#cold-storage">Cold storage &amp; requests</a>
+        <a href="#procurement">Procurement &amp; commitments</a>
+        <a href="#pos">Dairy Box sales</a>
+        <a href="#oversight">Alerts, reports &amp; audit</a>
+        <a href="#offline">Offline &amp; safe use</a>
+        <a href="#help">Quick answers</a>
+      </nav>
+    </aside>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow">PCC-MMSU · Batac City</p>
+        <h1 id="page-title">Your guide to DairySync.</h1>
+        <p>Follow stock from receiving to production, cold storage, and Dairy Box. This visual, task-based manual helps each team find its work and complete it with confidence.</p>
+      </section>
+
+      <div class="intro-strip" aria-label="Manual highlights">
+        <div class="intro-item"><span class="intro-icon" aria-hidden="true">🧭</span><span><strong>Role-based workspaces</strong><small>See the tools available to your account</small></span></div>
+        <div class="intro-item"><span class="intro-icon" aria-hidden="true">📦</span><span><strong>Shared stock records</strong><small>Follow materials and finished goods</small></span></div>
+        <div class="intro-item"><span class="intro-icon" aria-hidden="true">🖨️</span><span><strong>Ready to print</strong><small>Use Print / Save PDF for a hard copy</small></span></div>
+      </div>
+
+      <section class="section" id="start">
+        <div class="section-heading"><span class="section-number">01</span><div><h2>Start with a secure sign-in</h2><p>Use the account and role assigned to you by your administrator.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <span class="tag">FIRST STEPS</span>
+            <ol>
+              <li>Open the DairySync web app and enter your registered email address or username.</li>
+              <li>Enter your password and choose the sign-in button.</li>
+              <li>Confirm that your name and role appear in the app header, then begin at the Command Center.</li>
+            </ol>
+            <div class="callout info"><span aria-hidden="true">ⓘ</span><span><strong>Forgot your password?</strong>Enter your registered email address in the sign-in form and use the password-reset option. Follow the link sent to your email.</span></div>
+          </div>
+          <figure class="mock-window" style="margin:0" aria-label="Illustration of the DairySync navigation and dashboard">
+            <div class="mock-top">
+              <div class="mock-brand"><img src="../public/dairysync-app-icon.png" alt="">DairySync <span style="color:#8591a3;font-weight:500">· Cloud operations</span></div>
+              <div class="mock-user"><span>Plant Manager</span><span class="avatar">PM</span></div>
+            </div>
+            <div class="mock-body">
+              <p class="mock-role">YOUR ROLE · PLANT MANAGER</p>
+              <div class="mock-tabs" aria-hidden="true">
+                <span class="mock-tab active">▦ &nbsp;Command Center</span><span class="mock-tab">❄ &nbsp;Cold Storage</span><span class="mock-tab">▱ &nbsp;WIP Batches</span><span class="mock-tab">▤ &nbsp;Ingredients</span>
+              </div>
+              <div class="mock-heading"><strong>Plant Overview</strong><span>Role-specific dashboard</span></div>
+              <div class="mock-metrics"><div class="metric"><small>ACTIVE BATCHES</small><b>04</b></div><div class="metric"><small>COLD STORAGE</small><b>82%</b></div><div class="metric"><small>STOCK ALERTS</small><b>03</b></div></div>
+              <div class="mock-bottom"><div class="mock-panel"><strong>Operations at a glance</strong><div class="mock-chart"><i></i><i></i><i></i><i></i><i></i></div></div><div class="mock-panel"><strong>Recent activity</strong><div class="mock-list"><span></span><span></span><span></span></div></div></div>
+            </div>
+            <figcaption class="caption">Illustration only. Dashboard figures and available tabs depend on your account and live records.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="section" id="navigation">
+        <div class="section-heading"><span class="section-number">02</span><div><h2>Find your way around</h2><p>The app opens on the Command Center and shows navigation for your authorized work areas.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Navigation at a glance</h3>
+            <ul>
+              <li><strong>Command Center:</strong> role-specific summary, alerts, and shortcuts.</li>
+              <li><strong>Subsystem tabs:</strong> open ingredients, production, cold storage, sales, and other permitted areas.</li>
+              <li><strong>Header:</strong> check your account and role, notifications, profile, and online/offline indicator.</li>
+              <li><strong>Tab strip on small screens:</strong> swipe, drag, scroll, or use the arrow controls to reveal more tabs.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Use the dashboard as a shortcut</h3>
+            <p>Start from your Command Center to review the metrics and alerts relevant to your role. Choose a dashboard card or action to open its related subsystem. When a tab is not available to your account, ask an administrator rather than trying another role.</p>
+            <div class="callout"><span aria-hidden="true">🔒</span><span><strong>Access is tied to your account.</strong>Tabs and actions vary by role. A restricted page does not mean your data is lost; it means your account is not authorized for that area.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="roles">
+        <div class="section-heading"><span class="section-number">03</span><div><h2>Know your role and access</h2><p>Your role determines which tabs and actions are available. This quick guide summarizes the main areas.</p></div></div>
+        <div class="role-table-wrap">
+          <table>
+            <thead><tr><th>Role</th><th>Typical work areas</th><th>Helpful starting point</th></tr></thead>
+            <tbody>
+              <tr><td>Developer / Super Administrator</td><td>All operational modules, administration, audit, and manual.</td><td>Command Center; use administration tools only when assigned.</td></tr>
+              <tr><td>System Administrator</td><td>Command Center, account administration, read-only audit, and manual.</td><td>System Administration for staff accounts and shared app branding.</td></tr>
+              <tr><td>Director / PMO Supervisor</td><td>Oversight; read-only ingredients, PMO Inventory, WIP, and Cold Storage; recipes, commitments, reports, and sales history.</td><td>Command Center for operational summaries.</td></tr>
+              <tr><td>Administrative Assistant IV / Procurement</td><td>Command Center, ROP Procurement, Raw Ingredients, and PMO Inventory.</td><td>ROP Procurement for reorder needs and receipts.</td></tr>
+              <tr><td>Internal Custodian / Plant Manager</td><td>Command Center, Cold Storage, recipes, WIP, ingredients, PMO Inventory, procurement, commitments, and request review.</td><td>Command Center for plant operations and Dairy Box requests.</td></tr>
+              <tr><td>Production Staff</td><td>Command Center, WIP Batches, and Raw Ingredients.</td><td>WIP Batches for production work.</td></tr>
+              <tr><td>Store Outlet / Dairy Box</td><td>Command Center, Dairy Box POS, and Cold Storage; submit and track stock requests.</td><td>Dairy Box POS for sales and the dashboard for replenishment requests.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout info"><span aria-hidden="true">ⓘ</span><span><strong>Role names in this table describe access, not a way to switch accounts.</strong>Only authorized administrators manage accounts and permissions. Developer dashboard preview, when available, does not sign in as another staff member.</span></div>
+      </section>
+
+      <section class="section" id="administration">
+        <div class="section-heading"><span class="section-number">04</span><div><h2>Administer staff accounts and app branding</h2><p>System Administrators can manage operational staff access and the shared DairySync logo without accessing business inventory.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <span class="mini-label">SYSTEM ADMINISTRATION · STAFF ACCOUNTS</span>
+            <ol>
+              <li>Open <strong>System Administration</strong> and review the account totals and connection status.</li>
+              <li>To add a staff member, enter their name, email, username, job title, department, and operational role, then choose <strong>Create account &amp; send setup email</strong>.</li>
+              <li>Find an account in the directory to edit its staff profile, change an allowed operational role, send a password-reset email, or disable/reactivate access.</li>
+              <li>Refresh the directory to confirm that the requested change has been applied.</li>
+            </ol>
+          </div>
+          <div class="card">
+            <span class="mini-label">SYSTEM BRANDING · SHARED APP LOGO</span>
+            <ol>
+              <li>Use <strong>Change logo</strong> to select a PNG, JPEG, or WebP image while online.</li>
+              <li>Confirm that the updated logo appears in the application header and browser tab.</li>
+              <li>Choose <strong>Restore default</strong> to return to the standard DairySync logo.</li>
+            </ol>
+            <p class="caption">Changing the shared logo does not update icons already installed on a device’s home screen.</p>
+          </div>
+        </div>
+        <div class="callout info"><span aria-hidden="true">🔒</span><span><strong>Respect elevated-role safeguards.</strong>System Administrators can manage operational roles but cannot grant or modify Developer or System Administrator access. They cannot change their own account role or disable their own account. Ask the Lead Developer to provision privileged accounts. Administrative changes are recorded for oversight.</span></div>
+      </section>
+
+      <section class="section" id="ingredients">
+        <div class="section-heading"><span class="section-number">05</span><div><h2>Manage ingredients and physical counts</h2><p>Keep material records current so teams can plan purchases and production against usable stock.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <span class="mini-label">RAW INGREDIENTS · EVERYDAY TASKS</span>
+            <ol>
+              <li>Open <strong>Raw Ingredients</strong>; search or filter by category, low stock, or expiry.</li>
+              <li>Open a material record to review stock, unit, supplier, expiry, reorder point, and safety stock.</li>
+              <li>Use the available add, edit, or stock-adjustment action for an authorized update. Record the correct quantity and unit.</li>
+              <li>Check the updated stock and any reorder or expiry warning. Export or print a report when needed.</li>
+            </ol>
+          </div>
+          <div class="card">
+            <span class="mini-label">PMO INVENTORY · PERIOD RECONCILIATION</span>
+            <ol>
+              <li>Open <strong>PMO Inventory</strong> and create a draft period for Raw Ingredients or Finished Goods.</li>
+              <li>Add the existing items to count and record physical ending quantities and any required movement details.</li>
+              <li>Compare the calculated expected balance with the physical count; resolve differences before posting.</li>
+              <li>Post the reviewed period once. Posted periods are locked to avoid a second reconciliation.</li>
+            </ol>
+          </div>
+        </div>
+        <div class="callout"><span aria-hidden="true">⚠</span><span><strong>Count once; avoid duplicate entries.</strong>For live-ledger periods, purchases, production, sales, and other recorded movements are derived from shared transactions. Do not enter the same movement again as a manual adjustment. Posted reconciliation changes shared stock.</span></div>
+      </section>
+
+      <section class="section" id="production">
+        <div class="section-heading"><span class="section-number">06</span><div><h2>Set up a recipe and run production</h2><p>Production consumes recipe materials when a batch is created and transfers its output to Cold Storage when completed.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <span class="mini-label">BEFORE THE FIRST BATCH</span>
+            <ul class="checklist">
+              <li>Confirm the finished product exists in Cold Storage.</li>
+              <li>Confirm its recipe/BOM is configured and required ingredients exist in Raw Ingredients.</li>
+              <li>Check material availability and verify the recipe's quantities and units.</li>
+              <li>If the product has no recipe, ask a Developer, Plant Manager, or other authorized recipe manager to configure it first.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="mini-label">BATCH JOURNEY</span>
+            <div class="wip-steps" aria-label="Scheduled, pasteurization or cooking, cooling, bottling and packaging, finished goods release">
+              <span>Scheduled</span><b>→</b><span>Pasteurization / Cooking</span><b>→</b><span>Cooling</span><b>→</b><span>Bottling &amp; Packaging</span><b>→</b><span>Finished Goods</span>
+            </div>
+            <p>Choose the product, target quantity, raw milk volume, assigned staff, and notes when creating a batch. Review the selected recipe and deductions, then advance the batch through each recorded production step.</p>
+          </div>
+        </div>
+        <div class="flow" style="margin-top:13px" aria-label="Production workflow">
+          <div class="flow-step"><span class="step-index">01 · Prepare</span><span class="step-icon" aria-hidden="true">🧾</span><strong>Check recipe &amp; stock</strong><small>Verify product, ingredient availability, and units.</small></div>
+          <div class="flow-step"><span class="step-index">02 · Create</span><span class="step-icon" aria-hidden="true">🧑‍🍳</span><strong>Record a batch</strong><small>Set target, milk volume, assigned staff, and notes.</small></div>
+          <div class="flow-step"><span class="step-index">03 · Process</span><span class="step-icon" aria-hidden="true">🌡️</span><strong>Advance each step</strong><small>Update the batch as work progresses on the floor.</small></div>
+          <div class="flow-step"><span class="step-index">04 · Release</span><span class="step-icon" aria-hidden="true">❄️</span><strong>Complete &amp; verify</strong><small>Confirm output appears in Cold Storage.</small></div>
+        </div>
+        <div class="callout good"><span aria-hidden="true">✓</span><span><strong>Cancel carefully.</strong>A scheduled batch may be cancelled; its deducted recipe ingredients are restored. Check the batch status and stock records after cancellation.</span></div>
+      </section>
+
+      <section class="section" id="cold-storage">
+        <div class="section-heading"><span class="section-number">07</span><div><h2>Monitor cold storage and request stock</h2><p>Cold Storage is the shared record for finished products available to the operation, retail, and commitments.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <h3>Cold Storage check</h3>
+            <ul>
+              <li>Search or filter products by category and stock condition.</li>
+              <li>Review current quantity, location, capacity, safety stock, and allocations.</li>
+              <li>Investigate low-stock or overstock warnings; use a stock adjustment only when authorized and supported by a physical check.</li>
+              <li>Print a cold-storage audit sheet or export the records when required.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Dairy Box replenishment request</h3>
+            <ol>
+              <li>Store Outlet staff submit a finished-goods request from the dashboard.</li>
+              <li>Track the request status and cancel it if it is still pending and no longer needed.</li>
+              <li>The Plant Manager reviews the request and approves or rejects it.</li>
+              <li>For an approved request, allocate available stock to fulfill it; inventory changes when the request is fulfilled.</li>
+            </ol>
+          </div>
+        </div>
+        <div class="callout info"><span aria-hidden="true">ⓘ</span><span><strong>A request is not a stock movement.</strong>Submitting a request does not reserve or deduct stock. Allocation occurs when the Plant Manager fulfills the approved request.</span></div>
+      </section>
+
+      <section class="section" id="procurement">
+        <div class="section-heading"><span class="section-number">08</span><div><h2>Plan replenishment and commitments</h2><p>Use reorder information to guide purchasing, and commitments to track planned supply against demand.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <span class="mini-label">ROP PROCUREMENT</span>
+            <ol>
+              <li>Open <strong>ROP Procurement</strong> and review items below their reorder point or safety stock.</li>
+              <li>Check supplier, lead time, maximum stock, packaging needs, and recent receipts.</li>
+              <li>Record a supplier arrival or receipt after confirming what physically arrived. Include waybill or notes when available.</li>
+              <li>Verify the updated ingredient stock and transaction history.</li>
+            </ol>
+          </div>
+          <div class="card">
+            <span class="mini-label">SUPPLY &amp; DEMAND</span>
+            <ol>
+              <li>Create a commitment with its partner, item, target quantity, unit, and scheduled date.</li>
+              <li>Set its type, priority, and status based on the agreed plan.</li>
+              <li>Update fulfilled quantity and status as supply is delivered.</li>
+              <li>Review upcoming or delayed commitments; include a reason when cancelling.</li>
+            </ol>
+          </div>
+        </div>
+        <p style="margin:11px 3px;color:var(--muted);font-size:11px">Reorder alerts are based on configured stock thresholds; they are decision support, not an automatically placed purchase order.</p>
+      </section>
+
+      <section class="section" id="pos">
+        <div class="section-heading"><span class="section-number">09</span><div><h2>Process a Dairy Box sale</h2><p>Complete each sale in the POS and verify the generated receipt and inventory update.</p></div></div>
+        <div class="flow" aria-label="Dairy Box point-of-sale workflow">
+          <div class="flow-step"><span class="step-index">01 · Select</span><span class="step-icon" aria-hidden="true">🛍️</span><strong>Choose available items</strong><small>Check the product and available stock before adding.</small></div>
+          <div class="flow-step"><span class="step-index">02 · Review</span><span class="step-icon" aria-hidden="true">🧮</span><strong>Adjust the cart</strong><small>Change quantities or remove items; check the total.</small></div>
+          <div class="flow-step"><span class="step-index">03 · Complete</span><span class="step-icon" aria-hidden="true">✅</span><strong>Complete the sale</strong><small>Insufficient stock prevents checkout.</small></div>
+          <div class="flow-step"><span class="step-index">04 · Confirm</span><span class="step-icon" aria-hidden="true">🧾</span><strong>Check the receipt</strong><small>Confirm receipt details and stock deduction.</small></div>
+        </div>
+        <div class="callout"><span aria-hidden="true">⚠</span><span><strong>Before moving to the next customer, confirm the sale finished successfully.</strong>For shared stock, coordinate with other operators so two people do not spend the same available units at the same time.</span></div>
+      </section>
+
+      <section class="section" id="oversight">
+        <div class="section-heading"><span class="section-number">10</span><div><h2>Review alerts, reports, and audit history</h2><p>Use these tools to monitor activity and keep an operational record.</p></div></div>
+        <div class="grid-3">
+          <div class="card">
+            <h3>Notifications</h3>
+            <p>Open the header notification area to review unread alerts. Alerts may highlight low stock, reorder points, overstock, and other operational conditions. Mark reviewed alerts as read.</p>
+          </div>
+          <div class="card">
+            <h3>Reports &amp; exports</h3>
+            <p>Use available report actions to preview and print inventory records or download Excel/CSV data. Audit reports may include filters, a summary, notes, and sign-off information.</p>
+          </div>
+          <div class="card">
+            <h3>Audit Trail</h3>
+            <p>Search and filter recorded actions by category, severity, or date. Open a record for details. Access and controls depend on your role.</p>
+          </div>
+        </div>
+        <div class="callout info"><span aria-hidden="true">ⓘ</span><span><strong>Keep records factual.</strong>Use notes for clear, concise context such as a receipt reference or the reason for a reconciliation. Audit history supports review; follow your site's recordkeeping policy.</span></div>
+      </section>
+
+      <section class="section" id="offline">
+        <div class="section-heading"><span class="section-number">11</span><div><h2>Work safely when connectivity changes</h2><p>DairySync can show cached data and queue supported changes when offline; not every workflow is an offline transaction.</p></div></div>
+        <div class="grid-2">
+          <div class="card">
+            <h3>When you see the offline indicator</h3>
+            <ul>
+              <li>Check the connection indicator in the app header.</li>
+              <li>Cached data may be older than the shared cloud records.</li>
+              <li>Some supported updates can remain queued until the connection returns.</li>
+              <li>After reconnecting, allow synchronization to finish and verify the updated record before repeating an action.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Reliable stock habits</h3>
+            <ul>
+              <li>Do not repeat a sale, receipt, or batch because the screen appears slow; first check whether it completed.</li>
+              <li>Coordinate simultaneous stock deductions for the same product or ingredient.</li>
+              <li>Check current stock before confirming a physical adjustment or count.</li>
+              <li>Report a failed sync or unexpected balance to your supervisor or administrator.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="help">
+        <div class="section-heading"><span class="section-number">?</span><div><h2>Quick answers</h2><p>A few common questions to help you keep work moving.</p></div></div>
+        <div class="faq">
+          <details>
+            <summary>I cannot see a tab I need. What should I do?</summary>
+            <p>Confirm you signed in to the correct account. Tabs are role-based. Contact your system administrator if you believe your account needs different access.</p>
+          </details>
+          <details>
+            <summary>A batch cannot be created for a product. Why?</summary>
+            <p>Check that the product has a configured recipe/BOM and that its required raw ingredients are available. Ask an authorized recipe manager to configure a missing recipe.</p>
+          </details>
+          <details>
+            <summary>Why is a sale blocked?</summary>
+            <p>The cart may request more units than available stock. Adjust the quantity, remove an unavailable item, or ask the responsible stock custodian to verify inventory.</p>
+          </details>
+          <details>
+            <summary>Did my offline change reach the shared records?</summary>
+            <p>Check the connection status and allow queued supported changes to synchronize. Verify the record after reconnecting; do not submit the same stock movement again unless you have confirmed the first attempt failed.</p>
+          </details>
+          <details>
+            <summary>How can I keep a copy of this manual?</summary>
+            <p>Choose <strong>Print / Save PDF</strong> at the top of the page, then select your browser's print or save-as-PDF destination.</p>
+          </details>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <a class="backtop" href="#top">Back to top ↑</a>
+        <strong>DairySync Cloud Inventory &amp; Production Management System</strong><br>
+        Developed for the Philippine Carabao Center at Mariano Marcos State University (PCC-MMSU), Batac City.<br>
+        Visual user manual · Prepared for operational guidance. Screens and figures shown as illustrations are not live system data.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

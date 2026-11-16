@@ -4,7 +4,6 @@ import {
   Bell, 
   CloudCheck, 
   Cloud, 
-  FileText, 
   ShieldCheck, 
   User, 
   UserCog,
@@ -20,15 +19,10 @@ import {
 } from 'lucide-react';
 import { ProfileEditModal } from './ProfileEditModal';
 import { PWAInstallButton } from './pwa/PWAInstallButton';
-import { USER_ROLES, USER_ROLE_LABELS } from '../types';
+import { SystemAlert, USER_ROLES, USER_ROLE_LABELS } from '../types';
+import { useAppBranding } from '../hooks/useAppBranding';
 
-interface HeaderProps {
-  onOpenReports: () => void;
-}
-
-export const Header: React.FC<HeaderProps> = ({
-  onOpenReports
-}) => {
+export const Header: React.FC = () => {
   const { 
     currentRole, 
     setCurrentRole, 
@@ -41,8 +35,10 @@ export const Header: React.FC<HeaderProps> = ({
     isDeveloperActive,
     returnToDeveloperAccount
   } = useDairySync();
+  const { logoUrl } = useAppBranding();
 
   const [showAlertsDrawer, setShowAlertsDrawer] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<SystemAlert | null>(null);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -51,7 +47,19 @@ export const Header: React.FC<HeaderProps> = ({
   const roleDropdownRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const unreadAlerts = alerts.filter(a => !a.read);
+  const visibleAlerts = alerts.filter(alert =>
+    currentRole !== 'system_admin' &&
+    (!alert.targetRole || alert.targetRole.includes(currentRole) || currentRole === 'developer')
+  );
+  const unreadAlerts = visibleAlerts.filter(alert => !alert.read);
+  const openAlert = (alert: SystemAlert) => {
+    markAlertRead(alert.id);
+    setSelectedAlert(alert);
+  };
+  const handleClearAllAlerts = () => {
+    clearAllAlerts();
+    setSelectedAlert(null);
+  };
 
   useEffect(() => {
     if (!showAlertsDrawer && !showRoleDropdown && !showMobileMenu) return;
@@ -87,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Logo & Institution Branding */}
           <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
             <img
-              src="/dairysync-app-icon.png"
+              src={logoUrl}
               alt="DairySync"
               className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-2xl object-cover shadow-md shadow-indigo-200"
             />
@@ -110,15 +118,6 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="hidden sm:flex items-center space-x-2 sm:space-x-3">
             {/* Install PWA Button */}
             <PWAInstallButton />
-
-            {/* Reports */}
-            <button
-              onClick={onOpenReports}
-              className="p-2 bg-slate-100 hover:bg-slate-200 text-indigo-600 rounded-xl border border-slate-200 transition-colors"
-              title="Generate System Reports"
-            >
-              <FileText className="w-4 h-4" />
-            </button>
 
             {/* Notifications Bell */}
             <div className="relative" ref={desktopAlertsRef}>
@@ -144,7 +143,8 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                     <div className="flex items-center space-x-2">
                       <button 
-                        onClick={clearAllAlerts}
+                        type="button"
+                        onClick={handleClearAllAlerts}
                         className="text-[11px] font-semibold text-slate-500 hover:text-slate-900"
                       >
                         Clear All
@@ -158,14 +158,15 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
                   <div className="max-h-80 overflow-y-auto space-y-1.5 p-1">
-                    {alerts.length === 0 ? (
+                    {visibleAlerts.length === 0 ? (
                       <p className="text-xs text-slate-500 text-center py-6">No active alerts.</p>
                     ) : (
-                      alerts.map(a => (
-                        <div 
+                      visibleAlerts.map(a => (
+                        <button
                           key={a.id} 
-                          onClick={() => markAlertRead(a.id)}
-                          className={`p-3 rounded-2xl border transition-colors cursor-pointer ${
+                          type="button"
+                          onClick={() => openAlert(a)}
+                          className={`w-full p-3 text-left rounded-2xl border transition-colors ${
                             a.read ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
                           }`}
                         >
@@ -181,7 +182,7 @@ export const Header: React.FC<HeaderProps> = ({
                               <p className="text-[10px] font-mono text-slate-400 mt-1">{a.timestamp}</p>
                             </div>
                           </div>
-                        </div>
+                        </button>
                       ))
                     )}
                   </div>
@@ -369,10 +370,11 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                     <div className="flex items-center space-x-2">
                       <button 
-                        onClick={clearAllAlerts}
+                        type="button"
+                        onClick={handleClearAllAlerts}
                         className="text-[10px] font-semibold text-slate-500 hover:text-slate-900"
                       >
-                        Clear
+                        Clear All
                       </button>
                       <button 
                         onClick={() => setShowAlertsDrawer(false)}
@@ -383,14 +385,15 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
                   <div className="max-h-72 overflow-y-auto space-y-1.5 p-1">
-                    {alerts.length === 0 ? (
+                    {visibleAlerts.length === 0 ? (
                       <p className="text-xs text-slate-500 text-center py-6">No active alerts.</p>
                     ) : (
-                      alerts.map(a => (
-                        <div 
+                      visibleAlerts.map(a => (
+                        <button
                           key={a.id} 
-                          onClick={() => markAlertRead(a.id)}
-                          className={`p-2.5 rounded-2xl border transition-colors cursor-pointer ${
+                          type="button"
+                          onClick={() => openAlert(a)}
+                          className={`w-full p-2.5 text-left rounded-2xl border transition-colors ${
                             a.read ? 'bg-slate-50/50 border-slate-100 opacity-60' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
                           }`}
                         >
@@ -405,7 +408,7 @@ export const Header: React.FC<HeaderProps> = ({
                               <p className="text-[10px] text-slate-600 mt-0.5 leading-tight">{a.message}</p>
                             </div>
                           </div>
-                        </div>
+                        </button>
                       ))
                     )}
                   </div>
@@ -491,18 +494,6 @@ export const Header: React.FC<HeaderProps> = ({
                 Quick Tools & System Status
               </p>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                {/* System Reports */}
-                <button
-                  onClick={() => {
-                    onOpenReports();
-                    setShowMobileMenu(false);
-                  }}
-                  className="p-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl font-bold text-slate-800 flex items-center justify-center space-x-2 transition-colors"
-                >
-                  <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span className="truncate">Reports</span>
-                </button>
-
                 {/* Alerts Trigger */}
                 <button
                   onClick={() => {
@@ -602,6 +593,59 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
           </div>
+        </div>
+      )}
+
+      {selectedAlert && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4"
+          onClick={() => setSelectedAlert(null)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="alert-detail-title"
+            className="w-full max-w-lg rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-2xl sm:p-6"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-start gap-3">
+                {selectedAlert.type === 'rop_triggered' || selectedAlert.severity === 'critical' ? (
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-500" />
+                ) : (
+                  <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                )}
+                <div className="min-w-0">
+                  <p className={`mb-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                    selectedAlert.severity === 'critical'
+                      ? 'bg-rose-50 text-rose-700'
+                      : selectedAlert.severity === 'warning'
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-blue-50 text-blue-700'
+                  }`}>
+                    {selectedAlert.severity}
+                  </p>
+                  <h2 id="alert-detail-title" className="break-words text-base font-extrabold text-slate-900 sm:text-lg">
+                    {selectedAlert.title}
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedAlert(null)}
+                aria-label="Close alert details"
+                className="shrink-0 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">
+              {selectedAlert.message}
+            </p>
+            <p className="mt-4 border-t border-slate-100 pt-3 text-xs font-mono text-slate-400">
+              {selectedAlert.timestamp}
+            </p>
+          </section>
         </div>
       )}
 

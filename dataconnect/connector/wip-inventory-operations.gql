@@ -1,0 +1,47 @@
+query ListWipProductionRecords
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager']")
+  @refresh(onMutationExecuted: { operation: "UpsertWipProductionRecord" })
+  @refresh(onMutationExecuted: { operation: "DeleteWipProductionRecord" }) {
+  wipProductionRecords(orderBy: [{ updatedAt: DESC }]) {
+    id
+    batchId
+    pasteurizationTempC
+    pasteurizationTimeMinutes
+    coolingTempC
+    coolingTimeMinutes
+    yieldPackages
+    bestBeforeDate
+    remarks
+  }
+}
+
+mutation UpsertWipProductionRecord(
+  $id: String!
+  $batchId: String!
+  $pasteurizationTempC: Float
+  $pasteurizationTimeMinutes: Float
+  $coolingTempC: Float
+  $coolingTimeMinutes: Float
+  $yieldPackages: [Any!]!
+  $bestBeforeDate: Date
+  $remarks: String
+) @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager']") {
+  wipProductionRecord_upsert(data: {
+    id: $id
+    batchId: $batchId
+    pasteurizationTempC: $pasteurizationTempC
+    pasteurizationTimeMinutes: $pasteurizationTimeMinutes
+    coolingTempC: $coolingTempC
+    coolingTimeMinutes: $coolingTimeMinutes
+    yieldPackages: $yieldPackages
+    bestBeforeDate: $bestBeforeDate
+    remarks: $remarks
+    updatedAt_expr: "request.time"
+    updatedBy_expr: "auth.uid"
+  })
+}
+
+mutation DeleteWipProductionRecord($id: String!)
+  @auth(expr: "auth != null && auth.token.role in ['developer', 'plant_manager']") {
+  wipProductionRecord_delete(id: $id)
+}

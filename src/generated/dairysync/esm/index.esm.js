@@ -55,7 +55,7 @@ export const listRawIngredientsRef = (dc) => {
 listRawIngredientsRef.operationName = 'ListRawIngredients';
 
 export function listRawIngredients(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listRawIngredientsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -92,7 +92,7 @@ export const listStockTransactionsRef = (dc) => {
 listStockTransactionsRef.operationName = 'ListStockTransactions';
 
 export function listStockTransactions(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listStockTransactionsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -141,7 +141,7 @@ export const listPmoInventoryPeriodsRef = (dc) => {
 listPmoInventoryPeriodsRef.operationName = 'ListPmoInventoryPeriods';
 
 export function listPmoInventoryPeriods(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listPmoInventoryPeriodsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -170,6 +170,80 @@ export function deletePmoInventoryPeriod(dcOrVars, vars) {
   return executeMutation(deletePmoInventoryPeriodRef(dcInstance, inputVars));
 }
 
+export const listStockRequestsRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'ListStockRequests');
+}
+listStockRequestsRef.operationName = 'ListStockRequests';
+
+export function listStockRequests(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(listStockRequestsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+
+export const listOwnStockRequestsRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'ListOwnStockRequests');
+}
+listOwnStockRequestsRef.operationName = 'ListOwnStockRequests';
+
+export function listOwnStockRequests(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(listOwnStockRequestsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+
+export const createStockRequestRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'CreateStockRequest', inputVars);
+}
+createStockRequestRef.operationName = 'CreateStockRequest';
+
+export function createStockRequest(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(createStockRequestRef(dcInstance, inputVars));
+}
+
+export const reviewStockRequestRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'ReviewStockRequest', inputVars);
+}
+reviewStockRequestRef.operationName = 'ReviewStockRequest';
+
+export function reviewStockRequest(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(reviewStockRequestRef(dcInstance, inputVars));
+}
+
+export const cancelOwnStockRequestRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'CancelOwnStockRequest', inputVars);
+}
+cancelOwnStockRequestRef.operationName = 'CancelOwnStockRequest';
+
+export function cancelOwnStockRequest(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(cancelOwnStockRequestRef(dcInstance, inputVars));
+}
+
+export const deleteStockRequestRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'DeleteStockRequest', inputVars);
+}
+deleteStockRequestRef.operationName = 'DeleteStockRequest';
+
+export function deleteStockRequest(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(deleteStockRequestRef(dcInstance, inputVars));
+}
+
 export const listFinishedGoodsRef = (dc) => {
   const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
   dcInstance._useGeneratedSdk();
@@ -178,7 +252,7 @@ export const listFinishedGoodsRef = (dc) => {
 listFinishedGoodsRef.operationName = 'ListFinishedGoods';
 
 export function listFinishedGoods(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listFinishedGoodsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -227,7 +301,7 @@ export const listWipBatchesRef = (dc) => {
 listWipBatchesRef.operationName = 'ListWipBatches';
 
 export function listWipBatches(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listWipBatchesRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -264,7 +338,7 @@ export const listCommitmentsRef = (dc) => {
 listCommitmentsRef.operationName = 'ListCommitments';
 
 export function listCommitments(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listCommitmentsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -301,7 +375,7 @@ export const listSystemAlertsRef = (dc) => {
 listSystemAlertsRef.operationName = 'ListSystemAlerts';
 
 export function listSystemAlerts(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listSystemAlertsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -338,7 +412,7 @@ export const listIsoRatingsRef = (dc) => {
 listIsoRatingsRef.operationName = 'ListIsoRatings';
 
 export function listIsoRatings(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listIsoRatingsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -375,7 +449,7 @@ export const listAuditLogEntriesRef = (dc) => {
 listAuditLogEntriesRef.operationName = 'ListAuditLogEntries';
 
 export function listAuditLogEntries(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listAuditLogEntriesRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -412,7 +486,7 @@ export const listUserProfilesRef = (dc) => {
 listUserProfilesRef.operationName = 'ListUserProfiles';
 
 export function listUserProfiles(dcOrOptions, options) {
-  
+
   const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
   return executeQuery(listUserProfilesRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
 }
@@ -453,3 +527,76 @@ export function deleteUserProfile(dcOrVars, vars) {
   return executeMutation(deleteUserProfileRef(dcInstance, inputVars));
 }
 
+export const getAppBrandingRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'GetAppBranding');
+}
+getAppBrandingRef.operationName = 'GetAppBranding';
+
+export function getAppBranding(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(getAppBrandingRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+
+export const upsertAppBrandingRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'UpsertAppBranding', inputVars);
+}
+upsertAppBrandingRef.operationName = 'UpsertAppBranding';
+
+export function upsertAppBranding(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(upsertAppBrandingRef(dcInstance, inputVars));
+}
+
+export const deleteAppBrandingRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'DeleteAppBranding');
+}
+deleteAppBrandingRef.operationName = 'DeleteAppBranding';
+
+export function deleteAppBranding(dc) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dc, undefined);
+  return executeMutation(deleteAppBrandingRef(dcInstance, inputVars));
+}
+
+export const listWipProductionRecordsRef = (dc) => {
+  const { dc: dcInstance} = validateArgs(connectorConfig, dc, undefined);
+  dcInstance._useGeneratedSdk();
+  return queryRef(dcInstance, 'ListWipProductionRecords');
+}
+listWipProductionRecordsRef.operationName = 'ListWipProductionRecords';
+
+export function listWipProductionRecords(dcOrOptions, options) {
+
+  const { dc: dcInstance, vars: inputVars, options: inputOpts } = validateArgsWithOptions(connectorConfig, dcOrOptions, options, undefined,false, false);
+  return executeQuery(listWipProductionRecordsRef(dcInstance, inputVars), inputOpts && { fetchPolicy: inputOpts.fetchPolicy });
+}
+
+export const upsertWipProductionRecordRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'UpsertWipProductionRecord', inputVars);
+}
+upsertWipProductionRecordRef.operationName = 'UpsertWipProductionRecord';
+
+export function upsertWipProductionRecord(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(upsertWipProductionRecordRef(dcInstance, inputVars));
+}
+
+export const deleteWipProductionRecordRef = (dcOrVars, vars) => {
+  const { dc: dcInstance, vars: inputVars} = validateArgs(connectorConfig, dcOrVars, vars, true);
+  dcInstance._useGeneratedSdk();
+  return mutationRef(dcInstance, 'DeleteWipProductionRecord', inputVars);
+}
+deleteWipProductionRecordRef.operationName = 'DeleteWipProductionRecord';
+
+export function deleteWipProductionRecord(dcOrVars, vars) {
+  const { dc: dcInstance, vars: inputVars } = validateArgs(connectorConfig, dcOrVars, vars, true);
+  return executeMutation(deleteWipProductionRecordRef(dcInstance, inputVars));
+}

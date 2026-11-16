@@ -14,6 +14,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { isAtOrBelowBuffer } from '../utils/inventoryThresholds';
+import { formatIngredientCategory } from '../utils/ingredientCategories';
 
 interface PrintStockReportModalProps {
   type: 'raw_ingredients' | 'cold_storage';
@@ -276,7 +277,7 @@ export const PrintStockReportModal: React.FC<PrintStockReportModalProps> = ({
                           )}
                         </td>
                         <td className="py-2 px-2 border border-slate-300 capitalize text-slate-700">
-                          {ing.category}
+                          {formatIngredientCategory(ing.category)}
                         </td>
                         <td className="py-2 px-2 border border-slate-300 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
                           {ing.currentStock.toLocaleString()} {ing.unit}

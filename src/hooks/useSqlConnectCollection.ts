@@ -26,6 +26,8 @@ interface UseSqlConnectCollectionOptions<T extends { id: string }> {
   onStatus: (entity: SqlConnectEntity, status: SqlCollectionStatus) => void;
   clearRowsBeforeTimestamp?: number;
   removeMatchingRows?: (row: T) => boolean;
+  preserveLocalWhenCloudEmpty?: boolean;
+  backfillMissingRowsOnce?: boolean;
 }
 
 const serializeRows = <T extends { id: string }>(rows: T[]) =>
@@ -66,6 +68,8 @@ export function useSqlConnectCollection<T extends { id: string }>({
   onStatus,
   clearRowsBeforeTimestamp,
   removeMatchingRows,
+  preserveLocalWhenCloudEmpty = true,
+  backfillMissingRowsOnce = false,
 }: UseSqlConnectCollectionOptions<T>) {
   const rowsRef = useRef(rows);
   const syncedRowsRef = useRef<Map<string, string> | null>(null);
@@ -215,6 +219,21 @@ export function useSqlConnectCollection<T extends { id: string }>({
 
     const initialize = async () => {
       const rowsAtStart = serializeRows(rowsRef.current);
+      const backfillKey = `dairysync_sql_connect_${entity}_backfill_v1`;
+      let backfillSourceRows = rowsRef.current;
+      if (canSeed && backfillMissingRowsOnce) {
+        const sourceKey = `${backfillKey}_source`;
+        const savedSource = localStorage.getItem(sourceKey);
+        if (savedSource) {
+          backfillSourceRows = JSON.parse(savedSource) as T[];
+        } else {
+          backfillSourceRows = rowsRef.current.filter(row =>
+            !removeMatchingRows?.(row) &&
+            !(SAMPLE_RECORD_IDS[entity] ?? []).includes(row.id)
+          );
+          localStorage.setItem(sourceKey, JSON.stringify(backfillSourceRows));
+        }
+      }
       if (!online) {
         syncedRowsRef.current = serializeRows(rowsRef.current);
         statusHandlerRef.current(entity, 'offline');
@@ -231,8 +250,10 @@ export function useSqlConnectCollection<T extends { id: string }>({
       }
 
       statusHandlerRef.current(entity, 'syncing');
+      let backfillHasPendingWrites = false;
       try {
         let cloudRows = await removeHistoricalRows(await removeSampleRows(await removeTargetedRows(await adapter.fetch())));
+        let remoteCloudRows = cloudRows;
         cloudRows = await preserveQueuedRows(cloudRows);
         if (!active) return;
 
@@ -262,10 +283,51 @@ export function useSqlConnectCollection<T extends { id: string }>({
               }
             }));
           }
-          cloudRows = await preserveQueuedRows(await removeHistoricalRows(await removeSampleRows(await removeTargetedRows(await adapter.fetch()))));
+          cloudRows = await removeHistoricalRows(await removeSampleRows(await removeTargetedRows(await adapter.fetch())));
+          remoteCloudRows = cloudRows;
+          cloudRows = await preserveQueuedRows(cloudRows);
           if (seedFailed) statusHandlerRef.current(entity, 'offline');
-        } else if (!canSeed && cloudRows.length === 0 && rowsRef.current.length > 0) {
+        } else if (preserveLocalWhenCloudEmpty && !canSeed && cloudRows.length === 0 && rowsRef.current.length > 0) {
           cloudRows = rowsRef.current;
+        }
+
+        if (canSeed && backfillMissingRowsOnce && localStorage.getItem(backfillKey) !== 'complete') {
+          const cloudIds = new Set(remoteCloudRows.map(row => row.id));
+          const missingRows = backfillSourceRows.filter(row =>
+            !cloudIds.has(row.id) &&
+            !removeMatchingRows?.(row) &&
+            !(SAMPLE_RECORD_IDS[entity] ?? []).includes(row.id)
+          );
+          for (let index = 0; index < missingRows.length; index += 10) {
+            await Promise.all(missingRows.slice(index, index + 10).map(async row => {
+              try {
+                await adapter.save(row);
+              } catch (error) {
+                backfillHasPendingWrites = true;
+                await enqueueOfflineAction({
+                  entity,
+                  action: 'SQL_UPSERT',
+                  payload: row,
+                  userEmail,
+                  userUid,
+                });
+                console.warn(`Queued missing ${entity} record for SQL Connect recovery:`, error);
+              }
+            }));
+          }
+
+          if (!backfillHasPendingWrites) {
+            const verifiedCloudRows = await removeHistoricalRows(await removeSampleRows(await removeTargetedRows(await adapter.fetch())));
+            const verifiedIds = new Set(verifiedCloudRows.map(row => row.id));
+            const allSourceRowsRecovered = backfillSourceRows.every(row => verifiedIds.has(row.id));
+            if (allSourceRowsRecovered) {
+              localStorage.setItem(backfillKey, 'complete');
+            } else {
+              backfillHasPendingWrites = true;
+              console.error(`SQL Connect recovery could not verify every source ${entity} record.`);
+            }
+            cloudRows = await preserveQueuedRows(verifiedCloudRows);
+          }
         }
         if (!active) return;
 
@@ -276,7 +338,7 @@ export function useSqlConnectCollection<T extends { id: string }>({
           const withoutLocallyDeletedRows = remoteRows.filter(row => !locallyDeletedIdsRef.current.has(row.id));
           void removeTargetedRows(withoutLocallyDeletedRows).then(persistedRows => removeSampleRows(persistedRows)).then(persistedRows => removeHistoricalRows(persistedRows)).then(persistedRows => preserveQueuedRows(persistedRows)).then(mergedRows => {
             if (!active) return;
-            if (!canSeed && mergedRows.length === 0 && rowsRef.current.length > 0) {
+            if (preserveLocalWhenCloudEmpty && !canSeed && mergedRows.length === 0 && rowsRef.current.length > 0) {
               mergedRows = rowsRef.current;
               syncedRowsRef.current = serializeRows(mergedRows);
               setRows(mergedRows);
@@ -296,7 +358,7 @@ export function useSqlConnectCollection<T extends { id: string }>({
           console.error(`SQL Connect subscription failed for ${entity}:`, error);
           if (active) statusHandlerRef.current(entity, 'offline');
         });
-        statusHandlerRef.current(entity, 'synced');
+        statusHandlerRef.current(entity, backfillHasPendingWrites ? 'offline' : 'synced');
       } catch (error) {
         console.error(`SQL Connect initialization failed for ${entity}:`, error);
         if (active) {
@@ -312,7 +374,7 @@ export function useSqlConnectCollection<T extends { id: string }>({
       stopSubscription();
       syncedRowsRef.current = null;
     };
-  }, [enabled, readEnabled, canSeed, online, adapter, entity, setRows, userEmail, userUid, clearRowsBeforeTimestamp, removeMatchingRows]);
+  }, [enabled, readEnabled, canSeed, online, adapter, entity, setRows, userEmail, userUid, clearRowsBeforeTimestamp, removeMatchingRows, preserveLocalWhenCloudEmpty, backfillMissingRowsOnce]);
 
   useEffect(() => {
     const previous = syncedRowsRef.current;

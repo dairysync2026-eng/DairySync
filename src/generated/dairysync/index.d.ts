@@ -11,9 +11,43 @@ export type DateString = string;
 
 
 
+export interface AppBranding_Key {
+  id: string;
+  __typename?: 'AppBranding_Key';
+}
+
 export interface AuditLogEntry_Key {
   id: string;
   __typename?: 'AuditLogEntry_Key';
+}
+
+export interface CancelOwnStockRequestData {
+  stockRequest_updateMany: number;
+}
+
+export interface CancelOwnStockRequestVariables {
+  id: string;
+}
+
+export interface CreateStockRequestData {
+  stockRequest_insert: StockRequest_Key;
+}
+
+export interface CreateStockRequestVariables {
+  id: string;
+  finishedGoodId: string;
+  finishedGoodName: string;
+  finishedGoodSku: string;
+  quantity: number;
+  unit: string;
+  requestedByName: string;
+  requestedAt: string;
+  neededBy?: string | null;
+  notes?: string | null;
+}
+
+export interface DeleteAppBrandingData {
+  appBranding_delete?: AppBranding_Key | null;
 }
 
 export interface DeleteAuditLogEntryData {
@@ -64,6 +98,14 @@ export interface DeleteRawIngredientVariables {
   id: string;
 }
 
+export interface DeleteStockRequestData {
+  stockRequest_delete?: StockRequest_Key | null;
+}
+
+export interface DeleteStockRequestVariables {
+  id: string;
+}
+
 export interface DeleteStockTransactionData {
   stockTransaction_delete?: StockTransaction_Key | null;
 }
@@ -96,9 +138,23 @@ export interface DeleteWipBatchVariables {
   id: string;
 }
 
+export interface DeleteWipProductionRecordData {
+  wipProductionRecord_delete?: WipProductionRecord_Key | null;
+}
+
+export interface DeleteWipProductionRecordVariables {
+  id: string;
+}
+
 export interface FinishedGood_Key {
   id: string;
   __typename?: 'FinishedGood_Key';
+}
+
+export interface GetAppBrandingData {
+  appBrandings: ({
+    logoDataUrl: string;
+  })[];
 }
 
 export interface IsoEvaluationRating_Key {
@@ -150,6 +206,7 @@ export interface ListFinishedGoodsData {
     category: string;
     currentStock: number;
     unit: string;
+    containerVolumeMl?: number | null;
     coldStorageCapacity: number;
     maxThreshold: number;
     safetyStock: number;
@@ -182,10 +239,33 @@ export interface ListIsoRatingsData {
   } & IsoEvaluationRating_Key)[];
 }
 
+export interface ListOwnStockRequestsData {
+  stockRequests: ({
+    id: string;
+    finishedGoodId: string;
+    finishedGoodName: string;
+    finishedGoodSku: string;
+    quantity: number;
+    unit: string;
+    requestedByEmail: string;
+    requestedByName: string;
+    requestedAt: string;
+    neededBy?: string | null;
+    status: string;
+    notes?: string | null;
+    responseNotes?: string | null;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    fulfilledAt?: string | null;
+    fulfilledQuantity?: number | null;
+  } & StockRequest_Key)[];
+}
+
 export interface ListPmoInventoryPeriodsData {
   pmoInventoryPeriods: ({
     id: string;
     title: string;
+    inventoryType?: string | null;
     sourceFileName: string;
     lines: unknown[];
     createdAt: string;
@@ -215,6 +295,28 @@ export interface ListRawIngredientsData {
     location: string;
     expiryDate?: DateString | null;
   } & RawIngredient_Key)[];
+}
+
+export interface ListStockRequestsData {
+  stockRequests: ({
+    id: string;
+    finishedGoodId: string;
+    finishedGoodName: string;
+    finishedGoodSku: string;
+    quantity: number;
+    unit: string;
+    requestedByEmail: string;
+    requestedByName: string;
+    requestedAt: string;
+    neededBy?: string | null;
+    status: string;
+    notes?: string | null;
+    responseNotes?: string | null;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    fulfilledAt?: string | null;
+    fulfilledQuantity?: number | null;
+  } & StockRequest_Key)[];
 }
 
 export interface ListStockTransactionsData {
@@ -284,6 +386,20 @@ export interface ListWipBatchesData {
   } & WipBatch_Key)[];
 }
 
+export interface ListWipProductionRecordsData {
+  wipProductionRecords: ({
+    id: string;
+    batchId: string;
+    pasteurizationTempC?: number | null;
+    pasteurizationTimeMinutes?: number | null;
+    coolingTempC?: number | null;
+    coolingTimeMinutes?: number | null;
+    yieldPackages: unknown[];
+    bestBeforeDate?: DateString | null;
+    remarks?: string | null;
+  } & WipProductionRecord_Key)[];
+}
+
 export interface PmoInventoryPeriod_Key {
   id: string;
   __typename?: 'PmoInventoryPeriod_Key';
@@ -292,6 +408,19 @@ export interface PmoInventoryPeriod_Key {
 export interface RawIngredient_Key {
   id: string;
   __typename?: 'RawIngredient_Key';
+}
+
+export interface ReviewStockRequestData {
+  stockRequest_updateMany: number;
+}
+
+export interface ReviewStockRequestVariables {
+  id: string;
+  status: string;
+  responseNotes?: string | null;
+  reviewedAt: string;
+  fulfilledAt?: string | null;
+  fulfilledQuantity?: number | null;
 }
 
 export interface SeedAuditLogEntryData {
@@ -365,6 +494,11 @@ export interface SetRetailFinishedGoodStockVariables {
   allocatedRetail: number;
 }
 
+export interface StockRequest_Key {
+  id: string;
+  __typename?: 'StockRequest_Key';
+}
+
 export interface StockTransaction_Key {
   id: string;
   __typename?: 'StockTransaction_Key';
@@ -388,6 +522,7 @@ export interface UpdateFinishedGoodRecipeVariables {
   id: string;
   recipe: unknown[];
   batchUnitQuantity: number;
+  containerVolumeMl?: number | null;
 }
 
 export interface UpdateOwnUserProfileData {
@@ -402,6 +537,14 @@ export interface UpdateOwnUserProfileVariables {
   avatar: string;
   username: string;
   nickname?: string | null;
+}
+
+export interface UpsertAppBrandingData {
+  appBranding_upsert: AppBranding_Key;
+}
+
+export interface UpsertAppBrandingVariables {
+  logoDataUrl: string;
 }
 
 export interface UpsertAuditLogEntryData {
@@ -453,6 +596,7 @@ export interface UpsertFinishedGoodVariables {
   category: string;
   currentStock: number;
   unit: string;
+  containerVolumeMl?: number | null;
   coldStorageCapacity: number;
   maxThreshold: number;
   safetyStock: number;
@@ -491,6 +635,7 @@ export interface UpsertPmoInventoryPeriodData {
 export interface UpsertPmoInventoryPeriodVariables {
   id: string;
   title: string;
+  inventoryType?: string | null;
   sourceFileName: string;
   lines: unknown[];
   createdAt: string;
@@ -597,6 +742,22 @@ export interface UpsertWipBatchVariables {
   coldStorageTemp: string;
 }
 
+export interface UpsertWipProductionRecordData {
+  wipProductionRecord_upsert: WipProductionRecord_Key;
+}
+
+export interface UpsertWipProductionRecordVariables {
+  id: string;
+  batchId: string;
+  pasteurizationTempC?: number | null;
+  pasteurizationTimeMinutes?: number | null;
+  coolingTempC?: number | null;
+  coolingTimeMinutes?: number | null;
+  yieldPackages: unknown[];
+  bestBeforeDate?: DateString | null;
+  remarks?: string | null;
+}
+
 export interface UserProfile_Key {
   id: string;
   __typename?: 'UserProfile_Key';
@@ -605,6 +766,11 @@ export interface UserProfile_Key {
 export interface WipBatch_Key {
   id: string;
   __typename?: 'WipBatch_Key';
+}
+
+export interface WipProductionRecord_Key {
+  id: string;
+  __typename?: 'WipProductionRecord_Key';
 }
 
 interface SeedStockTransactionRef {
@@ -762,6 +928,78 @@ export const deletePmoInventoryPeriodRef: DeletePmoInventoryPeriodRef;
 
 export function deletePmoInventoryPeriod(vars: DeletePmoInventoryPeriodVariables): MutationPromise<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
 export function deletePmoInventoryPeriod(dc: DataConnect, vars: DeletePmoInventoryPeriodVariables): MutationPromise<DeletePmoInventoryPeriodData, DeletePmoInventoryPeriodVariables>;
+
+interface ListStockRequestsRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListStockRequestsData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): QueryRef<ListStockRequestsData, undefined>;
+  operationName: string;
+}
+export const listStockRequestsRef: ListStockRequestsRef;
+
+export function listStockRequests(options?: ExecuteQueryOptions): QueryPromise<ListStockRequestsData, undefined>;
+export function listStockRequests(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListStockRequestsData, undefined>;
+
+interface ListOwnStockRequestsRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListOwnStockRequestsData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): QueryRef<ListOwnStockRequestsData, undefined>;
+  operationName: string;
+}
+export const listOwnStockRequestsRef: ListOwnStockRequestsRef;
+
+export function listOwnStockRequests(options?: ExecuteQueryOptions): QueryPromise<ListOwnStockRequestsData, undefined>;
+export function listOwnStockRequests(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListOwnStockRequestsData, undefined>;
+
+interface CreateStockRequestRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateStockRequestVariables): MutationRef<CreateStockRequestData, CreateStockRequestVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CreateStockRequestVariables): MutationRef<CreateStockRequestData, CreateStockRequestVariables>;
+  operationName: string;
+}
+export const createStockRequestRef: CreateStockRequestRef;
+
+export function createStockRequest(vars: CreateStockRequestVariables): MutationPromise<CreateStockRequestData, CreateStockRequestVariables>;
+export function createStockRequest(dc: DataConnect, vars: CreateStockRequestVariables): MutationPromise<CreateStockRequestData, CreateStockRequestVariables>;
+
+interface ReviewStockRequestRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ReviewStockRequestVariables): MutationRef<ReviewStockRequestData, ReviewStockRequestVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: ReviewStockRequestVariables): MutationRef<ReviewStockRequestData, ReviewStockRequestVariables>;
+  operationName: string;
+}
+export const reviewStockRequestRef: ReviewStockRequestRef;
+
+export function reviewStockRequest(vars: ReviewStockRequestVariables): MutationPromise<ReviewStockRequestData, ReviewStockRequestVariables>;
+export function reviewStockRequest(dc: DataConnect, vars: ReviewStockRequestVariables): MutationPromise<ReviewStockRequestData, ReviewStockRequestVariables>;
+
+interface CancelOwnStockRequestRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CancelOwnStockRequestVariables): MutationRef<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CancelOwnStockRequestVariables): MutationRef<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+  operationName: string;
+}
+export const cancelOwnStockRequestRef: CancelOwnStockRequestRef;
+
+export function cancelOwnStockRequest(vars: CancelOwnStockRequestVariables): MutationPromise<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+export function cancelOwnStockRequest(dc: DataConnect, vars: CancelOwnStockRequestVariables): MutationPromise<CancelOwnStockRequestData, CancelOwnStockRequestVariables>;
+
+interface DeleteStockRequestRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeleteStockRequestVariables): MutationRef<DeleteStockRequestData, DeleteStockRequestVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: DeleteStockRequestVariables): MutationRef<DeleteStockRequestData, DeleteStockRequestVariables>;
+  operationName: string;
+}
+export const deleteStockRequestRef: DeleteStockRequestRef;
+
+export function deleteStockRequest(vars: DeleteStockRequestVariables): MutationPromise<DeleteStockRequestData, DeleteStockRequestVariables>;
+export function deleteStockRequest(dc: DataConnect, vars: DeleteStockRequestVariables): MutationPromise<DeleteStockRequestData, DeleteStockRequestVariables>;
 
 interface ListFinishedGoodsRef {
   /* Allow users to create refs without passing in DataConnect */
@@ -1038,4 +1276,76 @@ export const deleteUserProfileRef: DeleteUserProfileRef;
 
 export function deleteUserProfile(vars: DeleteUserProfileVariables): MutationPromise<DeleteUserProfileData, DeleteUserProfileVariables>;
 export function deleteUserProfile(dc: DataConnect, vars: DeleteUserProfileVariables): MutationPromise<DeleteUserProfileData, DeleteUserProfileVariables>;
+
+interface GetAppBrandingRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<GetAppBrandingData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): QueryRef<GetAppBrandingData, undefined>;
+  operationName: string;
+}
+export const getAppBrandingRef: GetAppBrandingRef;
+
+export function getAppBranding(options?: ExecuteQueryOptions): QueryPromise<GetAppBrandingData, undefined>;
+export function getAppBranding(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<GetAppBrandingData, undefined>;
+
+interface UpsertAppBrandingRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertAppBrandingVariables): MutationRef<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpsertAppBrandingVariables): MutationRef<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+  operationName: string;
+}
+export const upsertAppBrandingRef: UpsertAppBrandingRef;
+
+export function upsertAppBranding(vars: UpsertAppBrandingVariables): MutationPromise<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+export function upsertAppBranding(dc: DataConnect, vars: UpsertAppBrandingVariables): MutationPromise<UpsertAppBrandingData, UpsertAppBrandingVariables>;
+
+interface DeleteAppBrandingRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): MutationRef<DeleteAppBrandingData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): MutationRef<DeleteAppBrandingData, undefined>;
+  operationName: string;
+}
+export const deleteAppBrandingRef: DeleteAppBrandingRef;
+
+export function deleteAppBranding(): MutationPromise<DeleteAppBrandingData, undefined>;
+export function deleteAppBranding(dc: DataConnect): MutationPromise<DeleteAppBrandingData, undefined>;
+
+interface ListWipProductionRecordsRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<ListWipProductionRecordsData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): QueryRef<ListWipProductionRecordsData, undefined>;
+  operationName: string;
+}
+export const listWipProductionRecordsRef: ListWipProductionRecordsRef;
+
+export function listWipProductionRecords(options?: ExecuteQueryOptions): QueryPromise<ListWipProductionRecordsData, undefined>;
+export function listWipProductionRecords(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<ListWipProductionRecordsData, undefined>;
+
+interface UpsertWipProductionRecordRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertWipProductionRecordVariables): MutationRef<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpsertWipProductionRecordVariables): MutationRef<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+  operationName: string;
+}
+export const upsertWipProductionRecordRef: UpsertWipProductionRecordRef;
+
+export function upsertWipProductionRecord(vars: UpsertWipProductionRecordVariables): MutationPromise<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+export function upsertWipProductionRecord(dc: DataConnect, vars: UpsertWipProductionRecordVariables): MutationPromise<UpsertWipProductionRecordData, UpsertWipProductionRecordVariables>;
+
+interface DeleteWipProductionRecordRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeleteWipProductionRecordVariables): MutationRef<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: DeleteWipProductionRecordVariables): MutationRef<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
+  operationName: string;
+}
+export const deleteWipProductionRecordRef: DeleteWipProductionRecordRef;
+
+export function deleteWipProductionRecord(vars: DeleteWipProductionRecordVariables): MutationPromise<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
+export function deleteWipProductionRecord(dc: DataConnect, vars: DeleteWipProductionRecordVariables): MutationPromise<DeleteWipProductionRecordData, DeleteWipProductionRecordVariables>;
 

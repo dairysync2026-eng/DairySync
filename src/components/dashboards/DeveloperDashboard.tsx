@@ -17,8 +17,6 @@ import {
   Truck, 
   ShoppingCart, 
   Users,
-  Code2,
-  FileText,
   UserCheck,
   X,
   UserCog,
@@ -32,14 +30,10 @@ import { isAtOrBelowBuffer } from '../../utils/inventoryThresholds';
 
 interface SubsystemDashboardProps {
   onNavigateTab: (tab: string) => void;
-  onOpenIsoSurvey?: () => void;
-  onOpenReports?: () => void;
 }
 
 export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({ 
-  onNavigateTab, 
-  onOpenIsoSurvey,
-  onOpenReports
+  onNavigateTab
 }) => {
   const { 
     ingredients, 
@@ -52,7 +46,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     currentUser,
     currentRole,
     loginAsRoleUser,
-    addUserProfile,
+    createManagedUser,
     updateUserProfile
   } = useDairySync();
 
@@ -76,6 +70,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
   });
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusIsError, setStatusIsError] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   const handleStartEditUser = (u: UserProfile) => {
     setShowAddUserForm(false);
@@ -111,25 +106,33 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
     }
   };
 
-  const handleAddUserProfile = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddUserProfile = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const result = addUserProfile({
-      ...newUserForm,
-      avatar: users[0]?.avatar || '',
-    });
-    setStatusMessage(result.message);
-    setStatusIsError(!result.success);
-    if (!result.success) return;
+    setIsCreatingUser(true);
+    try {
+      const result = await createManagedUser({
+        ...newUserForm,
+        avatar: users[0]?.avatar || '',
+      });
+      setStatusMessage(result.message);
+      setStatusIsError(!result.success);
+      if (!result.success) return;
 
-    setNewUserForm({
-      name: '',
-      email: '',
-      username: '',
-      role: 'production_staff',
-      title: '',
-      department: ''
-    });
-    setShowAddUserForm(false);
+      setNewUserForm({
+        name: '',
+        email: '',
+        username: '',
+        role: 'production_staff',
+        title: '',
+        department: ''
+      });
+      setShowAddUserForm(false);
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : 'The staff account could not be created.');
+      setStatusIsError(true);
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const totalRawValuation = ingredients.reduce((sum, i) => sum + (i.currentStock * i.costPerUnit), 0);
@@ -230,15 +233,6 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            onClick={onOpenReports}
-            className="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-2xl border border-slate-700 transition-all"
-          >
-            <FileText className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Reports</span>
-          </button>
-        </div>
       </div>
 
       <div className="bg-white border-2 border-indigo-100 rounded-3xl p-5 shadow-sm space-y-3">
@@ -318,7 +312,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
       </div>
 
       {/* System KPIs Bento */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         
         {/* Total Inventory Valuation */}
         <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
@@ -345,7 +339,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
             </div>
           </div>
           <div className="mt-4">
-            <span className="text-2xl font-black text-slate-900 font-mono">{users.length} Accounts</span>
+            <span className="text-2xl font-black text-slate-900 font-mono">{users.length} Staff Profiles</span>
             <p className="text-xs text-slate-500 mt-1 font-medium">
               Lead Dev Master Clearance Active
             </p>
@@ -354,7 +348,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
               className="mt-3 w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 shadow-sm"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Manage All Account Users</span>
+              <span>Manage Staff Profiles</span>
             </button>
           </div>
         </div>
@@ -372,25 +366,6 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
             <p className="text-xs text-slate-500 mt-1 font-medium">
               Local Storage Key: dairysync_pcc_mmsu_state_v1
             </p>
-          </div>
-        </div>
-
-        {/* ISO 25010 Benchmark */}
-        <div className="bg-white border-2 border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">Software Quality</span>
-            <div className="p-2.5 bg-purple-50 border border-purple-100 rounded-2xl text-purple-600">
-              <Code2 className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <span className="text-2xl font-black text-purple-700 font-mono">4.85 / 5.0</span>
-            <button
-              onClick={onOpenIsoSurvey}
-              className="mt-1 text-xs font-bold text-purple-700 hover:text-purple-900 block"
-            >
-              Open ISO 25010 Evaluator →
-            </button>
           </div>
         </div>
 
@@ -494,25 +469,26 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
               <div className="flex justify-end">
                 <button
                   type="button"
+                  disabled={isCreatingUser}
                   onClick={() => {
                     setShowAddUserForm(open => !open);
                     setEditingUser(null);
                     setStatusMessage(null);
                     setStatusIsError(false);
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4" />
-                  {showAddUserForm ? 'Cancel Add User' : 'Add Staff Profile'}
+                  {showAddUserForm ? 'Cancel Add User' : 'Create Staff Account'}
                 </button>
               </div>
 
               {showAddUserForm && (
                 <form onSubmit={handleAddUserProfile} className="space-y-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5">
                   <div>
-                    <h4 className="text-sm font-extrabold text-slate-900">Register staff profile</h4>
+                    <h4 className="text-sm font-extrabold text-slate-900">Create staff account</h4>
                     <p className="mt-1 text-xs text-slate-600">
-                      Use the same email as the Firebase Authentication account. Multiple staff can share a role, but each needs a unique email and username.
+                      Creates the Firebase Authentication account and staff profile, then sends a password setup email.
                     </p>
                   </div>
                   <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
@@ -552,6 +528,7 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                         className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-medium focus:border-indigo-500 focus:outline-none"
                       >
                         <option value="developer">Developer</option>
+                        <option value="system_admin">System Administrator</option>
                         <option value="director">Director</option>
                         <option value="procurement">Procurement</option>
                         <option value="plant_manager">Plant Manager</option>
@@ -581,9 +558,10 @@ export const DeveloperDashboard: React.FC<SubsystemDashboardProps> = ({
                   <div className="flex justify-end">
                     <button
                       type="submit"
-                      className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700"
+                      disabled={isCreatingUser}
+                      className="rounded-xl bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
                     >
-                      Save Staff Profile
+                      {isCreatingUser ? 'Creating Account...' : 'Create Account & Send Setup Email'}
                     </button>
                   </div>
                 </form>
